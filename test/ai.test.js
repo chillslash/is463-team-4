@@ -31,3 +31,14 @@ test('assessment parser rejects invented partner ids and accepts only bounded pr
  const out=validateAssessment({assessments:[{id:'p1',priority:'high',reason:'Potential',check:'Ask'}, {id:'invented',priority:'high',reason:'Fabricated'}, {id:'p2',priority:'extreme',reason:'Not allowed'}]},['p1','p2']);
  assert.equal(out.length,1);assert.equal(out[0].id,'p1');
 });
+test('CODEX_PATH overrides PATH only for Codex, without hardcoded machine fallbacks',()=>{
+ const custom='C:/Program Files/OpenAI/Codex/codex.exe';
+ const a=cliInvocation('codex','win32',{CODEX_PATH:custom,ComSpec:'cmd.exe'});
+ assert.equal(a.command,custom);assert.deepEqual(a.args.slice(0,2),['exec','--ephemeral']);
+ const b=cliInvocation('codex','win32',{ComSpec:'cmd.exe'});
+ assert.equal(b.command,'cmd.exe');assert.deepEqual(b.args.slice(0,4),['/d','/s','/c','codex']);
+ const c=cliInvocation('claude','win32',{CODEX_PATH:custom,ComSpec:'cmd.exe'});
+ assert.equal(c.command,'cmd.exe');assert.equal(c.args[3],'claude');
+ assert.equal(cliInvocation('codex','linux',{CODEX_PATH:'/opt/custom/codex'}).command,'/opt/custom/codex');
+ assert.throws(()=>cliInvocation('codex','win32',{CODEX_PATH:'relative/codex.exe'}),/absolute/);
+});

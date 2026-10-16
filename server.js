@@ -1,6 +1,7 @@
 import {createServer} from 'node:http';
 import {readFile, writeFile, rename, mkdir, stat} from 'node:fs/promises';
 import {existsSync} from 'node:fs';
+import {loadEnvFile} from 'node:process';
 import {join, resolve, extname} from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {initialState, numbers, rankPartners, osmCandidates, nparksCandidates, draftTemplate, STATUSES} from './src/core.js';
@@ -8,6 +9,9 @@ import {AI_PROVIDERS,generateJSON,validateDraft,validateAssessment} from './src/
 import {discoverAll} from './src/discovery.js';
 
 const ROOT=process.cwd();
+// Optional per-member configuration, kept outside Git. Existing OS environment variables take precedence.
+const localConfig=join(ROOT,'.env');
+if(existsSync(localConfig))loadEnvFile(localConfig);
 const DB_PATH=process.env.DATA_FILE || join(ROOT,'data','state.json');
 const PORT=Number(process.env.PORT || 4173);
 const ROUTES={'/':'this_week','/this-week':'this_week','/find-partners':'find_partners','/outreach':'outreach_draft','/pipeline':'pipeline','/log-handover':'log_handover'};

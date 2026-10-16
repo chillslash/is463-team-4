@@ -4,7 +4,7 @@ Working IS463 Group Project prototype based on the five-screen **Google Stitch e
 
 ## Quick start
 
-Requirements: **Node.js 20+**. No npm installation or database server required.
+Requirements: **Node.js 20.12+**. No npm installation or database server required.
 
 ```powershell
 cd C:\Users\ryano\Documents\Projects\is463-group-project
@@ -60,6 +60,8 @@ Keep credentials in environment variables, not Git. No remote GitHub repository 
 The app runs locally. Each teammate independently installs and signs into either the **Codex CLI** (ChatGPT account) or **Claude Code CLI** (Claude account), then chooses that provider using **AI settings** in the UI. The choice is saved in local `data/state.json` (gitignored). It is used for both **Assess with AI** on discovered candidates and **Generate draft** on Outreach. Selection `No AI` uses an explicit rule-based email and disables AI candidate assessment.
 
 - Codex: Install `@openai/codex`, run `codex login`, then check `codex exec --help`.
+- If Codex is not on PATH (e.g. installed under a user-specific folder), create a **local Git-ignored `.env`** file containing `CODEX_PATH=C:\path\to\codex.exe`. The executable path must be absolute. OS-level `CODEX_PATH` takes precedence. This setting is optional: group members with Codex on PATH do nothing.
+- `.env` is loaded on server startup; keep it local and never commit API keys or account credentials.
 - Claude: Install the official Claude Code CLI, run `claude` and authenticate, then check `claude --help`.
 - Launch `npm start` under the **same operating-system user** who authenticated that CLI.
 - CLI entitlements and usage limits depend on each teammate's plan. App subscriptions do not give third-party API keys. API billing/keys are not required for this **local CLI** integration.

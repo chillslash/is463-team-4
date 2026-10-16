@@ -1,14 +1,23 @@
 import {spawn} from 'node:child_process';
+import {isAbsolute as isWinAbsolute} from 'node:path/win32';
+import {isAbsolute as isPosixAbsolute} from 'node:path/posix';
 
 export const AI_PROVIDERS = ['template', 'codex', 'claude'];
 const LIMIT = 120000;
-export function cliInvocation(provider, platform = process.platform) {
+export function cliInvocation(provider, platform = process.platform, env = process.env) {
   if (!['codex', 'claude'].includes(provider)) throw new Error('Choose Codex or Claude in AI settings');
   const args = provider === 'codex'
     ? ['exec', '--ephemeral', '--sandbox', 'read-only', '--skip-git-repo-check', '-']
     : ['-p', '--output-format', 'json', '--max-turns', '1', '--no-session-persistence', '--tools', '', '--disallowedTools', 'mcp__*'];
+  // A teammate may explicitly override Codex's location; otherwise use the normal PATH lookup.
+  const codexPath = provider === 'codex' ? env.CODEX_PATH?.trim() : null;
+  if (codexPath) {
+    const isAbsolute = platform === 'win32' ? isWinAbsolute : isPosixAbsolute;
+    if (!isAbsolute(codexPath)) throw new Error('CODEX_PATH must be an absolute path to the Codex executable');
+    return {command: codexPath, args};
+  }
   return platform === 'win32'
-    ? {command: process.env.ComSpec || 'cmd.exe', args: ['/d', '/s', '/c', provider, ...args]}
+    ? {command: env.ComSpec || 'cmd.exe', args: ['/d', '/s', '/c', provider, ...args]}
     : {command: provider, args};
 }
 export function parseAIJSON(text, provider) {

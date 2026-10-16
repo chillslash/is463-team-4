@@ -4,6 +4,12 @@
   "private": true,
   "type": "module",
   "description": "CoffeeBot Circularity Copilot — working IS463 demonstration",
-  "scripts": {"start":"node server.js", "dev":"node --watch server.js", "test":"node --test"},
-  "engines": {"node":">=20"}
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20.12"
+  }
 }
