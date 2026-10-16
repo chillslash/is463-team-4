@@ -1,7 +1,7 @@
 export const STATUSES = ['suggested', 'contacted', 'interested', 'trial', 'regular', 'closed'];
-export const DEFAULT_SETTINGS = { cupsPerWeek: 9100, gramsPerCup: 20, referenceLat: 1.3000, referenceLon: 103.8500, referenceLabel: 'Singapore city centre (demo reference)', reportingCollectedKg: null, reportingDiscardedKg: null, aiProvider: 'template' };
+export const DEFAULT_SETTINGS = { cupsPerWeek: 9100, gramsPerCup: 20, referenceLat: 1.3275, referenceLon: 103.8723, referenceLabel: 'CoffeeBot HQ, 8 Lor Bakar Batu, #05-01, Singapore 348743 (approximate coordinates)', reportingCollectedKg: null, reportingDiscardedKg: null, aiProvider: 'template' };
 const demo = (id, name, category, status, capacityKg = null, extra = {}) => ({
-  id, name, category, status, capacityKg, fee: 'unknown', willingness: status === 'regular' ? 'confirmed (demo)' : 'unknown',
+  id, name, category, status, capacityKg, willingness: status === 'regular' ? 'confirmed (demo)' : 'unknown',
   verified: status === 'regular', confirmed: status === 'regular', use: 'Potential soil and compost applications',
   frequency: status === 'regular' ? 'weekly (demo)' : 'unknown', source: 'Fictional Stitch scenario', sourceUrl: '',
   location: 'Singapore (demo)', distanceKm: null, contactName: '', contactEmail: '', notes: '', evidence: '', ...extra
@@ -15,9 +15,9 @@ export const initialState = () => ({
     demo('p4','CitySoil Community Composting','community garden','trial',10,{ use: 'Community composting', notes: 'Illustrative lead; no actual acceptance verified' }),
     demo('p5','SporeWorks Mushroom Farm','urban farm','contacted',null,{ use: 'Potential growing substrate research' }),
     demo('p6','Northside Primary School Garden','school garden','contacted',null,{ use: 'School gardening programme' }),
-    demo('p7','LoopMaterials Studio','business','suggested',null,{ use: 'Potential recycled material experiments' })
+    demo('p7','LoopMaterials Studio','business','interested',null,{ use: 'Potential recycled material experiments' })
   ],
-  handovers: [], outreach: []
+  handovers: [], outreach: [], discoveryRuns: []
 });
 export function numbers(settings, partners, handovers) {
   const forecastKg = round(Number(settings.cupsPerWeek) * Number(settings.gramsPerCup) / 1000);
@@ -37,14 +37,15 @@ export function scorePartner(p, gap) {
   if (/garden|park|farm|compost|nursery|horticulture|zoo/.test(category+' '+use)) {score+=38;reasons.push('Plausible horticultural or composting use');}
   else {score+=12;reasons.push('Possible reuse application; verify intended use');}
   if (/community garden|urban farm|nursery|allotment/.test(category)) {score+=12; reasons.push('Growing site has a potentially relevant activity (not confirmed acceptance)');}
-  if (p.fee === 'none') {score+=22;reasons.push('No acceptance fee reported');}
-  else if(p.fee === 'paid') {score-=25;checks.push('Review acceptance fee and total logistics cost');}
-  else checks.push('Confirm whether acceptance incurs a fee');
+
   if (p.verified) {score+=20; reasons.push('Details staff-verified');} else checks.push('Confirm organisation interest and authorised contact');
   if (Number.isFinite(Number(p.capacityKg)) && p.capacityKg !== null && Number(p.capacityKg) > 0){score+=Math.min(15,10+Number(p.capacityKg)/Math.max(1,gap)*5); reasons.push(`Recorded capacity ${p.capacityKg} kg/week`);}
   else checks.push('Confirm weekly capacity and frequency');
   if(Number.isFinite(Number(p.distanceKm)) && p.distanceKm !== null){score+=Math.max(0,12-Number(p.distanceKm)); reasons.push(`Approximately ${p.distanceKm} km from reference point`);}
   else checks.push('Check collection route and distance');
+  if(p.aiAssessment?.priority==='high'){score+=14; reasons.push('AI identified a plausible use; staff verification needed');}
+  else if(p.aiAssessment?.priority==='medium'){score+=6;}
+  else if(p.aiAssessment?.priority==='low'){score-=9;}
   if(p.status==='closed') score-=100;
   return { score:Math.round(score), reasons, checks };
 }
@@ -65,7 +66,7 @@ export function osmCandidates(elements, reference) {
     const cat=tags.leisure==='park'?'park':tags.leisure==='garden'?'garden':tags.tourism==='zoo'?'zoo':tags.landuse==='allotments'?'allotments':tags.landuse==='farmland'?'farmland':tags.shop==='garden_centre'?'garden_centre':tags.shop==='nursery'?'nursery':'garden';
     seen.add(name.toLowerCase());
     const sourceUrl=`https://www.openstreetmap.org/${e.type}/${e.id}`;
-    result.push({id:`osm-${e.type}-${e.id}`,name,category:typeNames[cat]||cat,status:'suggested',capacityKg:null,fee:'unknown',willingness:'unknown',verified:false,confirmed:false,frequency:'unknown',use:`Potential horticulture/composting application (${typeNames[cat]||cat}; not validated)`,source:'OpenStreetMap live discovery',sourceUrl,location:tags['addr:street']||tags['addr:suburb']||'Singapore',lat,lon,distanceKm:distanceKm(reference.referenceLat,reference.referenceLon,lat,lon),contactName:'',contactEmail:'',notes:'Site identified from place data; authority to approve acceptance, fees and capacity are unknown',evidence:''});
+    result.push({id:`osm-${e.type}-${e.id}`,name,category:typeNames[cat]||cat,status:'suggested',capacityKg:null,willingness:'unknown',verified:false,confirmed:false,frequency:'unknown',use:`Potential horticulture/composting application (${typeNames[cat]||cat}; not validated)`,source:'OpenStreetMap live discovery',sourceUrl,location:tags['addr:street']||tags['addr:suburb']||'Singapore',lat,lon,distanceKm:distanceKm(reference.referenceLat,reference.referenceLon,lat,lon),contactName:'',contactEmail:'',notes:'Site identified from place data; authority to approve acceptance, fees and capacity are unknown',evidence:''});
     if(result.length>=60)break;
   }
   return result;
@@ -74,7 +75,7 @@ export function draftTemplate(p, kg) {
   const trial=Math.min(10,Math.max(1,Math.round(kg||10)));
   const hello=p.contactName?`Dear ${p.contactName},`:'Hello,';
   return {subject:`CoffeeBot — exploring a small spent coffee grounds reuse trial with ${p.name}`,
-   body:`${hello}\n\nI'm reaching out from CoffeeBot about a possible collaboration with ${p.name}. We collect spent coffee grounds from our coffee machines and are looking for regular partners who may be able to put them to good use.\n\nWe understand your organisation may be involved in ${p.category}. Would spent coffee grounds be relevant to your activities? Our grounds are collected, sun-dried at our headquarters and stored; moisture content has not been measured. We would first like to confirm your requirements and whether this material would be appropriate for your intended use.\n\nIf there is interest, would you consider discussing a small trial of up to ${trial} kg? We would appreciate knowing what quantity and schedule might work, who could approve such an arrangement, whether there are any acceptance fees, and what handling or collection arrangements you require.\n\nThank you for considering this. We would be happy to discuss the details.\n\nBest regards,\nCoffeeBot Partnerships`,
+   body:`${hello}\n\nI'm reaching out from CoffeeBot about a possible collaboration with ${p.name}. We collect spent coffee grounds from our coffee machines and are looking for regular partners who may be able to put them to good use.\n\nWe understand your organisation may be involved in ${p.category}. Would spent coffee grounds be relevant to your activities? Our grounds are collected, sun-dried at our headquarters and stored; moisture content has not been measured. We would first like to confirm your requirements and whether this material would be appropriate for your intended use.\n\nIf there is interest, would you consider discussing a small trial of up to ${trial} kg? We would appreciate knowing what quantity and schedule might work, who could approve such an arrangement, what handling or collection arrangements you require.\n\nThank you for considering this. We would be happy to discuss the details.\n\nBest regards,\nCoffeeBot Partnerships`,
   guide:`Potential use: ${p.use || 'To be discussed with the organisation'}.\nCoffeeBot currently sun-dries grounds; moisture content is not measured. Store and handle according to recipient requirements. Confirm suitability with the recipient before application. Do not claim agronomic or food-safety benefits without evidence. Ask for feedback on amount accepted, intended use and whether the grounds were ultimately reused.`, mode:'Template fallback (no AI selected)'};
 }
 
@@ -86,7 +87,7 @@ export function nparksCandidates(featureCollection, reference) {
     if(feature.geometry?.type!=='Point'||!Array.isArray(coords)||coords.length<2)return null;
     const [lon,lat]=coords;const name=String(props.NAME||'').trim();
     if(!name||!Number.isFinite(lat)||!Number.isFinite(lon))return null;
-    return {id:`nparks-${props.OBJECTID??name.toLowerCase().replace(/[^a-z0-9]/g,'-')}`,name,category:'public park',status:'suggested',capacityKg:null,fee:'unknown',willingness:'unknown',verified:false,confirmed:false,frequency:'unknown',use:'Potential park horticulture / composting needs (not validated)',source:'NParks Parks open dataset (data.gov.sg)',sourceUrl:'https://data.gov.sg/datasets/d_0542d48f0991541706b58059381a6eca/view',location:'Singapore · NParks-managed site',lat,lon,distanceKm:distanceKm(reference.referenceLat,reference.referenceLon,lat,lon),contactName:'',contactEmail:'',notes:'This is an NParks-managed physical site, NOT an organisation confirmed to accept grounds. Staff must identify its authorised decision-maker and verify any reuse agreement.',evidence:''};
+    return {id:`nparks-${props.OBJECTID??name.toLowerCase().replace(/[^a-z0-9]/g,'-')}`,name,category:'public park',status:'suggested',capacityKg:null,willingness:'unknown',verified:false,confirmed:false,frequency:'unknown',use:'Potential park horticulture / composting needs (not validated)',source:'NParks Parks open dataset (data.gov.sg)',sourceUrl:'https://data.gov.sg/datasets/d_0542d48f0991541706b58059381a6eca/view',location:'Singapore · NParks-managed site',lat,lon,distanceKm:distanceKm(reference.referenceLat,reference.referenceLon,lat,lon),contactName:'',contactEmail:'',notes:'This is an NParks-managed physical site, NOT an organisation confirmed to accept grounds. Staff must identify its authorised decision-maker and verify any reuse agreement.',evidence:''};
   }).filter(Boolean).filter(p=>/\b(PARK|GARDEN|NATURE|RESERVE|BOTANIC)\b/i.test(p.name)).sort((a,b)=>a.distanceKm-b.distanceKm).slice(0,35);
 }
 
@@ -98,6 +99,6 @@ export function cibCandidates(featureCollection, reference) {
   const [lon,lat]=feature.geometry.coordinates||[];const props=feature.properties||{};
   const name=String(props.GARDEN_NAME||'').trim();
   if(!name||!Number.isFinite(lon)||!Number.isFinite(lat))return null;
-  return {id:'cib-'+(props.GARDENID??props.OBJECTID??name.toLowerCase().replace(/[^a-z0-9]/g,'-')),name,category:'community garden',status:'suggested',capacityKg:null,fee:'unknown',willingness:'unknown',verified:false,confirmed:false,frequency:'unknown',use:'Registered community growing programme; possible soil/composting use (not verified)',source:'NParks Community in Bloom open dataset (data.gov.sg)',sourceUrl:'https://data.gov.sg/datasets/d_f91a8b057cfb2bebf2e531ad8061e1c1/view',location:'Singapore · registered Community in Bloom location',lat,lon,distanceKm:distanceKm(reference.referenceLat,reference.referenceLon,lat,lon),contactName:'',contactEmail:'',notes:'CIB registration locates a growing community, not a commitment to accept grounds. Contact organisers and confirm permission, materials, fees and quantities.',evidence:''};
+  return {id:'cib-'+(props.GARDENID??props.OBJECTID??name.toLowerCase().replace(/[^a-z0-9]/g,'-')),name,category:/school|primary|secondary|junior college|polytechnic|university|institute of technical education/i.test(name)?'school garden':'community garden',status:'suggested',capacityKg:null,willingness:'unknown',verified:false,confirmed:false,frequency:'unknown',use:'Registered community growing programme; possible soil/composting use (not verified)',source:'NParks Community in Bloom open dataset (data.gov.sg)',sourceUrl:'https://data.gov.sg/datasets/d_f91a8b057cfb2bebf2e531ad8061e1c1/view',location:'Singapore · registered Community in Bloom location',lat,lon,distanceKm:distanceKm(reference.referenceLat,reference.referenceLon,lat,lon),contactName:'',contactEmail:'',notes:'CIB registration locates a growing community, not a commitment to accept grounds. Contact organisers and confirm permission, materials, fees and quantities.',evidence:''};
  }).filter(Boolean).sort((a,b)=>a.distanceKm-b.distanceKm).slice(0,70);
 }

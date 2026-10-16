@@ -9,19 +9,19 @@ test('community garden records are unverified leads and rank ahead of generic pa
  const results=cibCandidates({features:[geo('Example CIB Group',{GARDENID:12})]},ref);
  assert.equal(results.length,1);
  const p=results[0]; assert.equal(p.id,'cib-12');assert.equal(p.capacityKg,null);
- assert.equal(p.verified,false);assert.equal(p.fee,'unknown');assert.equal(p.confirmed,false);
+ assert.equal(p.verified,false);assert.equal(p.fee,undefined);assert.equal(p.confirmed,false);
  assert.ok(scorePartner(p,42).score>scorePartner({...p,category:'public park'},42).score);
 });
 test('independent data sources merge even when OpenStreetMap is unavailable',async()=>{
  const get=async (url)=>{
   if(url.includes('poll-download')){const id=url.split('/')[7];return {ok:true,json:async()=>({code:0,data:{url:'https://s3.ap-southeast-1.amazonaws.com/'+id}})};}
-  if(url.includes('amazonaws.com')){const cib=url.includes('d_f91');return {ok:true,json:async()=>cib?{features:[geo('Demo CIB Garden',{GARDENID:5})]}:{features:[{geometry:{type:'Point',coordinates:[103.86,1.35]},properties:{NAME:'Demo Park',OBJECTID:6}}]}};}
+  if(url.includes('amazonaws.com')){const cib=url.includes('d_f91');const item=cib?{features:[geo('Demo CIB Garden',{GARDENID:5})]}:{features:[{geometry:{type:'Point',coordinates:[103.86,1.35]},properties:{NAME:'Demo Park',OBJECTID:6}}]};return {ok:true,json:async()=>item,text:async()=>JSON.stringify(item)};}
   return {ok:false,status:502};
  };
  const r=await discoverAll(ref,{httpFetch:get});
  assert.equal(r.sources.length,2);
  assert.equal(r.candidates.length,2);
- assert.equal(r.warnings.length,1);
+ assert.equal(r.warnings.length,2);
  assert.ok(r.candidates.some(p=>p.source.includes('Community in Bloom')));
  assert.ok(r.candidates.every(p=>!p.confirmed));
 });

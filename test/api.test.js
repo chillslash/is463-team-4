@@ -6,6 +6,7 @@ import {join} from 'node:path';
 import {once} from 'node:events';
 const tmp=await mkdtemp(join(tmpdir(),'coffee-copilot-test-'));
 process.env.DATA_FILE=join(tmp,'state.json');
+process.env.AI_PROVIDER='template';
 const {createApp}=await import('../server.js');
 const server=createApp();server.listen(0,'127.0.0.1');await once(server,'listening');
 const base=`http://127.0.0.1:${server.address().port}`;

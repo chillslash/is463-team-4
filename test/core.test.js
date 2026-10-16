@@ -8,22 +8,23 @@ test('midterm scenario recomputes without adding trial capacity',()=>{
 });
 test('unverified candidates do not inherit fees, acceptance or capacity',()=>{
  const c=osmCandidates([{type:'way',id:900,center:{lat:1.302,lon:103.851},tags:{name:'Example Garden',leisure:'garden'}}],initialState().settings);
- assert.equal(c.length,1);assert.equal(c[0].fee,'unknown');assert.equal(c[0].capacityKg,null);assert.equal(c[0].confirmed,false);assert.equal(c[0].sourceUrl,'https://www.openstreetmap.org/way/900');
+ assert.equal(c.length,1);assert.equal(c[0].fee,undefined);assert.equal(c[0].capacityKg,null);assert.equal(c[0].confirmed,false);assert.equal(c[0].sourceUrl,'https://www.openstreetmap.org/way/900');
 });
-test('ranking penalises paid accepting arrangements',()=>{
+test('ranking prioritises relevant, verified partners',()=>{
  const a={category:'community garden',use:'Composting',fee:'none',verified:true,capacityKg:30,distanceKm:3};
- assert.ok(scorePartner(a,42).score>scorePartner({...a,fee:'paid'},42).score);
+ assert.ok(scorePartner(a,42).score>scorePartner({...a,verified:false},42).score);
  assert.ok(rankPartners(initialState().partners,42).every(p=>p.status!=='regular'));
+ assert.ok(initialState().partners.filter(p=>p.source==='Fictional Stitch scenario').every(p=>p.status!=='suggested'));
 });
 test('draft has relevant caveats and does not promise acceptance',()=>{
  const draft=draftTemplate(initialState().partners[3],42);
  assert.match(draft.body,/moisture content has not been measured/);
- assert.match(draft.body,/acceptance fees/);
+ assert.match(draft.body,/handling or collection arrangements/);
  assert.match(draft.mode,/Template fallback/);
 });
 
 test('NParks places remain only potential sites with no acceptance assumed',()=>{
  const features={features:[{geometry:{type:'Point',coordinates:[103.84,1.31]},properties:{NAME:'Example Park',OBJECTID:1200}}]};
  const c=nparksCandidates(features,initialState().settings);
- assert.equal(c[0].id,'nparks-1200');assert.equal(c[0].capacityKg,null);assert.equal(c[0].verified,false);assert.equal(c[0].fee,'unknown');
+ assert.equal(c[0].id,'nparks-1200');assert.equal(c[0].capacityKg,null);assert.equal(c[0].verified,false);assert.equal(c[0].fee,undefined);
 });
