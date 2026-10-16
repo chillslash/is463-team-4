@@ -11,3 +11,72 @@
 .co-dialog-back{position:fixed;inset:0;background:#0b2319aa;z-index:900;display:flex;align-items:center;justify-content:center;padding:16px}.co-dialog{width:min(610px,96vw);max-height:90vh;overflow:auto;background:#fff;border-radius:12px;padding:25px;box-shadow:0 20px 55px #0004}.co-dialog h2{font-size:22px;color:var(--forest);font-weight:700;margin:0 0 8px}.co-dialog .co-field{margin:11px 0}.co-dialog .co-field-row{margin:7px 0}.co-source{font-size:11px;color:#52675a;overflow-wrap:anywhere}.co-source a{color:#256348;text-decoration:underline}.co-foot{text-align:right;margin-top:20px;display:flex;gap:9px;justify-content:flex-end}.co-progress{height:13px;background:#f1eae2;border-radius:3px;overflow:hidden;display:flex}.co-progress span{background:#164d35;height:100%}.co-progress em{background:#bb723a;height:100%}
 .co-help{font-size:11px;color:#64806b;padding:7px 0}.co-inline{display:flex;justify-content:space-between;align-items:center;gap:12px}.co-section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}.co-section-head h3{font-size:16px;color:var(--forest);font-weight:750;margin:0}.co-steps{display:flex;gap:7px;flex-wrap:wrap;font-size:11px;color:#67786b}.co-steps span{background:#e7f0e7;border-radius:5px;padding:7px 9px}.co-source-link{color:#1a6540;text-decoration:underline;font-size:11px}.co-notice{background:#fff6ec;border-left:3px solid #ad6b32;padding:12px 14px;color:#74491f;font-size:12px;line-height:1.6}
 @media(max-width:1050px){.co-grid{grid-template-columns:1fr 1fr}.co-draft-layout{grid-template-columns:1fr}.co-page{padding:25px 18px}}@media(max-width:680px){.co-grid,.co-grid.two,.co-field-row,.co-discovery-blurb{grid-template-columns:1fr}.co-head{flex-direction:column}.co-discovery-card{grid-template-columns:1fr}.co-page{padding:16px}.co-metric{font-size:30px}}
+
+/* Readability and progressive disclosure — preserves Stitch's palette and shell. */
+.co-page{font-size:15px;line-height:1.55}
+.co-sub{font-size:15px;max-width:68ch}
+.co-eyebrow{font-size:12px;letter-spacing:.09em}
+.co-card{padding:24px}
+.co-card h3{font-size:17px}
+.co-metric-label{font-size:12px}
+.co-metric{font-size:clamp(36px,3.4vw,45px)}
+.co-note,.co-banner,.co-check,.co-ranking,.co-source,.co-notice{font-size:14px;line-height:1.6}
+.co-pill{font-size:12px;padding:5px 8px}
+.co-button{font-size:14px;min-height:40px}
+.co-button.small{font-size:13px;min-height:35px}
+.co-field>label,.co-toolbar label{font-size:14px}
+.co-field input,.co-field select,.co-field textarea,.co-toolbar input,.co-toolbar select{font-size:15px;min-height:40px}
+.co-tagline,.co-help,.co-source-link{font-size:13px}
+.co-table td,.co-table th{font-size:14px}
+.co-table th{font-size:12px}
+.co-discovery-card{grid-template-columns:minmax(0,1fr) auto;gap:18px;padding:19px 22px;align-items:start}
+.co-discovery-card h3{font-size:18px}
+.co-discovery-card .co-note{margin:0}
+.co-discovery-card .co-details{margin:10px 0}
+.co-card-actions{display:flex;flex-direction:column;align-items:stretch;gap:9px;min-width:145px}
+.co-candidate-details{border-top:1px solid var(--line);margin-top:13px;padding-top:9px}
+.co-candidate-details summary{cursor:pointer;font-size:14px;color:var(--leaf);font-weight:650;list-style-position:inside}
+.co-candidate-details summary:hover{text-decoration:underline}
+.co-candidate-details .co-discovery-blurb{margin-top:13px}
+.co-candidate-details .co-source{margin-top:12px}
+.co-ai-summary{border-left:3px solid #50856b;background:#f1f8f2;font-size:14px;line-height:1.55;padding:9px 12px;border-radius:4px}
+.co-ai-summary span{color:#785a32;font-size:12px;margin-left:5px}
+.co-load-more{text-align:center;padding:22px}
+.co-board{display:flex;gap:15px;overflow-x:auto;padding:0 0 14px;scrollbar-width:thin}
+.co-lane{flex:0 0 260px;min-width:260px;padding:17px;min-height:270px}
+.co-lane h3{font-size:16px}
+.co-mini{font-size:14px;line-height:1.5;padding:14px}
+.co-guide{font-size:14px}
+.co-draft-layout{grid-template-columns:minmax(0,1.9fr) minmax(245px,.8fr)}
+.co-expand summary{cursor:pointer;font-size:16px;font-weight:650;color:var(--forest)}
+.co-expand summary span{font-size:13px;color:var(--sub);font-weight:450;margin-left:10px}
+.co-expand[open] summary{margin-bottom:18px}
+.co-foot{margin-top:24px}
+.co-dialog{width:min(700px,96vw)}
+.co-notice{font-size:14px}
+.co-toolbar{gap:12px}
+.co-toolbar input{max-width:290px}
+.co-chart{background:repeating-linear-gradient(to top,transparent,transparent 52px,#e5eee6 53px,#e5eee6 54px)}
+@media(max-width:1050px){.co-draft-layout{grid-template-columns:1fr}}
+@media(max-width:760px){
+ body>aside{position:relative!important;width:100%!important;height:auto!important;z-index:20}
+ body>aside>div:first-child>div:first-child{height:56px}
+ body>aside nav{display:flex!important;flex-direction:row!important;flex-wrap:wrap}
+ body>aside nav a{font-size:14px!important}
+ body>div.pl-60{padding-left:0!important}
+ body>div header{position:sticky!important;left:0!important;right:0!important;top:0!important}
+ .co-page{padding:22px 16px 38px}
+ .co-head{flex-direction:column}
+ .co-discovery-card{grid-template-columns:1fr}
+ .co-card-actions{flex-direction:row;flex-wrap:wrap}
+ .co-card-actions .co-button{flex:1}
+ .co-discovery-blurb{grid-template-columns:1fr}
+ .co-grid{grid-template-columns:1fr}
+ .co-metric{font-size:38px}
+ .co-board{gap:10px}
+ .co-lane{min-width:240px;flex-basis:240px}
+}
+
+/* AI configuration stays visible without competing with the primary workflow. */
+.co-head .co-button[data-action=ai-settings]{background:transparent;border-color:transparent;color:var(--leaf);font-weight:600}
+.co-head .co-button[data-action=ai-settings]:hover{background:#e8f4eb}
