@@ -47,7 +47,6 @@ Use a **small curated, maintainable prospect database**, populated from a mixtur
 | Quantity | Candidate's verified or estimated capacity versus surplus kg | Do not invent capacity; treat as unverified |
 | Regularity | Weekly/recurring use preferred over one-off acceptance | Mark as unknown until checked |
 | Location and logistics | Distance from relevant CoffeeBot collection/storage point, pickup/delivery needs | Use approximate distance if that is all that is available |
-| Cost to CoffeeBot | Acceptance fees, transport and handling costs; prefer free/low-cost arrangements | Mark fee as unknown, never assume free |
 | Evidence and readiness | Data provenance, verified contact, stated willingness, trial history | Prioritise verified facts, with clear flags for unverified leads |
 
 Start with simple **rules and explainable ordering**, not an opaque AI score. Hard incompatibilities (e.g. unacceptable handling requirements or prohibitive fees) should be flagged before scoring. Unknown information should create a **question to verify**, not a false positive. Do not silently exclude paid arrangements: surface the trade-off so CoffeeBot can decide if exceptional benefits justify the cost.
@@ -56,7 +55,7 @@ Start with simple **rules and explainable ordering**, not an opaque AI score. Ha
 
 - `name`, `entity_type` (site/organisation), `category`, `location`, `source`, `source_checked_at`.
 - `potential_use`, `verification_status` (unverified / contacted / verified), `decision_maker_or_contact` where known.
-- `capacity_kg_per_week`, `frequency`, `collection_mode`, `handling_requirements`, `acceptance_fee`, each nullable/unknown.
+- `capacity_kg_per_week`, `frequency`, `collection_mode`, `handling_requirements`, `each nullable/unknown.
 - `notes`, `last_verified_at`, and optionally parent organisation / managed site linkage.
 
 Avoid storing unnecessary personal information. Let staff edit a prospect and retain the reason for a recommendation.
@@ -76,7 +75,7 @@ Avoid storing unnecessary personal information. Let staff edit a prospect and re
 - Use known partner activity and *approved, accurate* CoffeeBot handling details.
 - State that grounds are dried by CoffeeBot; **do not assert tested moisture levels**.
 - Suggest a low-risk trial where appropriate, but don't promise capacity, deliveries, food-safe use, or agronomic benefit.
-- Produce an editable message, recipient-specific questions (fees, acceptable condition, kg/week, pickup frequency), and a short reuse-information note.
+- Produce an editable message, recipient-specific questions (acceptable condition, kg/week, transport arrangements and pickup frequency), and a short reuse-information note.
 - Human approval before external communication. Sending email via an API is **not** required for the MVP.
 
 ### Tracking and material accounting
@@ -119,7 +118,7 @@ Avoid storing unnecessary personal information. Let staff edit a prospect and re
 
 - Which discovery data source(s) and terms are workable for the team's implementation?
 - Who at NParks, Gardens by the Bay, zoos, community gardens, or other institutions can authorise accepting SCG? Which categories are worthwhile to contact?
-- What constitutes an unacceptable fee, and how should transport costs be valued?
+- Will partners collect at HQ, or will CoffeeBot deliver? This is not yet agreed.
 - What recipient requirements must be screened (moisture, contaminants, handling, use-case restrictions, minimum collection size)?
 - Can CoffeeBot provide anonymised or sample IoT cup counts, existing partner capacities, and representative outreach details?
 - What can the team honestly classify as **reused** versus **handed over for intended reuse**?
@@ -131,3 +130,13 @@ Avoid storing unnecessary personal information. Let staff edit a prospect and re
 - **Sponsor's additional feedback:** Avoid reducing circularity to paid waste management; explore non-commercial and institutional recipients, including parks and gardens.
 
 The above informs the **proposed** MVP; it does not imply external organisations have agreed to take grounds or that live API/IoT integrations have already been implemented.
+
+## Implementation update — October 2026
+
+- CoffeeBot HQ is treated as **8 Lor Bakar Batu, #05-01, Singapore 348743** (map coordinates approximate). Distances are straight-line reference distances, not routes or delivery promises. Who arranges transport remains unconfirmed.
+- The **Suggested** stage contains sourced prospects only; fictional midterm partners populate Contacted, Interested, Trial and Regular for demo purposes. Historical simulated confirmed capacity is not sponsor-verified.
+- **Discover Partners** is one workflow: it queries NParks Community in Bloom, NParks parks, MOE sustainability-related school programmes joined with the MOE directory, and OpenStreetMap; removes duplicates; performs bounded AI assessment using locally configured Codex/Claude; and ranks saved candidates.
+- Each lead retains the original source URL and claim, first date sourced if known, and last observed date. AI assessments retain source references, assessment time, provider, run ID, and input/prompt hashes. A discovery-run audit includes source availability, cache use, counts and number of AI calls.
+- Official dataset snapshots are cached for 24 hours to reduce repeated requests; where stale snapshots are used after an outage, the run metadata identifies this. Unchanged candidates are not repeatedly reassessed merely because staff clicks discovery again.
+- An MOE sustainability programme identifies a potential **school lead**, not necessarily a garden or a willingness to reuse spent grounds. The source-backed finding and the AI's inference must remain distinct.
+- AI provider selection is local repository configuration via `.env`, not an operator-facing control. Fees are not part of the prototype workflow or ranking.

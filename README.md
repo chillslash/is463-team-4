@@ -1,79 +1,65 @@
 # CoffeeBot Circularity Copilot
 
-Working IS463 Group Project prototype based on the five-screen **Google Stitch export** and the team's midterm workflow. The interface retains the exported Stitch navigation/layout and visual design tokens; the screens are wired to one backend and persistent state.
+IS463 group prototype based on the Google Stitch screens. The app estimates spent coffee grounds, finds **potential** reuse partners in Singapore, prepares staff-reviewed outreach, tracks pipeline stages and records actual handovers.
 
-## Quick start
+## Start
 
-Requirements: **Node.js 20.12+**. No npm installation or database server required.
+Requires Node.js 20.12+.
 
 ```powershell
 cd C:\Users\ryano\Documents\Projects\is463-group-project
 npm start
 ```
 
-Visit **http://localhost:4173**. Run `npm test` to execute the automated tests. Optional: `npm run dev` to restart the server when JavaScript changes.
+Open **http://localhost:4173**. Run `npm test` to run the automated checks.
 
-The first run creates `data/state.json` with the **fictional midterm demonstration dataset**, which is gitignored. All changes persist across refreshes and restarts. To revert to the original example data use `POST /api/reset-demo` (destructive to local changes); back up `data/state.json` first if needed.
+Each team member configures AI **on their own computer**, not in the user-facing interface. Create a **local** `.env` file (ignored by Git):
 
-## Demonstration journey
-
-1. **This Week:** Start with 9,100 illustrative cups × 20 g = 182 kg forecast, 140 kg simulated regular pickup capacity, 42 kg projected gap. Change values via **Edit forecast** to recompute them.
-2. **Find Partners:** Click **Discover live sites** to combine the official [NParks Community in Bloom dataset](https://data.gov.sg/datasets/d_f91a8b057cfb2bebf2e531ad8061e1c1/view), the [NParks Parks dataset](https://data.gov.sg/datasets/d_0542d48f0991541706b58059381a6eca/view) and the [OpenStreetMap Overpass API](https://wiki.openstreetmap.org/wiki/Overpass_API). Sources run independently, so partial success is retained. This is a live API query, not HTML scraping. It may fail if the public service is down/rate-limited; the error is shown and existing leads remain. Inspect the source link and unknowns. You can add or edit leads manually.
-3. **Outreach:** Select a candidate, generate an editable draft, review it, and copy or save it. No email is sent. Choose the local AI provider (Codex, Claude, or a safe template) via **AI settings**. Signed-in local CLI is required for model-generated drafts; no API key is needed.
-4. **Pipeline:** Move a lead through Suggested → Contacted → Interested → Trial → Regular. Only **verified + confirmed + regular** capacity counts against the projected gap; all other capacities remain prospective.
-5. **Log Handover:** Record actual kilogram amounts and distinguish unverified transfer, partner-confirmed intended use, and confirmed actual reuse. Tracked outcomes update immediately. Provide *measured* collected kilograms separately for a reuse-rate denominator.
-
-## Evidence & limitations
-
-- **Initial contacts/organisations are fictional** and must not be approached as if real. Existing regular capacity is illustrative, *not* actual CoffeeBot agreements.
-- **NParks and OpenStreetMap return sites, not willing recipients.** Staff must identify the relevant decision-maker, verify whether they accept grounds, handling requirements, willingness, fees and capacity. Parks/NParks sites are not presumed to accept grounds. Distances use a clearly labelled Singapore city-centre **demo reference**, not CoffeeBot HQ.
-- **No CoffeeBot IoT connection** is available. Weekly cup counts are editable sample inputs, not live machine telemetry.
-- **Outreach is human-reviewed.** Copying/saving a draft does not mean a message was sent; pipeline status is updated by staff separately.
-- **Handover ≠ verified reuse.** The impact screen tracks evidence levels separately. No fabricated CO₂e or automatic net carbon handprint is shown without an agreed disposal route and defensible emission factors.
-- The source uses Stitch Tailwind CDN and Google Fonts, so styling requires internet access; business data is served by the local Node server.
-- Single-user classroom prototype using an atomic JSON file, not a hardened multi-user production service. Do not expose it publicly without authentication and security hardening.
-- NParks open data uses the Singapore Open Data Licence. The Overpass source is subject to its own terms and fair-use requirements. If unavailable, manually add a sourced real candidate and clearly record provenance.
-
-## Configuration
-
-```powershell
-$env:PORT=4173                    # optional; default 4173
-$env:OPENAI_API_KEY="..."        # optional; otherwise template fallback
-$env:OPENAI_MODEL="gpt-4.1-mini"  # optional
-npm start
+```ini
+AI_PROVIDER=codex
+# Optional if codex is not available through PATH:
+CODEX_PATH=C:\path\to\codex.exe
 ```
 
-Keep credentials in environment variables, not Git. No remote GitHub repository is configured or pushed yet.
+Alternatively set `AI_PROVIDER=claude` for an installed, authenticated Claude Code CLI, or `AI_PROVIDER=template` for no model calls. Each user must sign in to their selected CLI under the same OS account that launches the app. These commands use the local CLI subscription rather than API billing. An absent or failing AI backend leaves sourced, rule-ranked candidates in place; outreach generation reports errors instead of silently claiming AI succeeded.
 
-## Structure
+## Workflow
 
-- `public/*.html` — original Stitch design shell for five screens, wired to the shared app.
-- `public/app.js`, `public/app.css` — screens, interactions and styling.
-- `src/discovery.js` — independent official garden, park and OpenStreetMap requests; candidate merging and partial failures.\n- `src/ai.js` — local Claude Code and Codex CLI adapters, structured response parsing, strict timeouts.\n- `server.js` — minimal HTTP API, persistence, live discovery and optional draft generation.
-- `src/core.js` — model, forecast, ranking, OpenStreetMap transformation, fallback outreach.
-- `test/` — calculations and API integration tests.
-- `docs/` — problem statement and prototype specification.
-- `design/DESIGN.md` — original Stitch design tokens and notes.
+1. **This Week:** Change the illustrative forecast: 9,100 cups × 20 g = 182 kg, simulated regular partner capacity 140 kg and projected surplus 42 kg. These are **demo figures**, not CoffeeBot telemetry or real commitments.
+2. **Suggested Partners:** Select **Discover Partners**. The app queries source datasets, removes duplicates, adds new candidates, reuses unmodified AI assessments, evaluates a bounded batch of unevaluated leads and ranks them. Progress is shown by completed stages. Only sourced, non-fictional candidates appear in Suggested.
+3. **Outreach Draft:** Generate a reviewable email via the configured local AI CLI, or a transparent rule-based template. The application **does not send emails**.
+4. **Partner Pipeline:** Update contacted, interested, trial and regular relationships. Fictional demo organisations illustrate these later stages. Simulated regular capacity counts toward the demo forecast but must never be presented as a real agreement.
+5. **Log Handover:** Record kg actually transferred and evidence level. A recorded handover is not automatically verified reuse.
 
-## AI via group members' subscriptions
+## Sources and traceability
 
-The app runs locally. Each teammate independently installs and signs into either the **Codex CLI** (ChatGPT account) or **Claude Code CLI** (Claude account), then chooses that provider using **AI settings** in the UI. The choice is saved in local `data/state.json` (gitignored). It is used for both **Assess with AI** on discovered candidates and **Generate draft** on Outreach. Selection `No AI` uses an explicit rule-based email and disables AI candidate assessment.
+Live discovery aggregates independently from:
 
-- Codex: Install `@openai/codex`, run `codex login`, then check `codex exec --help`.
-- If Codex is not on PATH (e.g. installed under a user-specific folder), create a **local Git-ignored `.env`** file containing `CODEX_PATH=C:\path\to\codex.exe`. The executable path must be absolute. OS-level `CODEX_PATH` takes precedence. This setting is optional: group members with Codex on PATH do nothing.
-- `.env` is loaded on server startup; keep it local and never commit API keys or account credentials.
-- Claude: Install the official Claude Code CLI, run `claude` and authenticate, then check `claude --help`.
-- Launch `npm start` under the **same operating-system user** who authenticated that CLI.
-- CLI entitlements and usage limits depend on each teammate's plan. App subscriptions do not give third-party API keys. API billing/keys are not required for this **local CLI** integration.
-- The app sends bounded text prompts over standard input. Codex runs in a read-only sandbox; Claude's tools are disabled. Models only draft text or triage publicly sourced candidates; they must not be trusted as evidence of acceptance, fees, contact authority or capacity.
-- If a CLI is missing, not signed in, or returns invalid JSON, the UI reports an error instead of quietly pretending AI ran. Use the No AI setting for template drafting.
-- The CLI-dependent paths are tested using a mock runner; **real subscription-authenticated inference must be tested by a logged-in teammate**. The Gateway account does not have these CLIs installed.
+- [NParks Community in Bloom](https://data.gov.sg/datasets/d_f91a8b057cfb2bebf2e531ad8061e1c1/view): registered garden sites, including some schools and institutions.
+- [NParks public parks](https://data.gov.sg/datasets/d_0542d48f0991541706b58059381a6eca/view): possible sites for horticultural activity.
+- [MOE School Distinctive Programmes](https://data.gov.sg/datasets/d_db1faeea02c646fa3abccfa5aba99214/view), joined with the [MOE School Directory](https://data.gov.sg/datasets/d_688b934f82c1059ed0a6993d2a829089/view): schools with documented sustainability-related programmes. **A programme does not prove the presence of a garden or a willingness to accept grounds.**
+- [OpenStreetMap Overpass](https://wiki.openstreetmap.org/wiki/Overpass_API): named growing sites, gardens, nurseries, parks and zoos; public endpoints may be unavailable.
 
-## Discovery coverage (initial implementation)
+The source searches are independent, so one failed API need not cancel all results. Successful official dataset snapshots are cached under `data/source-cache/` for up to 24 hours, with stale snapshots usable during outages. Each saved candidate has source records/URLs, its initial sourced date (if known) and last-seen date. Older imports with an unknown first-sourced date are not assigned a fabricated original date.
 
-**Community in Bloom** registered garden locations and **NParks public parks** are separate official data.gov.sg sources, fetched on each discovery request. **OpenStreetMap** is queried independently for named gardens, allotments, urban growing sites, nurseries and zoos; public Overpass instances are sometimes unavailable (HTTP 500). In that case, the two official datasets can still supply candidates. A source breakdown and partial failures are shown after discovery. Nearby duplicate place names are suppressed.
+Every discovery run stores its source success/failure summary, source cache age, AI provider, number of AI calls, assessment count and timestamp in `data/state.json`. The 40 latest runs are retained. AI assessments record the provider, assessment date, source references, run ID and a hash of the exact input facts and prompt. This is **auditability**, not independent fact-checking. The CLI is instructed not to browse or use tools: AI interprets sourced records, rather than performing autonomous web search. **Accepting grounds, suitability, capacity and contact authority remain unverified until confirmed by staff.**
 
-All discoveries are **locations/leads**, not confirmed willingness, fees, collection authority or capacity. Community growing sites rank ahead of generic public parks *as a search heuristic*, not as proof of acceptance. Use **Assess with AI** for a bounded batch of candidates based on these source facts; assessments are not independent web research. Google Places is not used because it would require an API key, billing and review of Places data-use restrictions. Staff can manually add verifiable leads not in these datasets.
-## Interface refinement
+AI assessment processes at most **24 pending leads per click**, in batches of 12, favouring promising candidates. Unchanged source facts are cached by hash so subsequent runs do not needlessly repeat an assessment. New or changed candidates can be assessed in later runs. Each request starts an independent ephemeral CLI session. The app counts AI calls but does **not** claim to measure exact token consumption.
 
-The Stitch palette and five-screen shell are retained. Headline numbers are larger, routine badges are reduced, partner cards show short summaries with expandable evidence, and search results display 12 at a time with a **Show more results** control. The illustrative chart is expandable rather than always competing with the main metrics. The pipeline uses wider horizontally scrollable columns, outreach gives the email editor more space, and the small-screen layout collapses the fixed sidebar into a top navigation area. Source and acceptance uncertainty remain visible in the condensed view.
+## HQ, handling and limitations
+
+Use **8 Lor Bakar Batu, #05-01, Singapore 348743** as the CoffeeBot HQ reference. Its approximate map coordinates in this demo are **1.3275° N, 103.8723° E**. Distances shown are approximate **straight-line distances**, not driving kilometres. School programme records without coordinates show distance unavailable. Whether partners collect at HQ or CoffeeBot delivers remains to be agreed; neither is promised in outreach.
+
+Staff must verify grounds handling requirements, material suitability, and any actual beneficial reuse. Grounds are sun-dried at HQ with unmeasured moisture. No defensible CO₂e figure is calculated without confirmed material flows, disposal baseline and emissions factors. AI assessments are suggestions, **not external evidence of acceptance**.
+
+The app is a single-user local prototype using JSON state, not a production multi-user service. Do not expose it publicly without authentication and security controls. The five Stitch-inspired screens use Tailwind CDN and Google Fonts, requiring internet connectivity for styling. The browser talks to a local Node backend. `data/`, `.env` and `node_modules/` are Git-ignored. No GitHub remote is configured.
+
+## Project files
+
+- `public/`: Stitch-inspired frontend and interactions.
+- `src/core.js`: scoring, demo state, forecasts and data transformations.
+- `src/discovery.js`, `src/moe.js`: multi-source search, caching and school programme data.
+- `src/ai.js`: local Codex and Claude Code CLI adapters.
+- `server.js`: API, JSON persistence, batch AI assessment and discovery audit.
+- `test/`: unit and API integration tests.
+- `docs/`: problem statement and prototype scope.

@@ -80,7 +80,7 @@ The disposal route, defensible emission factors, and some activity data are **no
 ## Validation questions for CoffeeBot
 
 1. Who has the authority to approve SCG use at parks, gardens, or larger institutions, and which recipient types are realistically approachable?
-2. What is an acceptable collection/handling fee, if any, and who normally bears transport costs?
+2. Who normally arranges transport from CoffeeBot HQ to reuse partners, and what logistical constraints matter?
 3. Which SCG properties, drying/storage practices, and minimum/maximum quantities must be disclosed to a recipient?
 4. Can sample or real cup counts and existing partner arrangements (capacity, frequency, location) be supplied?
 5. What evidence counts as a confirmed handover and, separately, as grounds actually **reused** rather than merely collected?
