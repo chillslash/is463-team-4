@@ -158,3 +158,12 @@
 .co-source-row p{margin:4px 0 0!important;color:var(--sub);line-height:1.5}
 .co-source-row a{white-space:nowrap;font-weight:650;text-decoration:underline;color:var(--leaf)}
 @media(max-width:760px){.co-scan-primary{flex-direction:column;align-items:flex-start;gap:4px}.co-scan-meta{text-align:left}.co-source-row{flex-direction:column}}
+
+/* Compact Fit Score visual and evidence-first detail hierarchy */
+.co-card-actions .co-fit-track{height:8px;width:100%;border-radius:99px;background:#e8f1e9;overflow:hidden;margin:-3px 0 6px}
+.co-card-actions .co-fit-fill{height:100%;border-radius:inherit;background:linear-gradient(90deg,#77ab83 0%,#347953 100%);transition:width .35s ease}
+.co-fit-details{margin-top:15px;border-top:1px solid var(--line);padding-top:11px}
+.co-fit-details>summary{cursor:pointer;color:var(--leaf);font-size:13px;font-weight:650}
+.co-fit-details .co-score-breakdown{margin:9px 0 0;border-bottom:0;padding:8px 0 0}
+.co-discovery-card .co-evidence-block .co-last-checked{display:block;margin-top:17px!important;padding-top:3px}
+@media (prefers-reduced-motion:reduce){.co-card-actions .co-fit-fill{transition:none}}

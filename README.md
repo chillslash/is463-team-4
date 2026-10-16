@@ -79,3 +79,5 @@ The app is a single-user local prototype using JSON state, not a production mult
 - For promising leads with a source-linked organisation website but no email, it checks up to five public websites per discovery, inspecting at most three pages per site. Failed lookups are not repeated for seven days.
 - Candidate assessment rotates across independent source groups, saving results against original partner records and reusing unchanged assessments on later runs.
 - NParks datasets are sampled across broad geographic regions instead of taking only nearest locations. Proximity is now 10 of 100 Fit Score points. Last Scanned shows source success counts, and the progress bar animates during work.
+
+- The Find Partners cards show source evidence first and a small visual Fit Score bar; the numerical breakdown is optional. Contact emails stay in Outreach Draft, not in discovery cards. Outbound drafts contain the email body and a concise verification checklist; no separate AI-generated handling essay is displayed.
