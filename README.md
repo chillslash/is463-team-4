@@ -18,7 +18,7 @@ The first run creates `data/state.json` with the **fictional midterm demonstrati
 ## Demonstration journey
 
 1. **This Week:** Start with 9,100 illustrative cups × 20 g = 182 kg forecast, 140 kg simulated regular pickup capacity, 42 kg projected gap. Change values via **Edit forecast** to recompute them.
-2. **Find Partners:** Click **Discover live sites** to retrieve real geographic candidates from the official [NParks Parks dataset on data.gov.sg](https://data.gov.sg/datasets/d_0542d48f0991541706b58059381a6eca/view), with the [OpenStreetMap Overpass API](https://wiki.openstreetmap.org/wiki/Overpass_API) as fallback. This is a live API query, not HTML scraping. It may fail if the public service is down/rate-limited; the error is shown and existing leads remain. Inspect the source link and unknowns. You can add or edit leads manually.
+2. **Find Partners:** Click **Discover live sites** to combine the official [NParks Community in Bloom dataset](https://data.gov.sg/datasets/d_f91a8b057cfb2bebf2e531ad8061e1c1/view), the [NParks Parks dataset](https://data.gov.sg/datasets/d_0542d48f0991541706b58059381a6eca/view) and the [OpenStreetMap Overpass API](https://wiki.openstreetmap.org/wiki/Overpass_API). Sources run independently, so partial success is retained. This is a live API query, not HTML scraping. It may fail if the public service is down/rate-limited; the error is shown and existing leads remain. Inspect the source link and unknowns. You can add or edit leads manually.
 3. **Outreach:** Select a candidate, generate an editable draft, review it, and copy or save it. No email is sent. Choose the local AI provider (Codex, Claude, or a safe template) via **AI settings**. Signed-in local CLI is required for model-generated drafts; no API key is needed.
 4. **Pipeline:** Move a lead through Suggested → Contacted → Interested → Trial → Regular. Only **verified + confirmed + regular** capacity counts against the projected gap; all other capacities remain prospective.
 5. **Log Handover:** Record actual kilogram amounts and distinguish unverified transfer, partner-confirmed intended use, and confirmed actual reuse. Tracked outcomes update immediately. Provide *measured* collected kilograms separately for a reuse-rate denominator.
@@ -49,7 +49,7 @@ Keep credentials in environment variables, not Git. No remote GitHub repository 
 
 - `public/*.html` — original Stitch design shell for five screens, wired to the shared app.
 - `public/app.js`, `public/app.css` — screens, interactions and styling.
-- `src/ai.js` — local Claude Code and Codex CLI adapters, structured response parsing, strict timeouts.\n- `server.js` — minimal HTTP API, persistence, live discovery and optional draft generation.
+- `src/discovery.js` — independent official garden, park and OpenStreetMap requests; candidate merging and partial failures.\n- `src/ai.js` — local Claude Code and Codex CLI adapters, structured response parsing, strict timeouts.\n- `server.js` — minimal HTTP API, persistence, live discovery and optional draft generation.
 - `src/core.js` — model, forecast, ranking, OpenStreetMap transformation, fallback outreach.
 - `test/` — calculations and API integration tests.
 - `docs/` — problem statement and prototype specification.
@@ -66,3 +66,9 @@ The app runs locally. Each teammate independently installs and signs into either
 - The app sends bounded text prompts over standard input. Codex runs in a read-only sandbox; Claude's tools are disabled. Models only draft text or triage publicly sourced candidates; they must not be trusted as evidence of acceptance, fees, contact authority or capacity.
 - If a CLI is missing, not signed in, or returns invalid JSON, the UI reports an error instead of quietly pretending AI ran. Use the No AI setting for template drafting.
 - The CLI-dependent paths are tested using a mock runner; **real subscription-authenticated inference must be tested by a logged-in teammate**. The Gateway account does not have these CLIs installed.
+
+## Discovery coverage (initial implementation)
+
+**Community in Bloom** registered garden locations and **NParks public parks** are separate official data.gov.sg sources, fetched on each discovery request. **OpenStreetMap** is queried independently for named gardens, allotments, urban growing sites, nurseries and zoos; public Overpass instances are sometimes unavailable (HTTP 500). In that case, the two official datasets can still supply candidates. A source breakdown and partial failures are shown after discovery. Nearby duplicate place names are suppressed.
+
+All discoveries are **locations/leads**, not confirmed willingness, fees, collection authority or capacity. Community growing sites rank ahead of generic public parks *as a search heuristic*, not as proof of acceptance. Use **Assess with AI** for a bounded batch of candidates based on these source facts; assessments are not independent web research. Google Places is not used because it would require an API key, billing and review of Places data-use restrictions. Staff can manually add verifiable leads not in these datasets.

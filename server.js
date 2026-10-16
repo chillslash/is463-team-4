@@ -5,6 +5,7 @@ import {join, resolve, extname} from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {initialState, numbers, rankPartners, osmCandidates, nparksCandidates, draftTemplate, STATUSES} from './src/core.js';
 import {AI_PROVIDERS,generateJSON,validateDraft,validateAssessment} from './src/ai.js';
+import {discoverAll} from './src/discovery.js';
 
 const ROOT=process.cwd();
 const DB_PATH=process.env.DATA_FILE || join(ROOT,'data','state.json');
@@ -35,37 +36,16 @@ function validatePartnerFields(payload,current={}){
  return p;
 }
 async function discover(s){
- const errors=[];let candidates=[];let source='';
- const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),19000);
- try {
-  // Official open-data endpoint is attempted first: no scraping of NParks web pages.
-  try {
-    const id='d_0542d48f0991541706b58059381a6eca';
-    const metadata=await fetch(`https://api-open.data.gov.sg/v1/public/api/datasets/${id}/poll-download`,{signal:controller.signal});
-    if(!metadata.ok)throw new Error(`data.gov.sg metadata HTTP ${metadata.status}`);
-    const json=await metadata.json();const url=json?.data?.url;
-    if(json.code!==0||!url?.startsWith('https://'))throw new Error('No authorised dataset URL available');
-    const response=await fetch(url,{signal:controller.signal});
-    if(!response.ok)throw new Error(`NParks dataset HTTP ${response.status}`);
-    candidates=nparksCandidates(await response.json(),s.settings);
-    if(!candidates.length)throw new Error('No usable NParks park records returned');
-    source='NParks Parks dataset via data.gov.sg';
-  } catch(err) {errors.push(`NParks: ${err.message}`);}
-  if(!candidates.length){
-    try{
-      const query='[out:json][timeout:20];(nwr["leisure"~"^(garden|park)$"]["name"](1.22,103.60,1.48,104.04);nwr["landuse"="allotments"]["name"](1.22,103.60,1.48,104.04);nwr["shop"~"^(garden_centre|nursery)$"]["name"](1.22,103.60,1.48,104.04);nwr["tourism"="zoo"]["name"](1.22,103.60,1.48,104.04););out center 80;';
-      const r=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded','User-Agent':'CoffeeBot-IS463-Prototype/0.1 educational research'},body:new URLSearchParams({data:query}),signal:controller.signal});
-      if(!r.ok)throw new Error(`Overpass HTTP ${r.status}`);
-      const json=await r.json();if(!Array.isArray(json.elements))throw new Error('Invalid place dataset');
-      candidates=osmCandidates(json.elements,s.settings);source='OpenStreetMap Overpass';
-      if(!candidates.length)throw new Error('No usable OSM sites returned');
-    }catch(err){errors.push(`OSM: ${err.message}`);}
-  }
-  if(!candidates.length)throw Object.assign(new Error(`Live discovery unavailable: ${errors.join(' / ')}. Existing candidates remain usable.`),{status:503});
-  const existing=new Set(s.partners.map(p=>p.id));let added=0;
-  for(const p of candidates)if(!existing.has(p.id)){s.partners.push(p);added++;}
-  return {added,found:candidates.length,source,note:'Mapped parks and sites are NOT confirmed recipients. Acceptance, authority, fees and capacity remain unverified.'};
- }finally{clearTimeout(timer);}
+ const result=await discoverAll(s.settings);
+ const existingIds=new Set(s.partners.map(p=>p.id));
+ let added=0;
+ for(const p of result.candidates){
+  if(existingIds.has(p.id))continue;
+  const duplicate=s.partners.some(o=>o.name.trim().toLowerCase()===p.name.trim().toLowerCase()&&Number.isFinite(o.lat)&&Number.isFinite(p.lat)&&Math.abs(o.lat-p.lat)<0.008&&Math.abs(o.lon-p.lon)<0.008);
+  if(duplicate)continue;
+  s.partners.push(p);existingIds.add(p.id);added++;
+ }
+ return {added,found:result.candidates.length,sources:result.sources,warnings:result.warnings,note:'Public sites are potential leads only. No acceptance, fees, capacity or decision-maker has been confirmed.'};
 }
 
 async function aiDraft(p,kg,provider){
