@@ -25,10 +25,10 @@ Alternatively set `AI_PROVIDER=claude` for an installed, authenticated Claude Co
 
 ## Workflow
 
-1. **This Week:** Change the illustrative forecast: 9,100 cups × 20 g = 182 kg, simulated regular partner capacity 140 kg and projected surplus 42 kg. These are **demo figures**, not CoffeeBot telemetry or real commitments.
+1. **Dashboard:** Change the illustrative forecast: 9,100 cups × 20 g = 182 kg, simulated regular partner capacity 140 kg and projected surplus 42 kg. These are **demo figures**, not CoffeeBot telemetry or real commitments.
 2. **Suggested Partners:** Select **Discover Partners**. The app queries source datasets, removes duplicates, adds new candidates, reuses unmodified AI assessments, evaluates a bounded batch of unevaluated leads and ranks them. Progress is shown by completed stages. Only sourced, non-fictional candidates appear in Suggested.
-3. **Outreach Draft:** Generate a reviewable email via the configured local AI CLI, or a transparent rule-based template. The application **does not send emails**.
-4. **Partner Pipeline:** Update contacted, interested, trial and regular relationships. Fictional demo organisations illustrate these later stages. Simulated regular capacity counts toward the demo forecast but must never be presented as a real agreement.
+3. **Draft Outreach:** Generate a reviewable email via the configured local AI CLI, or a transparent rule-based template. The application **does not send emails**.
+4. **Dashboard — Partner Pipeline:** Update contacted, interested, trial and regular relationships. Fictional demo organisations illustrate these later stages. Simulated regular capacity counts toward the demo forecast but must never be presented as a real agreement.
 5. **Log Handover:** Record kg actually transferred and evidence level. A recorded handover is not automatically verified reuse.
 
 ## Sources and traceability
@@ -54,7 +54,7 @@ Use **8 Lor Bakar Batu, #05-01, Singapore 348743** as the CoffeeBot HQ reference
 
 Staff must verify grounds handling requirements, material suitability, and any actual beneficial reuse. Grounds are sun-dried at HQ with unmeasured moisture. No defensible CO₂e figure is calculated without confirmed material flows, disposal baseline and emissions factors. AI assessments are suggestions, **not external evidence of acceptance**.
 
-The app is a single-user local prototype using JSON state, not a production multi-user service. Do not expose it publicly without authentication and security controls. The five Stitch-inspired screens use Tailwind CDN and Google Fonts, requiring internet connectivity for styling. The browser talks to a local Node backend. `data/`, `.env` and `node_modules/` are Git-ignored. No GitHub remote is configured.
+The app is a single-user local prototype using JSON state, not a production multi-user service. Do not expose it publicly without authentication and security controls. The four navigation destinations use Tailwind CDN and Google Fonts, requiring internet connectivity for styling. The browser talks to a local Node backend. `data/`, `.env` and `node_modules/` are Git-ignored. No GitHub remote is configured.
 
 ## Project files
 
@@ -80,4 +80,8 @@ The app is a single-user local prototype using JSON state, not a production mult
 - Candidate assessment rotates across independent source groups, saving results against original partner records and reusing unchanged assessments on later runs.
 - NParks datasets are sampled across broad geographic regions instead of taking only nearest locations. Proximity is now 10 of 100 Fit Score points. Last Scanned shows source success counts, and the progress bar animates during work.
 
-- The Find Partners cards show source evidence first and a small visual Fit Score bar; the numerical breakdown is optional. Contact emails stay in Outreach Draft, not in discovery cards. Outbound drafts contain the email body and a concise verification checklist; no separate AI-generated handling essay is displayed.
+- The Find Partners cards show source evidence first and a segmented Fit Score bar inside Details & Sources, with all four scoring dimensions labelled. There is no nested score dropdown. Contact emails stay in Outreach Draft, not in discovery cards. Outbound drafts contain the email body and a concise verification checklist; no separate AI-generated handling essay is displayed.
+
+## Navigation
+
+The sidebar is organised as **Admin** (Dashboard, Log Handover) and **Discovery** (Find Partners, Draft Outreach). Dashboard combines the former This Week forecast, outcomes and five-stage Pipeline board. The previous `/this-week` and `/pipeline` URLs remain aliases for `/dashboard` and do not create separate pages. Sidebar text uses the same font size whether selected or not.

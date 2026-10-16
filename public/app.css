@@ -167,3 +167,30 @@
 .co-fit-details .co-score-breakdown{margin:9px 0 0;border-bottom:0;padding:8px 0 0}
 .co-discovery-card .co-evidence-block .co-last-checked{display:block;margin-top:17px!important;padding-top:3px}
 @media (prefers-reduced-motion:reduce){.co-card-actions .co-fit-fill{transition:none}}
+
+/* Consistent navigation typography for active/inactive entries */
+body>aside nav a{font-family:Inter,system-ui,Arial,sans-serif!important;font-size:14px!important;line-height:1.35!important;font-weight:500}
+body>aside nav a[aria-current="page"]{font-size:14px!important;line-height:1.35!important;font-weight:650}
+.co-dashboard-pipeline{margin-top:30px}
+.co-dashboard-pipeline>.co-section-head{display:flex;align-items:center;flex-wrap:wrap;gap:10px 18px;margin-bottom:14px}
+.co-dashboard-pipeline>.co-section-head h2{font-size:21px;font-weight:720;color:var(--forest);margin:0}
+.co-dashboard-pipeline>.co-section-head .co-actions{margin-left:auto}
+.co-dashboard-pipeline>.co-board{margin-top:8px}
+.co-fit-composition{border-top:1px solid var(--line);padding-top:17px;margin-top:14px}
+.co-fit-composition-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:11px;font-size:14px;color:var(--forest)}
+.co-fit-composition-head span{font-size:17px;font-weight:750;font-variant-numeric:tabular-nums}
+.co-fit-segments{display:flex;overflow:hidden;height:16px;border-radius:5px;background:#e9efeb;gap:2px;width:100%}
+.co-fit-segment{display:block;min-width:0;flex-shrink:0;height:100%}
+.co-fit-suitability{background:#276849}
+.co-fit-evidence{background:#4b9a8a}
+.co-fit-proximity{background:#5989c2}
+.co-fit-readiness{background:#d59f49}
+.co-fit-unearned{background:#e9efeb}
+.co-fit-legend{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 20px;margin:13px 0 8px}
+.co-fit-legend>div{display:flex;align-items:center;gap:8px;font-size:13px;line-height:1.45;color:var(--sub)}
+.co-fit-legend strong{font-weight:700;color:var(--forest);margin-left:auto;font-variant-numeric:tabular-nums;white-space:nowrap}
+.co-fit-dot{display:block;flex:0 0 10px;width:10px;height:10px;border-radius:2px}
+.co-fit-composition .co-note{margin-top:9px}
+@media(max-width:650px){.co-fit-legend{grid-template-columns:1fr}.co-dashboard-pipeline>.co-section-head .co-actions{margin-left:0}}
+
+.co-dashboard-pipeline{scroll-margin-top:90px}

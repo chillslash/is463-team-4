@@ -18,7 +18,7 @@ const PORT=Number(process.env.PORT || 4173);
 const AI_PROVIDER=['codex','claude'].includes(process.env.AI_PROVIDER)?process.env.AI_PROVIDER:'template';
 let discoveryStatus={active:false,phase:'Idle',completed:0,total:0};
 const digest=v=>createHash('sha256').update(JSON.stringify(v)).digest('hex');
-const ROUTES={'/':'this_week','/this-week':'this_week','/find-partners':'find_partners','/outreach':'outreach_draft','/pipeline':'pipeline','/log-handover':'log_handover'};
+const ROUTES={'/':'this_week','/dashboard':'this_week','/this-week':'this_week','/find-partners':'find_partners','/outreach':'outreach_draft','/pipeline':'this_week','/log-handover':'log_handover'};
 const FILE_TYPES={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8','.md':'text/markdown; charset=utf-8','.png':'image/png'};
 let serial=Promise.resolve();
 async function readState(){if(!existsSync(DB_PATH)){const seed=initialState();await store(seed);return seed;}const s=JSON.parse(await readFile(DB_PATH,'utf8'));const defaults=initialState().settings;for(const field of ['referenceLat','referenceLon','referenceLabel'])s.settings[field]=defaults[field];delete s.settings.aiProvider;s.discoveryRuns??=[];for(const p of s.partners){delete p.fee;if(p.source==='Fictional Stitch scenario'&&p.status==='suggested')p.status='interested';if(Number.isFinite(p.lat)&&Number.isFinite(p.lon))p.distanceKm=distanceKm(defaults.referenceLat,defaults.referenceLon,p.lat,p.lon);}return s;}

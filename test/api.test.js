@@ -14,7 +14,7 @@ const call=async(path,method='GET',body)=>{const r=await fetch(base+path,{method
 test.after(async()=>{server.close();await once(server,'close');await rm(tmp,{recursive:true,force:true});});
 test('health and each HTML page loads',async()=>{
  const {data}=await call('/api/health');assert.equal(data.ok,true);
- for(const p of ['/this-week','/find-partners','/outreach','/pipeline','/log-handover']){const r=await fetch(base+p);assert.equal(r.status,200);assert.match(await r.text(),/\/app.js/);}
+ for(const p of ['/dashboard','/this-week','/find-partners','/outreach','/pipeline','/log-handover']){const r=await fetch(base+p);assert.equal(r.status,200);assert.match(await r.text(),/\/app.js/);}
 });
 test('settings, partner updates, handovers persist and reflect actual vs confirmed outcomes',async()=>{
  let state=(await call('/api/state')).data;assert.equal(state.metrics.gapKg,42);
