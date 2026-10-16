@@ -4,6 +4,7 @@ import {existsSync} from 'node:fs';
 import {join, resolve, extname} from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {initialState, numbers, rankPartners, osmCandidates, nparksCandidates, draftTemplate, STATUSES} from './src/core.js';
+import {AI_PROVIDERS,generateJSON,validateDraft,validateAssessment} from './src/ai.js';
 
 const ROOT=process.cwd();
 const DB_PATH=process.env.DATA_FILE || join(ROOT,'data','state.json');
@@ -67,12 +68,27 @@ async function discover(s){
  }finally{clearTimeout(timer);}
 }
 
-async function aiDraft(p,kg){const base=draftTemplate(p,kg);const key=process.env.OPENAI_API_KEY;
- if(!key)return base;
- const facts=`CoffeeBot collects coffee grounds from coffee machines. Grounds are sun-dried and stored at HQ; moisture is NOT measured. Do not state safety or suitability as fact. The candidate organisation ${p.name} is listed as ${p.category} with ${p.use}. Their willingness, acceptance fees and capacity are NOT confirmed unless recorded explicitly. Fee: ${p.fee}; capacity: ${p.capacityKg ?? 'unknown'}; status: ${p.status}. Do not invent contacts, fees, capacity, agreements or evidence. Suggest a trial up to ${Math.min(10,Math.max(1,kg||10))} kg subject to agreement. Draft an email to ask about use, fees, authority, conditions, frequency and collection. Return JSON object with keys subject,body,guide.`;
- try{const c=new AbortController();const t=setTimeout(()=>c.abort(),12000);let r;try{r=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',signal:c.signal,headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({model:process.env.OPENAI_MODEL||'gpt-4.1-mini',temperature:0.2,response_format:{type:'json_object'},messages:[{role:'system',content:'Draft cautious, professional emails for a human to review. Use only supplied facts and label uncertainties.'},{role:'user',content:facts}]})});}finally{clearTimeout(t);}
- if(!r.ok)throw new Error(`AI HTTP ${r.status}`);const obj=JSON.parse((await r.json()).choices[0].message.content);if(!obj.body||!obj.subject||!obj.guide)throw new Error('Incomplete AI draft');return {subject:cleanString(obj.subject,300),body:cleanString(obj.body,8000),guide:cleanString(obj.guide,2500),mode:'AI-assisted draft (staff review required)'};
- }catch(err){return {...base,mode:`Template fallback (AI unavailable: ${err.message})`};}
+async function aiDraft(p,kg,provider){
+ const base=draftTemplate(p,kg);
+ if(provider==='template')return base;
+ const facts={organisation:p.name,category:p.category,possibleUse:p.use,source:p.source,sourceUrl:p.sourceUrl,location:p.location,verified:p.verified,fee:p.fee,weeklyCapacityKg:p.capacityKg,contact:p.contactName,notes:p.notes,
+   grounds:'CoffeeBot grounds are collected and sun-dried at HQ. Moisture content is not measured.',
+   trialMaxKg:Math.min(10,Math.max(1,kg||10))};
+ const prompt='Write a professional first-contact email plus short handling/verification guide as strictly JSON with keys subject, body, guide. Do not use tools, browse, or infer that a place is willing to accept grounds. Do not invent a recipient, safe-use claims, fees, capacity, ongoing agreement or authorised contact. Ask about any acceptance fees, costs, suitability, regularity and authorised approval. The email will be reviewed by staff and NOT sent automatically. Facts: '+JSON.stringify(facts);
+ const draft=validateDraft(await generateJSON(provider,prompt));
+ return {...draft, mode:provider+' CLI-assisted draft — review before use'};
+}
+async function assessCandidates(s){
+ const provider=s.settings.aiProvider||'template';
+ if(provider==='template')fail('Select Codex or Claude under AI settings before assessing candidates');
+ const targets=s.partners.filter(p=>p.status==='suggested'&&!p.verified&&p.source!=='Fictional Stitch scenario').slice(0,18);
+ if(!targets.length)fail('Discover live organisations before running AI assessment');
+ const facts=targets.map(p=>({id:p.id,name:p.name,category:p.category,use:p.use,location:p.location,source:p.source,sourceUrl:p.sourceUrl}));
+ const prompt='Assess these public-data candidate sites for POSSIBLE CoffeeBot spent-grounds reuse. Use ONLY the supplied facts; do NOT browse or use tools. We have no proof any site wants grounds, accepts material, has capacity, or charges a fee. Prioritise plausible contact/reuse opportunities but never label a candidate confirmed. Return one JSON object with assessments array of {id,priority (high|medium|low),reason (short, explicitly uncertain),check (one crucial verification question)}. Do not make up evidence or contacts. Candidates: '+JSON.stringify(facts);
+ const results=validateAssessment(await generateJSON(provider,prompt),targets.map(p=>p.id));
+ const lookup=new Map(results.map(a=>[a.id,a]));
+ for(const p of targets){const a=lookup.get(p.id);if(a)p.aiAssessment={...a,provider,assessedAt:new Date().toISOString()};}
+ return {provider,assessed:lookup.size,candidates:targets.length,note:'AI triage uses supplied data, not independent web verification. Acceptance and fees remain unknown.'};
 }
 export function createApp(){return createServer(async(req,res)=>{
  try{
@@ -82,9 +98,11 @@ export function createApp(){return createServer(async(req,res)=>{
   if(path==='/api/settings'&&req.method==='PATCH'){
    const v=await input(req);const changed=await mutation(s=>{for(const [key,min,max] of [['cupsPerWeek',0,10000000],['gramsPerCup',1,1000],['referenceLat',1.1,1.55],['referenceLon',103.5,104.1]])if(Object.hasOwn(v,key))s.settings[key]=validNumber(v[key],key,min,max);
     for(const k of ['reportingCollectedKg','reportingDiscardedKg'])if(Object.hasOwn(v,k))s.settings[k]=v[k]===null||v[k]===''?null:validNumber(v[k],k,0,100000000);
-    if(Object.hasOwn(v,'referenceLabel'))s.settings.referenceLabel=cleanString(v.referenceLabel,150);return s.settings;});return response(res,200,changed);
+    if(Object.hasOwn(v,'referenceLabel'))s.settings.referenceLabel=cleanString(v.referenceLabel,150);
+    if(Object.hasOwn(v,'aiProvider')){if(!AI_PROVIDERS.includes(v.aiProvider))fail('Invalid AI provider');s.settings.aiProvider=v.aiProvider;}return s.settings;});return response(res,200,changed);
   }
   if(path==='/api/discover'&&req.method==='POST'){const result=await mutation(discover);return response(res,200,result);}
+  if(path==='/api/assess'&&req.method==='POST'){const result=await mutation(assessCandidates);return response(res,200,result);}
   if(path==='/api/partners'&&req.method==='POST'){
    const payload=await input(req);const result=await mutation(s=>{const p=validatePartnerFields(payload,{id:randomUUID(),source:'Staff-entered lead',sourceUrl:'',verified:false,confirmed:false,fee:'unknown',capacityKg:null,status:'suggested',willingness:'unknown'});s.partners.push(p);return p;});return response(res,201,result);
   }
@@ -93,7 +111,7 @@ export function createApp(){return createServer(async(req,res)=>{
    const v=await input(req);const updated=await mutation(s=>{const idx=s.partners.findIndex(p=>p.id===pm[1]);if(idx<0)throw Object.assign(new Error('Partner not found'),{status:404});s.partners[idx]=validatePartnerFields(v,s.partners[idx]);return s.partners[idx];});return response(res,200,updated);
   }
   if(path==='/api/draft'&&req.method==='POST'){
-   const {partnerId}=await input(req);const s=await readState();const p=s.partners.find(x=>x.id===partnerId);if(!p)fail('Select a partner');const gap=numbers(s.settings,s.partners,s.handovers).gapKg;const draft=await aiDraft(p,gap);return response(res,200,{...draft,partnerId});
+   const {partnerId}=await input(req);const s=await readState();const p=s.partners.find(x=>x.id===partnerId);if(!p)fail('Select a partner');const gap=numbers(s.settings,s.partners,s.handovers).gapKg;const draft=await aiDraft(p,gap,s.settings.aiProvider||'template');return response(res,200,{...draft,partnerId});
   }
   if(path==='/api/outreach'&&req.method==='POST'){
    const v=await input(req);const saved=await mutation(s=>{if(!s.partners.some(p=>p.id===v.partnerId))fail('Partner not found');if(!cleanString(v.body))fail('Message required');const entry={id:randomUUID(),partnerId:v.partnerId,subject:cleanString(v.subject,300),body:cleanString(v.body,10000),preparedAt:new Date().toISOString(),sent:false};s.outreach.unshift(entry);return entry;});return response(res,201,saved);

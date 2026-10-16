@@ -1,5 +1,5 @@
 export const STATUSES = ['suggested', 'contacted', 'interested', 'trial', 'regular', 'closed'];
-export const DEFAULT_SETTINGS = { cupsPerWeek: 9100, gramsPerCup: 20, referenceLat: 1.3000, referenceLon: 103.8500, referenceLabel: 'Singapore city centre (demo reference)', reportingCollectedKg: null, reportingDiscardedKg: null };
+export const DEFAULT_SETTINGS = { cupsPerWeek: 9100, gramsPerCup: 20, referenceLat: 1.3000, referenceLon: 103.8500, referenceLabel: 'Singapore city centre (demo reference)', reportingCollectedKg: null, reportingDiscardedKg: null, aiProvider: 'template' };
 const demo = (id, name, category, status, capacityKg = null, extra = {}) => ({
   id, name, category, status, capacityKg, fee: 'unknown', willingness: status === 'regular' ? 'confirmed (demo)' : 'unknown',
   verified: status === 'regular', confirmed: status === 'regular', use: 'Potential soil and compost applications',
@@ -74,7 +74,7 @@ export function draftTemplate(p, kg) {
   const hello=p.contactName?`Dear ${p.contactName},`:'Hello,';
   return {subject:`CoffeeBot — exploring a small spent coffee grounds reuse trial with ${p.name}`,
    body:`${hello}\n\nI'm reaching out from CoffeeBot about a possible collaboration with ${p.name}. We collect spent coffee grounds from our coffee machines and are looking for regular partners who may be able to put them to good use.\n\nWe understand your organisation may be involved in ${p.category}. Would spent coffee grounds be relevant to your activities? Our grounds are collected, sun-dried at our headquarters and stored; moisture content has not been measured. We would first like to confirm your requirements and whether this material would be appropriate for your intended use.\n\nIf there is interest, would you consider discussing a small trial of up to ${trial} kg? We would appreciate knowing what quantity and schedule might work, who could approve such an arrangement, whether there are any acceptance fees, and what handling or collection arrangements you require.\n\nThank you for considering this. We would be happy to discuss the details.\n\nBest regards,\nCoffeeBot Partnerships`,
-  guide:`Potential use: ${p.use || 'To be discussed with the organisation'}.\nCoffeeBot currently sun-dries grounds; moisture content is not measured. Store and handle according to recipient requirements. Confirm suitability with the recipient before application. Do not claim agronomic or food-safety benefits without evidence. Ask for feedback on amount accepted, intended use and whether the grounds were ultimately reused.`, mode:'Template fallback (no AI key configured)'};
+  guide:`Potential use: ${p.use || 'To be discussed with the organisation'}.\nCoffeeBot currently sun-dries grounds; moisture content is not measured. Store and handle according to recipient requirements. Confirm suitability with the recipient before application. Do not claim agronomic or food-safety benefits without evidence. Ask for feedback on amount accepted, intended use and whether the grounds were ultimately reused.`, mode:'Template fallback (no AI selected)'};
 }
 
 /** Public NParks parks dataset. A physical site is NOT an accepting partner. */

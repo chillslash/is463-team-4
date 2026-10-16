@@ -19,7 +19,7 @@ The first run creates `data/state.json` with the **fictional midterm demonstrati
 
 1. **This Week:** Start with 9,100 illustrative cups × 20 g = 182 kg forecast, 140 kg simulated regular pickup capacity, 42 kg projected gap. Change values via **Edit forecast** to recompute them.
 2. **Find Partners:** Click **Discover live sites** to retrieve real geographic candidates from the official [NParks Parks dataset on data.gov.sg](https://data.gov.sg/datasets/d_0542d48f0991541706b58059381a6eca/view), with the [OpenStreetMap Overpass API](https://wiki.openstreetmap.org/wiki/Overpass_API) as fallback. This is a live API query, not HTML scraping. It may fail if the public service is down/rate-limited; the error is shown and existing leads remain. Inspect the source link and unknowns. You can add or edit leads manually.
-3. **Outreach:** Select a candidate, generate an editable draft, review it, and copy or save it. No email is sent. Without `OPENAI_API_KEY` the app uses a transparent, safe template. With a key it attempts AI generation, falling back to the template if unavailable.
+3. **Outreach:** Select a candidate, generate an editable draft, review it, and copy or save it. No email is sent. Choose the local AI provider (Codex, Claude, or a safe template) via **AI settings**. Signed-in local CLI is required for model-generated drafts; no API key is needed.
 4. **Pipeline:** Move a lead through Suggested → Contacted → Interested → Trial → Regular. Only **verified + confirmed + regular** capacity counts against the projected gap; all other capacities remain prospective.
 5. **Log Handover:** Record actual kilogram amounts and distinguish unverified transfer, partner-confirmed intended use, and confirmed actual reuse. Tracked outcomes update immediately. Provide *measured* collected kilograms separately for a reuse-rate denominator.
 
@@ -49,8 +49,20 @@ Keep credentials in environment variables, not Git. No remote GitHub repository 
 
 - `public/*.html` — original Stitch design shell for five screens, wired to the shared app.
 - `public/app.js`, `public/app.css` — screens, interactions and styling.
-- `server.js` — minimal HTTP API, persistence, live discovery and optional draft generation.
+- `src/ai.js` — local Claude Code and Codex CLI adapters, structured response parsing, strict timeouts.\n- `server.js` — minimal HTTP API, persistence, live discovery and optional draft generation.
 - `src/core.js` — model, forecast, ranking, OpenStreetMap transformation, fallback outreach.
 - `test/` — calculations and API integration tests.
 - `docs/` — problem statement and prototype specification.
 - `design/DESIGN.md` — original Stitch design tokens and notes.
+
+## AI via group members' subscriptions
+
+The app runs locally. Each teammate independently installs and signs into either the **Codex CLI** (ChatGPT account) or **Claude Code CLI** (Claude account), then chooses that provider using **AI settings** in the UI. The choice is saved in local `data/state.json` (gitignored). It is used for both **Assess with AI** on discovered candidates and **Generate draft** on Outreach. Selection `No AI` uses an explicit rule-based email and disables AI candidate assessment.
+
+- Codex: Install `@openai/codex`, run `codex login`, then check `codex exec --help`.
+- Claude: Install the official Claude Code CLI, run `claude` and authenticate, then check `claude --help`.
+- Launch `npm start` under the **same operating-system user** who authenticated that CLI.
+- CLI entitlements and usage limits depend on each teammate's plan. App subscriptions do not give third-party API keys. API billing/keys are not required for this **local CLI** integration.
+- The app sends bounded text prompts over standard input. Codex runs in a read-only sandbox; Claude's tools are disabled. Models only draft text or triage publicly sourced candidates; they must not be trusted as evidence of acceptance, fees, contact authority or capacity.
+- If a CLI is missing, not signed in, or returns invalid JSON, the UI reports an error instead of quietly pretending AI ran. Use the No AI setting for template drafting.
+- The CLI-dependent paths are tested using a mock runner; **real subscription-authenticated inference must be tested by a logged-in teammate**. The Gateway account does not have these CLIs installed.
