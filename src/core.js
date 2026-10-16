@@ -30,26 +30,47 @@ export function numbers(settings, partners, handovers) {
   return { forecastKg, confirmedKg, gapKg, transferredKg, evidencedKg, collectedKg, discardedKg: settings.reportingDiscardedKg, reuseRate: collectedKg > 0 ? round(100 * evidencedKg / collectedKg) : null };
 }
 export const round = n => Math.round((n + Number.EPSILON) * 10) / 10;
-export function scorePartner(p, gap) {
-  const category = (p.category || '').toLowerCase();
-  const use = (p.use || '').toLowerCase();
-  let score = 0; const reasons=[]; const checks=[];
-  if (/garden|park|farm|compost|nursery|horticulture|zoo/.test(category+' '+use)) {score+=38;reasons.push('Plausible horticultural or composting use');}
-  else {score+=12;reasons.push('Possible reuse application; verify intended use');}
-  if (/community garden|urban farm|nursery|allotment/.test(category)) {score+=12; reasons.push('Growing site has a potentially relevant activity (not confirmed acceptance)');}
-
-  if (p.verified) {score+=20; reasons.push('Details staff-verified');} else checks.push('Confirm organisation interest and authorised contact');
-  if (Number.isFinite(Number(p.capacityKg)) && p.capacityKg !== null && Number(p.capacityKg) > 0){score+=Math.min(15,10+Number(p.capacityKg)/Math.max(1,gap)*5); reasons.push(`Recorded capacity ${p.capacityKg} kg/week`);}
-  else checks.push('Confirm weekly capacity and frequency');
-  if(Number.isFinite(Number(p.distanceKm)) && p.distanceKm !== null){score+=Math.max(0,12-Number(p.distanceKm)); reasons.push(`Approximately ${p.distanceKm} km from reference point`);}
-  else checks.push('Check collection route and distance');
-  if(p.aiAssessment?.priority==='high'){score+=14; reasons.push('AI identified a plausible use; staff verification needed');}
-  else if(p.aiAssessment?.priority==='medium'){score+=6;}
-  else if(p.aiAssessment?.priority==='low'){score-=9;}
-  if(p.status==='closed') score-=100;
-  return { score:Math.round(score), reasons, checks };
+// Fit is an evidence-backed decision aid, not a probability of acceptance.
+export function scorePartner(p,gap){
+ const category=String(p.category||'').toLowerCase(),use=String(p.use||'').toLowerCase(),src=String(p.source||'').toLowerCase();
+ const text=category+' '+use;
+ let suitability=12;
+ if(p.directCoffeeEvidence) suitability=40;
+ else if(/organic waste recycler|compost|vermicompost/.test(category))suitability=33;
+ else if(/community garden|school garden|urban farm|nursery|horticultur|allotment/.test(category))suitability=30;
+ else if(/park/.test(category))suitability=16;
+ else if(/garden|farm|grow/.test(text))suitability=25;
+ else if(/school programme|sustainab/.test(text))suitability=12;
+ else if(/landscap/.test(text))suitability=16;
+ const ai=p.aiAssessment?.priority;
+ if(ai==='high')suitability=Math.min(40,suitability+4);
+ if(ai==='medium')suitability=Math.min(40,suitability+1);
+ if(ai==='low')suitability=Math.max(0,suitability-6);
+ let evidence=8;
+ if(p.directCoffeeEvidence)evidence=30;
+ else if(src.includes('nea food waste'))evidence=24;
+ else if(src.includes('community in bloom'))evidence=24;
+ else if(src.includes('moe school'))evidence=20;
+ else if(src.includes('nparks'))evidence=18;
+ else if(src.includes('openstreetmap'))evidence=13;
+ else if(src.includes('lias'))evidence=12;
+ if(p.verified)evidence=Math.min(30,evidence+3);
+ const km=Number(p.distanceKm);
+ // Unknown distance receives a neutral midpoint, never an invented kilometre figure.
+ const proximity=p.distanceKm==null||!Number.isFinite(km)?10:Math.round(Math.max(0,20-0.8*Math.max(0,km)));
+ const operations=Math.min(10,(p.verified?5:0)+(p.confirmed&&p.capacityKg>0?5:0)+(p.contactEmail?2:0));
+ const score=Math.max(0,Math.min(100,Math.round(suitability+evidence+proximity+operations)));
+ const reasons=[
+  p.directCoffeeEvidence?'NEA records used coffee grounds among this facility’s accepted waste materials':
+   /garden|farm|nursery|compost|landscap|recycl/.test(text)?'Source records indicate potentially relevant operations':'Source records a possible outreach lead; the reuse connection needs checking',
+  (p.distanceKm==null?'HQ distance not established':'Approximately '+p.distanceKm+' km straight-line from HQ'),
+ ];
+ if(ai)reasons.push('AI assessment: '+ai+' potential, based on the recorded sources');
+ const checks=['Confirm willingness to accept CoffeeBot spent grounds','Confirm suitable condition, kg/week, transport arrangement and authorised contact'];
+ return {score,parts:{suitability,evidence,proximity,operations},reasons,checks};
 }
-export function rankPartners(partners, gap){return partners.filter(p=>p.status!=='closed'&&p.status!=='regular').map(p=>({...p,match:scorePartner(p,gap)})).sort((a,b)=>b.match.score-a.match.score||a.name.localeCompare(b.name));}
+export function rankPartners(partners,gap){return partners.filter(p=>p.status!=='closed'&&p.status!=='regular').map(p=>({...p,match:scorePartner(p,gap)})).sort((a,b)=>b.match.score-a.match.score||a.name.localeCompare(b.name));}
+
 export function distanceKm(lat1,lon1,lat2,lon2) {
   const rad=Math.PI/180;const dlat=(lat2-lat1)*rad,dlon=(lon2-lon1)*rad;
   const a=Math.sin(dlat/2)**2+Math.cos(lat1*rad)*Math.cos(lat2*rad)*Math.sin(dlon/2)**2;

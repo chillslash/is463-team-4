@@ -18,6 +18,8 @@ let officialCalls=0;
 globalThis.fetch=async(url,opts)=>{
  const u=String(url);
  if(u.startsWith(base))return httpFetch(url,opts);
+ if(u.includes('lias.org.sg/members-list'))return new Response('<table id="tablepress-1"><tbody><tr><td>Corporate</td><td>Garden Grower Ltd</td><td>20 Sample Road</td></tr></tbody></table>',{status:200});
+ if(u.includes('nea.gov.sg/our-services/'))return new Response('<h3>Local food waste recycling facilities</h3><table><tbody><tr><td>A1 Environment Pte Ltd</td><td>Contact</td><td>Used coffee grounds</td></tr></tbody></table>',{status:200});
  if(u.includes('poll-download')){officialCalls++;const id=u.match(/d_[a-f0-9]+/)?.[0];return new Response(JSON.stringify({code:0,data:{url:'https://s3.ap-southeast-1.amazonaws.com/'+id+'.csv'}}),{status:200});}
  if(u.includes('amazonaws.com')){
   officialCalls++;
@@ -33,8 +35,8 @@ test.after(async()=>{globalThis.fetch=httpFetch;server.close();await once(server
 const api=async(path,method='GET',body)=>{const r=await fetch(base+path,{method,headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});return {status:r.status,body:await r.json()};};
 test('one discovery action persists source citations, run audit and source-cache reuse',async()=>{
  const first=await api('/api/discover','POST',{});
- assert.equal(first.status,200);assert.equal(first.body.added,3);assert.equal(first.body.assessed,0);
- assert.equal(first.body.sources.length,3);
+ assert.equal(first.status,200);assert.equal(first.body.added,5);assert.equal(first.body.assessed,0);
+ assert.equal(first.body.sources.length,5);
  assert.equal(first.body.warnings.length,1);
  let s=(await api('/api/state')).body;
  assert.equal(s.partners.filter(p=>p.source==='Fictional Stitch scenario'&&p.status==='suggested').length,0);

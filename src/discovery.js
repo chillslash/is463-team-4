@@ -5,6 +5,7 @@ const CACHE_DIR=process.env.SOURCE_CACHE_DIR||join(process.cwd(),'data','source-
 const DAY_MS=24*60*60*1000;
 function cachedResponse(body,savedAt,fromCache){return {json:async()=>JSON.parse(body),text:async()=>body,snapshotAt:savedAt,fromCache};}
 import {cibCandidates, nparksCandidates, osmCandidates} from './core.js';
+import {DIRECTORY_SOURCES} from './directories.js';
 import {moeSchoolCandidates,parseCSV,SCHOOL_PROGRAMMES_ID,SCHOOL_DIRECTORY_ID} from './moe.js';
 
 const DATA_URL = 'https://api-open.data.gov.sg/v1/public/api/datasets/';
@@ -82,6 +83,24 @@ async function fetchSchools(reference,httpFetch,useCache){
  },18000);
 }
 
+async function fetchDirectory(item,httpFetch,useCache){
+ return withDeadline(async signal=>{
+  const id='directory-'+item.name.toLowerCase().replace(/[^a-z0-9]+/g,'-');
+  const filename=join(CACHE_DIR,id+'.json');
+  let old=null;
+  if(useCache){try{old=JSON.parse(await readFile(filename,'utf8'));if(Date.now()-Date.parse(old.savedAt)<DAY_MS){const candidates=item.parse(old.body);if(candidates.length)return {key:item.name,candidates,cached:true,snapshotAt:old.savedAt};}}catch{}}
+  try{
+    const resp=await httpFetch(item.url,{signal,headers:{'User-Agent':'CoffeeBot-IS463-Prototype/0.3'}});
+    if(!resp.ok)throw Error('HTTP '+resp.status);
+    const body=await resp.text(),candidates=item.parse(body);
+    if(!candidates.length)throw Error('Directory structure not recognised or no relevant entries');
+    const savedAt=new Date().toISOString();
+    if(useCache){try{await mkdir(CACHE_DIR,{recursive:true});await writeFile(filename,JSON.stringify({body,savedAt}),'utf8');}catch{}}
+    return {key:item.name,candidates,cached:false,snapshotAt:savedAt};
+  }catch(err){if(old?.body){const candidates=item.parse(old.body);if(candidates.length)return {key:item.name,candidates,cached:true,snapshotAt:old.savedAt};}throw err;}
+ },18000);
+}
+
 async function fetchOSM(reference,httpFetch) {
  let error='';
  for(const endpoint of OSM_ENDPOINTS){
@@ -97,14 +116,16 @@ async function fetchOSM(reference,httpFetch) {
  }
  throw new Error(error||'OSM service unavailable');
 }
-export async function discoverAll(reference,{httpFetch=fetch,includeOSM=true,useCache=httpFetch===fetch}={}){
+export async function discoverAll(reference,{httpFetch=fetch,includeOSM=true,includeDirectories=true,useCache=httpFetch===fetch}={}){
  // Independent sources: a failed OSM endpoint must never suppress community gardens or parks.
  const requests=DATASETS.map(item=>fetchDataset(item,reference,httpFetch,useCache));
  requests.push(fetchSchools(reference,httpFetch,useCache));
+ if(includeDirectories)requests.push(...DIRECTORY_SOURCES.map(item=>fetchDirectory(item,httpFetch,useCache)));
  if(includeOSM)requests.push(fetchOSM(reference,httpFetch));
  const outcomes=await Promise.allSettled(requests),sources=[],warnings=[],entries=[];
  for(let i=0;i<outcomes.length;i++){
-  const item=outcomes[i];const label=i<DATASETS.length?DATASETS[i].key:i===DATASETS.length?'MOE school programmes':'OpenStreetMap';
+  const item=outcomes[i];const labels=[...DATASETS.map(item=>item.key),'MOE school programmes',...(includeDirectories?DIRECTORY_SOURCES.map(x=>x.name):[]),...(includeOSM?['OpenStreetMap']:[])];
+  const label=labels[i];
   if(item.status==='fulfilled'){
    sources.push({name:item.value.key,found:item.value.candidates.length,cached:!!item.value.cached,snapshotAt:item.value.snapshotAt||new Date().toISOString()});
    entries.push(...item.value.candidates);

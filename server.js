@@ -41,7 +41,7 @@ function validatePartnerFields(payload,current={}){
  if(p.status!=='regular')p.confirmed=false;
  return p;
 }
-function sourceFacts(p){return {id:p.id,name:p.name,category:p.category,use:p.use,distanceKm:p.distanceKm,sourceEvidence:(p.evidenceEntries||[{source:p.source,url:p.sourceUrl,claim:'Source lists '+p.name}]).map(e=>({source:e.source,url:e.url,claim:e.claim}))};}
+function sourceFacts(p){return {id:p.id,name:p.name,category:p.category,use:p.use,distanceKm:p.distanceKm,directCoffeeEvidence:!!p.directCoffeeEvidence,materialEvidence:p.materialEvidence||null,sourceEvidence:(p.evidenceEntries||[{source:p.source,url:p.sourceUrl,claim:'Source lists '+p.name}]).map(e=>({source:e.source,url:e.url,claim:e.claim}))};}
 async function discover(s){
  const runId=randomUUID(),startedAt=new Date().toISOString();
  discoveryStatus={active:true,phase:'Retrieving source data',completed:0,total:2,runId};

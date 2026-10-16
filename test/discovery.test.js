@@ -18,7 +18,7 @@ test('independent data sources merge even when OpenStreetMap is unavailable',asy
   if(url.includes('amazonaws.com')){const cib=url.includes('d_f91');const item=cib?{features:[geo('Demo CIB Garden',{GARDENID:5})]}:{features:[{geometry:{type:'Point',coordinates:[103.86,1.35]},properties:{NAME:'Demo Park',OBJECTID:6}}]};return {ok:true,json:async()=>item,text:async()=>JSON.stringify(item)};}
   return {ok:false,status:502};
  };
- const r=await discoverAll(ref,{httpFetch:get});
+ const r=await discoverAll(ref,{httpFetch:get,includeDirectories:false});
  assert.equal(r.sources.length,2);
  assert.equal(r.candidates.length,2);
  assert.equal(r.warnings.length,2);
