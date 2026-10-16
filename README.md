@@ -39,6 +39,8 @@ Live discovery aggregates independently from:
 - [NParks public parks](https://data.gov.sg/datasets/d_0542d48f0991541706b58059381a6eca/view): possible sites for horticultural activity.
 - [MOE School Distinctive Programmes](https://data.gov.sg/datasets/d_db1faeea02c646fa3abccfa5aba99214/view), joined with the [MOE School Directory](https://data.gov.sg/datasets/d_688b934f82c1059ed0a6993d2a829089/view): schools with documented sustainability-related programmes. **A programme does not prove the presence of a garden or a willingness to accept grounds.**
 - [OpenStreetMap Overpass](https://wiki.openstreetmap.org/wiki/Overpass_API): named growing sites, gardens, nurseries, parks and zoos; public endpoints may be unavailable.
+- [NEA Food Waste Recycling Facilities](https://www.nea.gov.sg/our-services/waste-management/3r-programmes-and-resources/food-waste-management/food-distribution-organisations-local-recycling-facilities-and-suppliers): facilities and published accepted materials. Some listings explicitly mention used coffee grounds. The separate equipment-supplier table is excluded.
+- [Landscape Industry Association (Singapore) members](https://lias.org.sg/members-list/): landscape and horticultural operators. Membership is not proof of grounds acceptance.
 
 The source searches are independent, so one failed API need not cancel all results. Successful official dataset snapshots are cached under `data/source-cache/` for up to 24 hours, with stale snapshots usable during outages. Each saved candidate has source records/URLs, its initial sourced date (if known) and last-seen date. Older imports with an unknown first-sourced date are not assigned a fabricated original date.
 
@@ -63,3 +65,10 @@ The app is a single-user local prototype using JSON state, not a production mult
 - `server.js`: API, JSON persistence, batch AI assessment and discovery audit.
 - `test/`: unit and API integration tests.
 - `docs/`: problem statement and prototype scope.
+
+## Discovery and UI refinement
+
+- Fit Score is an explainable 0–100 relevance score, not the probability of acceptance. Weights: reuse suitability 40, source evidence 30, proximity 20, operational readiness 10. AI adds a bounded adjustment. Unknown location receives neutral proximity points without a fabricated distance.
+- Find Partners supports Best Fit, Nearest and Recently Sourced sorting, Why Recommended notes, expandable source and scoring details, and SGT timestamps. The discovery progress bar replaces the last-scan summary only during scanning.
+- Pipeline shows at most five Suggested leads with a View All link. The later stages retain their members. Outreach has a searchable partner field, and Save Draft is clearly distinct from sending. Unverified badges have been removed from the routine card view.
+- A dated local-state backup is required before resetting the historical Suggested list; later-stage demo partners and the cached public source snapshots are preserved. A subsequent discovery can then regenerate Suggested results and new sourcing dates.
