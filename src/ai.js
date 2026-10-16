@@ -59,8 +59,8 @@ export async function generateJSON(provider, prompt, {runner=spawn, timeoutMs=90
   });
 }
 export function validateDraft(o) {
-  if (!o || typeof o.subject !== 'string' || typeof o.body !== 'string' || typeof o.guide !== 'string' || !o.subject.trim() || !o.body.trim() || !o.guide.trim()) throw new Error('AI draft was incomplete');
-  return {subject:o.subject.slice(0,300),body:o.body.slice(0,8000),guide:o.guide.slice(0,2500)};
+  if (!o || typeof o.subject !== 'string' || typeof o.body !== 'string' || !o.subject.trim() || !o.body.trim()) throw new Error('AI draft was incomplete');
+  return {subject:o.subject.slice(0,300),body:o.body.slice(0,8000),guide:typeof o.guide==='string'?o.guide.slice(0,2500):''};
 }
 export function validateAssessment(o, ids) {
   if (!o || !Array.isArray(o.assessments)) throw new Error('AI assessment was incomplete');

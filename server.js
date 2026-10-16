@@ -130,7 +130,7 @@ async function aiDraft(p,kg,provider){
  const facts={organisation:p.name,category:p.category,possibleUse:p.use,source:p.source,sourceUrl:p.sourceUrl,sourceEvidence:p.evidenceEntries,location:p.location,verified:p.verified,weeklyCapacityKg:p.capacityKg,contact:p.contactName,notes:p.notes,
    grounds:'CoffeeBot grounds are collected and sun-dried at HQ. Moisture content is not measured.',
    trialMaxKg:Math.min(10,Math.max(1,kg||10))};
- const prompt='Write a professional first-contact email plus short handling/verification guide as strictly JSON with keys subject, body, guide. Do not use tools, browse, or infer that a place is willing to accept grounds. Do not invent a recipient, safe-use claims, capacity, ongoing agreement or authorised contact. Ask about material suitability, transport arrangements, regularity and authorised approval. The email will be reviewed by staff and NOT sent automatically. Facts: '+JSON.stringify(facts);
+ const prompt='Write a concise professional first-contact email as strictly JSON with keys subject and body. Do not use tools, browse, or infer that a place is willing to accept grounds. Do not invent a recipient, safe-use claims, capacity, ongoing agreement or authorised contact. Ask about material suitability, transport arrangements, regularity and authorised approval. The email will be reviewed by staff and NOT sent automatically. Facts: '+JSON.stringify(facts);
  const draft=validateDraft(await generateJSON(provider,prompt));
  return {...draft, mode:provider+' CLI-assisted draft — review before use',audit:{provider,generatedAt:new Date().toISOString(),factsHash:digest(facts),sourceEvidence:p.evidenceEntries||[]}};
 }
