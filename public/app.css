@@ -132,3 +132,29 @@
 .co-evidence-links{font-size:14px;padding-left:20px;line-height:1.7}
 .co-evidence-links a{color:var(--leaf);text-decoration:underline}
 @media(max-width:760px){.co-last-scan{align-items:flex-start;flex-direction:column}.co-fit{align-self:flex-start}}
+
+.co-last-scan{display:flex;justify-content:space-between;align-items:center;gap:16px 24px;flex-wrap:wrap}
+.co-scan-primary{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.co-scan-primary span{font-size:14px;color:var(--ink);white-space:nowrap}
+.co-scan-meta{font-size:13px;color:var(--sub);text-align:right}
+.co-progress-fill{position:relative;overflow:hidden;min-width:8px}
+.co-progress-fill:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.48),transparent);animation:co-scan-sweep 1.5s ease-in-out infinite}
+@keyframes co-scan-sweep{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+@media(prefers-reduced-motion:reduce){.co-progress-fill:after{animation:none}}
+
+.co-discovery-card{border-color:#d9e5db;transition:border-color .15s ease,box-shadow .15s ease}
+.co-discovery-card:hover{border-color:#b6cdbb;box-shadow:0 2px 10px rgba(18,53,35,.055)}
+.co-discovery-card.co-highlight{border-left:4px solid #498565;background:linear-gradient(90deg,#f6faf6 0%,#fff 25%)}
+.co-discovery-card h3{font-size:19px;line-height:1.35}
+.co-fit{font-size:20px;font-weight:800;letter-spacing:-.025em;color:var(--forest)}
+.co-discovery-card .co-card-actions .co-button.alt{background:none;border:0;box-shadow:none;color:var(--leaf);text-decoration:underline;padding:6px 4px;min-height:30px}
+.co-contact{display:flex;align-items:baseline;gap:7px 12px;flex-wrap:wrap;font-size:14px;margin-top:10px}
+.co-contact strong{color:var(--forest)}
+.co-contact a{color:var(--leaf);text-decoration:underline;overflow-wrap:anywhere}
+.co-contact .co-contact-source{font-size:12px}
+.co-source-list{display:grid;gap:12px;margin-top:10px}
+.co-source-row{border:1px solid #e7eee8;border-radius:8px;padding:12px 14px;display:flex;justify-content:space-between;gap:12px;align-items:start;flex-wrap:wrap;background:#fbfdfb;font-size:14px}
+.co-source-row strong{color:var(--forest)}
+.co-source-row p{margin:4px 0 0!important;color:var(--sub);line-height:1.5}
+.co-source-row a{white-space:nowrap;font-weight:650;text-decoration:underline;color:var(--leaf)}
+@media(max-width:760px){.co-scan-primary{flex-direction:column;align-items:flex-start;gap:4px}.co-scan-meta{text-align:left}.co-source-row{flex-direction:column}}

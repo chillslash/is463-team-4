@@ -60,7 +60,7 @@ The app is a single-user local prototype using JSON state, not a production mult
 
 - `public/`: Stitch-inspired frontend and interactions.
 - `src/core.js`: scoring, demo state, forecasts and data transformations.
-- `src/discovery.js`, `src/moe.js`: multi-source search, caching and school programme data.
+- `src/discovery.js`, `src/moe.js`, `src/directories.js`, `src/contacts.js`: multi-source search, caching and school programme data.
 - `src/ai.js`: local Codex and Claude Code CLI adapters.
 - `server.js`: API, JSON persistence, batch AI assessment and discovery audit.
 - `test/`: unit and API integration tests.
@@ -68,7 +68,14 @@ The app is a single-user local prototype using JSON state, not a production mult
 
 ## Discovery and UI refinement
 
-- Fit Score is an explainable 0–100 relevance score, not the probability of acceptance. Weights: reuse suitability 40, source evidence 30, proximity 20, operational readiness 10. AI adds a bounded adjustment. Unknown location receives neutral proximity points without a fabricated distance.
+- Fit Score is an explainable 0–100 relevance score, not the probability of acceptance. Weights: reuse suitability 40, source evidence 35, proximity 10, operational readiness 15. AI adds a bounded adjustment. Unknown location receives neutral proximity points without a fabricated distance.
 - Find Partners supports Best Fit, Nearest and Recently Sourced sorting, Why Recommended notes, expandable source and scoring details, and SGT timestamps. The discovery progress bar replaces the last-scan summary only during scanning.
 - Pipeline shows at most five Suggested leads with a View All link. The later stages retain their members. Outreach has a searchable partner field, and Save Draft is clearly distinct from sending. Unverified badges have been removed from the routine card view.
 - A dated local-state backup is required before resetting the historical Suggested list; later-stage demo partners and the cached public source snapshots are preserved. A subsequent discovery can then regenerate Suggested results and new sourcing dates.
+
+## Evidence-backed contact discovery
+
+- NEA and LIAS public directory contacts are extracted directly, with the listing URL stored alongside each email. The app does not guess email addresses.
+- For promising leads with a source-linked organisation website but no email, it checks up to five public websites per discovery, inspecting at most three pages per site. Failed lookups are not repeated for seven days.
+- Candidate assessment rotates across independent source groups, saving results against original partner records and reusing unchanged assessments on later runs.
+- NParks datasets are sampled across broad geographic regions instead of taking only nearest locations. Proximity is now 10 of 100 Fit Score points. Last Scanned shows source success counts, and the progress bar animates during work.
