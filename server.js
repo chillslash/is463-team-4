@@ -7,6 +7,7 @@ import {randomUUID,createHash} from 'node:crypto';
 import {initialState, numbers, rankPartners, distanceKm, draftTemplate, STATUSES} from './src/core.js';
 import {generateJSON,validateDraft,validateAssessment} from './src/ai.js';
 import {discoverAll} from './src/discovery.js';
+import {researchPublicContact} from './src/contacts.js';
 
 const ROOT=process.cwd();
 // Optional per-member configuration, kept outside Git. Existing OS environment variables take precedence.
@@ -42,10 +43,30 @@ function validatePartnerFields(payload,current={}){
  return p;
 }
 function sourceFacts(p){return {id:p.id,name:p.name,category:p.category,use:p.use,distanceKm:p.distanceKm,directCoffeeEvidence:!!p.directCoffeeEvidence,materialEvidence:p.materialEvidence||null,sourceEvidence:(p.evidenceEntries||[{source:p.source,url:p.sourceUrl,claim:'Source lists '+p.name}]).map(e=>({source:e.source,url:e.url,claim:e.claim}))};}
+export function saveAIResults(partners,batch,results,{provider,prompt,runId}){
+ const byId=new Map(results.map(a=>[a.id,a]));let saved=0;
+ for(const ranked of batch){
+  const result=byId.get(ranked.id),record=partners.find(p=>p.id===ranked.id);
+  if(!record||!result)continue;
+  record.aiAssessment={...result,provider,assessedAt:new Date().toISOString(),factsHash:digest(sourceFacts(record)),promptHash:digest(prompt),runId,
+   basedOn:record.evidenceEntries?.map(e=>({source:e.source,url:e.url}))||[{source:record.source,url:record.sourceUrl}],method:'Inference from source records'};
+  saved++;
+ }
+ return saved;
+}
+export function chooseForAssessment(partners,limit=24){
+ const buckets=new Map();
+ for(const p of partners){const key=p.source||'Unknown';if(!buckets.has(key))buckets.set(key,[]);buckets.get(key).push(p);}
+ const selected=[];
+ while(selected.length<limit&&[...buckets.values()].some(a=>a.length)){
+  for(const bucket of buckets.values())if(bucket.length&&selected.length<limit)selected.push(bucket.shift());
+ }
+ return selected;
+}
 async function discover(s){
  const runId=randomUUID(),startedAt=new Date().toISOString();
  discoveryStatus={active:true,phase:'Retrieving source data',completed:0,total:2,runId};
- const run={id:runId,startedAt,provider:AI_PROVIDER,sources:[],warnings:[],newLeads:0,reviewed:0,aiCalls:0};
+ const run={id:runId,startedAt,provider:AI_PROVIDER,sources:[],warnings:[],newLeads:0,reviewed:0,aiCalls:0,contactsFound:0,contactPagesChecked:0};
  try{
   const result=await discoverAll(s.settings);
   run.sources=result.sources;run.warnings.push(...result.warnings);
@@ -59,36 +80,47 @@ async function discover(s){
     const prev=existing.evidenceEntries||[{source:existing.source,url:existing.sourceUrl,claim:'Previous source record'}];
     existing.evidenceEntries=[...prev,...p.evidenceEntries].filter((x,i,arr)=>arr.findIndex(y=>y.source===x.source&&y.url===x.url)===i);
     if(!Number.isFinite(existing.lat)&&Number.isFinite(p.lat)){existing.lat=p.lat;existing.lon=p.lon;existing.distanceKm=p.distanceKm;}
+    if(!existing.websiteUrl&&p.websiteUrl)existing.websiteUrl=p.websiteUrl;
+    if(!existing.directCoffeeEvidence&&p.directCoffeeEvidence){existing.directCoffeeEvidence=true;existing.materialEvidence=p.materialEvidence;existing.use=p.use;}
+    if(!existing.contactEmail&&p.contactEmail){existing.contactEmail=p.contactEmail;existing.contactName||=p.contactName||'';existing.contactEvidence=p.contactEvidence;run.contactsFound++;}
+
     continue;
    }
-   if(!ids.has(p.id)){s.partners.push(p);ids.add(p.id);run.newLeads++;}
+   if(!ids.has(p.id)){s.partners.push(p);ids.add(p.id);run.newLeads++;if(p.contactEmail)run.contactsFound++;}
   }
-  discoveryStatus={active:true,phase:'Ranking sourced leads',completed:1,total:2,runId};
+  discoveryStatus={active:true,phase:'Researching Public Contacts',completed:1,total:3,runId};
+  const sites=rankPartners(s.partners,numbers(s.settings,s.partners,s.handovers).gapKg)
+   .filter(p=>p.status==='suggested'&&!p.contactEmail&&p.websiteUrl&&(!p.contactSearch?.checkedAt||Date.now()-Date.parse(p.contactSearch.checkedAt)>7*86400000)).slice(0,5);
+  for(const ranked of sites){
+   const target=s.partners.find(p=>p.id===ranked.id);if(!target)continue;
+   const found=await researchPublicContact(target);
+   target.contactSearch={checkedAt:found.checkedAt,result:found.email?'found':'unavailable',pagesChecked:found.tried||0};
+   run.contactPagesChecked+=found.tried||0;
+   if(found.email){target.contactEmail=found.email;target.contactEvidence={source:'Organisation Website',url:found.sourceUrl,checkedAt:found.checkedAt,method:'website'};run.contactsFound++;}
+  }
+  discoveryStatus={active:true,phase:'Ranking Sourced Leads',completed:2,total:3,runId};
   if(AI_PROVIDER!=='template'){
    const candidates=rankPartners(s.partners,numbers(s.settings,s.partners,s.handovers).gapKg)
-    .filter(p=>p.source!=='Fictional Stitch scenario'&&!p.verified);
-   const pending=candidates.filter(p=>p.aiAssessment?.factsHash!==digest(sourceFacts(p))).slice(0,24);
+    .filter(p=>p.status==='suggested'&&p.source!=='Fictional Stitch scenario'&&!p.verified);
+   const pending=chooseForAssessment(candidates.filter(p=>p.aiAssessment?.factsHash!==digest(sourceFacts(p))),24);
    const batches=[];for(let i=0;i<pending.length;i+=12)batches.push(pending.slice(i,i+12));
-   discoveryStatus={active:true,phase:'Assessing candidates with AI',completed:1,total:2+batches.length,runId};
+   discoveryStatus={active:true,phase:'Assessing Candidates with AI',completed:2,total:3+batches.length,runId};
    for(let i=0;i<batches.length;i++){
     const batch=batches[i],facts=batch.map(sourceFacts);
     const prompt='Classify POSSIBLE reuse partner leads. You may ONLY use the supplied official/public source facts; do not browse or call tools. No record proves willingness, composting or acceptance of spent coffee grounds. Return JSON with assessments: [{id,priority (high|medium|low),reason (short grounded inference),check (critical question)}]. Never invent activities, contacts or agreements. Source records: '+JSON.stringify(facts);
     try{
      run.aiCalls++;
      const response=validateAssessment(await generateJSON(AI_PROVIDER,prompt),batch.map(p=>p.id));
-     const byId=new Map(response.map(x=>[x.id,x]));
-     for(const p of batch){const result=byId.get(p.id);if(!result)continue;
-      p.aiAssessment={...result,provider:AI_PROVIDER,assessedAt:new Date().toISOString(),factsHash:digest(sourceFacts(p)),promptHash:digest(prompt),runId,
-       basedOn:p.evidenceEntries?.map(e=>({source:e.source,url:e.url}))||[{source:p.source,url:p.sourceUrl}],method:'Inference from sourced records, not independently verified'};run.reviewed++;
-     }
+     run.reviewed+=saveAIResults(s.partners,batch,response,{provider:AI_PROVIDER,prompt,runId});
     }catch(err){run.warnings.push('AI batch '+(i+1)+': '+err.message);}
-    discoveryStatus={active:true,phase:'Assessing candidates with AI ('+(i+1)+'/'+batches.length+')',completed:2+i,total:2+batches.length,runId};
+    discoveryStatus={active:true,phase:'Assessing Candidates with AI ('+(i+1)+'/'+batches.length+')',completed:3+i,total:3+batches.length,runId};
    }
   }
+  if(AI_PROVIDER==='template')discoveryStatus={active:true,phase:'Finalising Results',completed:3,total:3,runId};
   run.finishedAt=new Date().toISOString();
   s.discoveryRuns.unshift(run);s.discoveryRuns=s.discoveryRuns.slice(0,40);
   discoveryStatus={active:false,phase:run.warnings.some(w=>w.startsWith('AI batch'))?'Completed with partial AI results':'Completed',completed:discoveryStatus.total,total:discoveryStatus.total,runId};
-  return {runId,found:result.candidates.length,added:run.newLeads,assessed:run.reviewed,aiCalls:run.aiCalls,provider:AI_PROVIDER,sources:run.sources,warnings:run.warnings};
+  return {runId,found:result.candidates.length,added:run.newLeads,assessed:run.reviewed,aiCalls:run.aiCalls,provider:AI_PROVIDER,sources:run.sources,warnings:run.warnings,contactsFound:run.contactsFound};
  }catch(err){discoveryStatus={active:false,phase:'Failed: '+err.message,completed:0,total:0,runId};throw err;}
 }
 

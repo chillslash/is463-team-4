@@ -31,12 +31,28 @@ export function numbers(settings, partners, handovers) {
 }
 export const round = n => Math.round((n + Number.EPSILON) * 10) / 10;
 // Fit is an evidence-backed decision aid, not a probability of acceptance.
+// Interleave broad geographic regions before applying dataset caps.
+export function diverseLocations(items,limit){
+ const groups=new Map();
+ for(const p of items){
+  const region=(p.lat>=1.34?'N':'S')+(p.lon>=103.84?'E':'W');
+  if(!groups.has(region))groups.set(region,[]);
+  groups.get(region).push(p);
+ }
+ for(const group of groups.values())group.sort((a,b)=>a.name.localeCompare(b.name));
+ const result=[];
+ while(result.length<limit&&[...groups.values()].some(arr=>arr.length)){
+  for(const group of groups.values())if(group.length&&result.length<limit)result.push(group.shift());
+ }
+ return result;
+}
 export function scorePartner(p,gap){
  const category=String(p.category||'').toLowerCase(),use=String(p.use||'').toLowerCase(),src=String(p.source||'').toLowerCase();
  const text=category+' '+use;
  let suitability=12;
  if(p.directCoffeeEvidence) suitability=40;
- else if(/organic waste recycler|compost|vermicompost/.test(category))suitability=33;
+ else if(/organic waste recycler/.test(category))suitability=/mixed food waste|spent grain|organic/.test(String(p.materialEvidence||'').toLowerCase())?28:18;
+ else if(/compost|vermicompost/.test(category))suitability=33;
  else if(/community garden|school garden|urban farm|nursery|horticultur|allotment/.test(category))suitability=30;
  else if(/park/.test(category))suitability=16;
  else if(/garden|farm|grow/.test(text))suitability=25;
@@ -47,18 +63,17 @@ export function scorePartner(p,gap){
  if(ai==='medium')suitability=Math.min(40,suitability+1);
  if(ai==='low')suitability=Math.max(0,suitability-6);
  let evidence=8;
- if(p.directCoffeeEvidence)evidence=30;
- else if(src.includes('nea food waste'))evidence=24;
+ if(p.directCoffeeEvidence)evidence=35;
+ else if(src.includes('nea food waste'))evidence=26;
  else if(src.includes('community in bloom'))evidence=24;
  else if(src.includes('moe school'))evidence=20;
- else if(src.includes('nparks'))evidence=18;
- else if(src.includes('openstreetmap'))evidence=13;
- else if(src.includes('lias'))evidence=12;
- if(p.verified)evidence=Math.min(30,evidence+3);
+ else if(src.includes('nparks'))evidence=16;
+ else if(src.includes('openstreetmap'))evidence=16;
+ else if(src.includes('lias'))evidence=13;
+ if(p.verified)evidence=Math.min(35,evidence+3);
  const km=Number(p.distanceKm);
- // Unknown distance receives a neutral midpoint, never an invented kilometre figure.
- const proximity=p.distanceKm==null||!Number.isFinite(km)?10:Math.round(Math.max(0,20-0.8*Math.max(0,km)));
- const operations=Math.min(10,(p.verified?5:0)+(p.confirmed&&p.capacityKg>0?5:0)+(p.contactEmail?2:0));
+ const proximity=p.distanceKm==null||!Number.isFinite(km)?5:Math.round(Math.max(0,10-0.35*Math.max(0,km)));
+ const operations=Math.min(15,(p.verified?5:0)+(p.confirmed&&p.capacityKg>0?5:0)+(p.contactEmail?5:0));
  const score=Math.max(0,Math.min(100,Math.round(suitability+evidence+proximity+operations)));
  const reasons=[
   p.directCoffeeEvidence?'NEA records used coffee grounds among this facility’s accepted waste materials':
@@ -87,7 +102,7 @@ export function osmCandidates(elements, reference) {
     const cat=tags.leisure==='park'?'park':tags.leisure==='garden'?'garden':tags.tourism==='zoo'?'zoo':tags.landuse==='allotments'?'allotments':tags.landuse==='farmland'?'farmland':tags.shop==='garden_centre'?'garden_centre':tags.shop==='nursery'?'nursery':'garden';
     seen.add(name.toLowerCase());
     const sourceUrl=`https://www.openstreetmap.org/${e.type}/${e.id}`;
-    result.push({id:`osm-${e.type}-${e.id}`,name,category:typeNames[cat]||cat,status:'suggested',capacityKg:null,willingness:'unknown',verified:false,confirmed:false,frequency:'unknown',use:`Potential horticulture/composting application (${typeNames[cat]||cat}; not validated)`,source:'OpenStreetMap live discovery',sourceUrl,location:tags['addr:street']||tags['addr:suburb']||'Singapore',lat,lon,distanceKm:distanceKm(reference.referenceLat,reference.referenceLon,lat,lon),contactName:'',contactEmail:'',notes:'Site identified from place data; authority to approve acceptance, fees and capacity are unknown',evidence:''});
+    result.push({id:`osm-${e.type}-${e.id}`,name,category:typeNames[cat]||cat,status:'suggested',capacityKg:null,willingness:'unknown',verified:false,confirmed:false,frequency:'unknown',use:`Potential horticulture/composting application (${typeNames[cat]||cat} )`,source:'OpenStreetMap live discovery',sourceUrl,location:tags['addr:street']||tags['addr:suburb']||'Singapore',lat,lon,distanceKm:distanceKm(reference.referenceLat,reference.referenceLon,lat,lon),contactName:'',contactEmail:'',notes:'Site identified from place data; authority to approve acceptance, capacity are unknown',evidence:''});
     if(result.length>=60)break;
   }
   return result;
@@ -103,23 +118,23 @@ export function draftTemplate(p, kg) {
 /** Public NParks parks dataset. A physical site is NOT an accepting partner. */
 export function nparksCandidates(featureCollection, reference) {
   const features=Array.isArray(featureCollection?.features)?featureCollection.features:[];
-  return features.map(feature=>{
+  return diverseLocations(features.map(feature=>{
     const coords=feature.geometry?.coordinates;const props=feature.properties||{};
     if(feature.geometry?.type!=='Point'||!Array.isArray(coords)||coords.length<2)return null;
     const [lon,lat]=coords;const name=String(props.NAME||'').trim();
     if(!name||!Number.isFinite(lat)||!Number.isFinite(lon))return null;
-    return {id:`nparks-${props.OBJECTID??name.toLowerCase().replace(/[^a-z0-9]/g,'-')}`,name,category:'public park',status:'suggested',capacityKg:null,willingness:'unknown',verified:false,confirmed:false,frequency:'unknown',use:'Potential park horticulture / composting needs (not validated)',source:'NParks Parks open dataset (data.gov.sg)',sourceUrl:'https://data.gov.sg/datasets/d_0542d48f0991541706b58059381a6eca/view',location:'Singapore · NParks-managed site',lat,lon,distanceKm:distanceKm(reference.referenceLat,reference.referenceLon,lat,lon),contactName:'',contactEmail:'',notes:'This is an NParks-managed physical site, NOT an organisation confirmed to accept grounds. Staff must identify its authorised decision-maker and verify any reuse agreement.',evidence:''};
-  }).filter(Boolean).filter(p=>/\b(PARK|GARDEN|NATURE|RESERVE|BOTANIC)\b/i.test(p.name)).sort((a,b)=>a.distanceKm-b.distanceKm).slice(0,35);
+    return {id:`nparks-${props.OBJECTID??name.toLowerCase().replace(/[^a-z0-9]/g,'-')}`,name,category:'public park',status:'suggested',capacityKg:null,willingness:'unknown',verified:false,confirmed:false,frequency:'unknown',use:'Potential park horticulture / composting needs ',source:'NParks Parks open dataset (data.gov.sg)',sourceUrl:'https://data.gov.sg/datasets/d_0542d48f0991541706b58059381a6eca/view',location:'Singapore · NParks-managed site',lat,lon,distanceKm:distanceKm(reference.referenceLat,reference.referenceLon,lat,lon),contactName:'',contactEmail:'',notes:'This is an NParks-managed physical site, NOT an organisation confirmed to accept grounds. Staff must identify its authorised decision-maker and verify any reuse agreement.',evidence:''};
+  }).filter(Boolean).filter(p=>/\b(PARK|GARDEN|NATURE|RESERVE|BOTANIC)\b/i.test(p.name)),35);
 }
 
 /** Official NParks Community in Bloom dataset lists registered garden locations, not recipients. */
 export function cibCandidates(featureCollection, reference) {
  const features=Array.isArray(featureCollection?.features)?featureCollection.features:[];
- return features.map(feature=>{
+ return diverseLocations(features.map(feature=>{
   if(feature.geometry?.type!=='Point')return null;
   const [lon,lat]=feature.geometry.coordinates||[];const props=feature.properties||{};
   const name=String(props.GARDEN_NAME||'').trim();
   if(!name||!Number.isFinite(lon)||!Number.isFinite(lat))return null;
-  return {id:'cib-'+(props.GARDENID??props.OBJECTID??name.toLowerCase().replace(/[^a-z0-9]/g,'-')),name,category:/school|primary|secondary|junior college|polytechnic|university|institute of technical education/i.test(name)?'school garden':'community garden',status:'suggested',capacityKg:null,willingness:'unknown',verified:false,confirmed:false,frequency:'unknown',use:'Registered community growing programme; possible soil/composting use (not verified)',source:'NParks Community in Bloom open dataset (data.gov.sg)',sourceUrl:'https://data.gov.sg/datasets/d_f91a8b057cfb2bebf2e531ad8061e1c1/view',location:'Singapore · registered Community in Bloom location',lat,lon,distanceKm:distanceKm(reference.referenceLat,reference.referenceLon,lat,lon),contactName:'',contactEmail:'',notes:'CIB registration locates a growing community, not a commitment to accept grounds. Contact organisers and confirm permission, materials, fees and quantities.',evidence:''};
- }).filter(Boolean).sort((a,b)=>a.distanceKm-b.distanceKm).slice(0,70);
+  return {id:'cib-'+(props.GARDENID??props.OBJECTID??name.toLowerCase().replace(/[^a-z0-9]/g,'-')),name,category:/school|primary|secondary|junior college|polytechnic|university|institute of technical education/i.test(name)?'school garden':'community garden',status:'suggested',capacityKg:null,willingness:'unknown',verified:false,confirmed:false,frequency:'unknown',use:'Registered community growing programme; possible soil/composting use ',source:'NParks Community in Bloom open dataset (data.gov.sg)',sourceUrl:'https://data.gov.sg/datasets/d_f91a8b057cfb2bebf2e531ad8061e1c1/view',location:'Singapore · registered Community in Bloom location',lat,lon,distanceKm:distanceKm(reference.referenceLat,reference.referenceLon,lat,lon),contactName:'',contactEmail:'',notes:'CIB registration locates a growing community, not a commitment to accept grounds. Contact organisers and confirm permission, materials and quantities.',evidence:''};
+ }).filter(Boolean),70);
 }
