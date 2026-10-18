@@ -3,13 +3,16 @@ import assert from 'node:assert/strict';
 import {saveAIResults,chooseForAssessment} from '../server.js';
 import {scorePartner,rankPartners} from '../src/core.js';
 const p=(id,source)=>({id,name:id,source,category:'community garden',use:'Possible reuse',status:'suggested',distanceKm:2,evidenceEntries:[{source,url:'https://example.org/evidence',claim:'Listed'}]});
-test('AI results persist to canonical partner and alter Fit Score',()=>{
+test('AI qualitative scores persist and outrank provisional leads',()=>{
  const saved=[p('a','A'),p('b','B')],copies=rankPartners(saved,10);
- const original=scorePartner(saved[0],10).score;
- const n=saveAIResults(saved,[copies[0]],[{id:'a',priority:'low',reason:'Missing evidence',check:'Confirm application'}],{provider:'codex',prompt:'test',runId:'r'});
- assert.equal(n,1);assert.equal(saved[0].aiAssessment.priority,'low');
+ const prior=scorePartner(saved[0],10).score;
+ const results=[{id:'a',reuseSuitability:4,sourceEvidence:5,operationalCompatibility:0,reason:'Sparse evidence',check:'Confirm'}];
+ assert.equal(saveAIResults(saved,[copies[0]],results,{provider:'codex',prompt:'test',runId:'run'}),1);
+ assert.equal(saved[0].aiAssessment.rubricVersion,'ai-led-v1');
  assert.equal(copies[0].aiAssessment,undefined);
- assert.ok(scorePartner(saved[0],10).score<original);
+ assert.equal(scorePartner(saved[0],10).aiLed,true);
+ assert.ok(scorePartner(saved[0],10).score<prior);
+ assert.equal(rankPartners(saved,10)[0].id,'a');
  assert.equal(saved[0].aiAssessment.basedOn[0].url,'https://example.org/evidence');
 });
 test('AI assessment rotates across source categories',()=>{

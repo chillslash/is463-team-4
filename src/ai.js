@@ -62,10 +62,18 @@ export function validateDraft(o) {
   if (!o || typeof o.subject !== 'string' || typeof o.body !== 'string' || !o.subject.trim() || !o.body.trim()) throw new Error('AI draft was incomplete');
   return {subject:o.subject.slice(0,300),body:o.body.slice(0,8000),guide:typeof o.guide==='string'?o.guide.slice(0,2500):''};
 }
-export function validateAssessment(o, ids) {
-  if (!o || !Array.isArray(o.assessments)) throw new Error('AI assessment was incomplete');
-  const allowed = new Set(ids);
-  return o.assessments.filter(a => allowed.has(a?.id) && ['high','medium','low'].includes(a?.priority) && typeof a?.reason === 'string').slice(0,ids.length).map(a=>({
-    id:a.id, priority:a.priority, reason:a.reason.slice(0,350), check: typeof a.check==='string'?a.check.slice(0,250):'Confirm willingness, fees and authorised contact'
-  }));
+export function validateAssessment(o,ids){
+ if(!o||!Array.isArray(o.assessments))throw new Error('AI assessment was incomplete');
+ const allowed=new Set(ids),seen=new Set(),valid=[];
+ for(const a of o.assessments){
+  if(!allowed.has(a?.id)||seen.has(a.id))continue;
+  const bounded=[['reuseSuitability',40],['sourceEvidence',35],['operationalCompatibility',10]];
+  if(!bounded.every(([key,max])=>Number.isInteger(a[key])&&a[key]>=0&&a[key]<=max))continue;
+  if(typeof a.reason!=='string'||!a.reason.trim()||typeof a.check!=='string'||!a.check.trim())continue;
+  seen.add(a.id);valid.push({id:a.id,reuseSuitability:a.reuseSuitability,sourceEvidence:a.sourceEvidence,
+    operationalCompatibility:a.operationalCompatibility,reason:a.reason.trim().slice(0,350),
+    check:a.check.trim().slice(0,250)});
+ }
+ if(!valid.length)throw new Error('AI response contained no valid evidence-grounded scores');
+ return valid.slice(0,ids.length);
 }

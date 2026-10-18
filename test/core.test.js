@@ -11,10 +11,21 @@ test('unverified candidates do not inherit fees, acceptance or capacity',()=>{
  assert.equal(c.length,1);assert.equal(c[0].fee,undefined);assert.equal(c[0].capacityKg,null);assert.equal(c[0].confirmed,false);assert.equal(c[0].sourceUrl,'https://www.openstreetmap.org/way/900');
 });
 test('ranking prioritises relevant, verified partners',()=>{
- const a={category:'community garden',use:'Composting',fee:'none',verified:true,capacityKg:30,distanceKm:3};
+ const a={category:'community garden',use:'Composting',verified:true,confirmed:true,capacityKg:30,distanceKm:3};
  assert.ok(scorePartner(a,42).score>scorePartner({...a,verified:false},42).score);
  assert.ok(rankPartners(initialState().partners,42).every(p=>p.status!=='regular'));
  assert.ok(initialState().partners.filter(p=>p.source==='Fictional Stitch scenario').every(p=>p.status!=='suggested'));
+});
+test('AI controls contextual score, while distance and confirmed facts remain deterministic',()=>{
+ const p={category:'public park',distanceKm:10,verified:false,confirmed:false,capacityKg:null,contactEmail:'',aiAssessment:{
+  rubricVersion:'ai-led-v1',reuseSuitability:30,sourceEvidence:20,operationalCompatibility:7,reason:'Source-backed activity',check:'Confirm use'
+ }};
+ const x=scorePartner(p,42);
+ assert.deepEqual(x.parts,{suitability:30,evidence:20,proximity:7,operations:7});
+ assert.equal(x.score,64);assert.equal(x.aiLed,true);
+ assert.equal(scorePartner({...p,distanceKm:0,contactEmail:'info@example.com'},42).score,69);
+ assert.equal(scorePartner({...p,verified:true,confirmed:true,capacityKg:25},42).score,67);
+ assert.equal(scorePartner({...p,aiAssessment:{priority:'high'}},42).provisional,true);
 });
 test('draft has relevant caveats and does not promise acceptance',()=>{
  const draft=draftTemplate(initialState().partners[3],42);

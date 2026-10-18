@@ -28,9 +28,14 @@ test('mock signed-in local CLI receives prompts over stdin',async()=>{
  const response=await generateJSON('codex','Assess candidate A', {runner,timeoutMs:2000});
  assert.equal(actualPrompt,'Assess candidate A');assert.equal(response.subject,'Subject');
 });
-test('assessment parser rejects invented partner ids and accepts only bounded priorities',()=>{
- const out=validateAssessment({assessments:[{id:'p1',priority:'high',reason:'Potential',check:'Ask'}, {id:'invented',priority:'high',reason:'Fabricated'}, {id:'p2',priority:'extreme',reason:'Not allowed'}]},['p1','p2']);
- assert.equal(out.length,1);assert.equal(out[0].id,'p1');
+test('AI-led assessment validator rejects old labels and unbounded scores',()=>{
+ const result=validateAssessment({assessments:[
+  {id:'p1',reuseSuitability:32,sourceEvidence:25,operationalCompatibility:3,reason:'Garden evidence',check:'Verify reuse'},
+  {id:'invented',reuseSuitability:40,sourceEvidence:35,operationalCompatibility:10,reason:'Wrong id',check:'Check'},
+  {id:'p2',reuseSuitability:41,sourceEvidence:0,operationalCompatibility:0,reason:'Too high',check:'Check'}
+ ]},['p1','p2']);
+ assert.equal(result.length,1);assert.equal(result[0].reuseSuitability,32);
+ assert.throws(()=>validateAssessment({assessments:[{id:'p1',priority:'high',reason:'Old contract'}]},['p1']),/valid/);
 });
 test('CODEX_PATH overrides PATH only for Codex, without hardcoded machine fallbacks',()=>{
  const custom='C:/Program Files/OpenAI/Codex/codex.exe';

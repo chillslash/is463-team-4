@@ -4,7 +4,7 @@ import {existsSync} from 'node:fs';
 import {loadEnvFile} from 'node:process';
 import {join, resolve, extname} from 'node:path';
 import {randomUUID,createHash} from 'node:crypto';
-import {initialState, numbers, rankPartners, distanceKm, draftTemplate, STATUSES} from './src/core.js';
+import {initialState, numbers, rankPartners, distanceKm, draftTemplate, STATUSES, AI_RUBRIC_VERSION, hasAIFit} from './src/core.js';
 import {generateJSON,validateDraft,validateAssessment} from './src/ai.js';
 import {discoverAll} from './src/discovery.js';
 import {researchPublicContact} from './src/contacts.js';
@@ -21,7 +21,7 @@ const digest=v=>createHash('sha256').update(JSON.stringify(v)).digest('hex');
 const ROUTES={'/':'this_week','/dashboard':'this_week','/this-week':'this_week','/find-partners':'find_partners','/outreach':'outreach_draft','/pipeline':'this_week','/log-handover':'log_handover'};
 const FILE_TYPES={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8','.md':'text/markdown; charset=utf-8','.png':'image/png'};
 let serial=Promise.resolve();
-async function readState(){if(!existsSync(DB_PATH)){const seed=initialState();await store(seed);return seed;}const s=JSON.parse(await readFile(DB_PATH,'utf8'));const defaults=initialState().settings;for(const field of ['referenceLat','referenceLon','referenceLabel'])s.settings[field]=defaults[field];delete s.settings.aiProvider;s.discoveryRuns??=[];for(const p of s.partners){delete p.fee;if(p.source==='Fictional Stitch scenario'&&p.status==='suggested')p.status='interested';if(Number.isFinite(p.lat)&&Number.isFinite(p.lon))p.distanceKm=distanceKm(defaults.referenceLat,defaults.referenceLon,p.lat,p.lon);}return s;}
+async function readState(){if(!existsSync(DB_PATH)){const seed=initialState();await store(seed);return seed;}const s=JSON.parse(await readFile(DB_PATH,'utf8'));const defaults=initialState().settings;for(const field of ['referenceLat','referenceLon','referenceLabel'])s.settings[field]=defaults[field];delete s.settings.aiProvider;s.discoveryRuns??=[];for(const p of s.partners){delete p.fee;if(p.source==='Fictional Stitch scenario'&&p.status==='suggested')p.status='interested';if(Number.isFinite(p.lat)&&Number.isFinite(p.lon))p.distanceKm=distanceKm(defaults.referenceLat,defaults.referenceLon,p.lat,p.lon);if(p.aiAssessment?.rubricVersion===AI_RUBRIC_VERSION&&p.aiAssessment.factsHash!==digest(sourceFacts(p)))delete p.aiAssessment;}return s;}
 async function store(v){await mkdir(resolve(DB_PATH,'..'),{recursive:true});const temp=DB_PATH+'.'+randomUUID()+'.tmp';await writeFile(temp,JSON.stringify(v,null,2)+'\n','utf8');await rename(temp,DB_PATH);}
 function mutation(fn){const next=serial.catch(()=>{}).then(async()=>{let s=await readState();const value=await fn(s);await store(s);return value;});serial=next;return next;}
 function response(res,status,value){const body=JSON.stringify(value);res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Content-Length':Buffer.byteLength(body),'Cache-Control':'no-store'});res.end(body);}
@@ -42,13 +42,13 @@ function validatePartnerFields(payload,current={}){
  if(p.status!=='regular')p.confirmed=false;
  return p;
 }
-function sourceFacts(p){return {id:p.id,name:p.name,category:p.category,use:p.use,distanceKm:p.distanceKm,directCoffeeEvidence:!!p.directCoffeeEvidence,materialEvidence:p.materialEvidence||null,sourceEvidence:(p.evidenceEntries||[{source:p.source,url:p.sourceUrl,claim:'Source lists '+p.name}]).map(e=>({source:e.source,url:e.url,claim:e.claim}))};}
+function sourceFacts(p){return {rubricVersion:AI_RUBRIC_VERSION,id:p.id,name:p.name,category:p.category,use:p.use,contactAvailable:!!p.contactEmail,verified:!!p.verified,confirmedCapacityKg:p.verified&&p.confirmed?p.capacityKg:null,directCoffeeEvidence:!!p.directCoffeeEvidence,materialEvidence:p.materialEvidence||null,sourceEvidence:(p.evidenceEntries||[{source:p.source,url:p.sourceUrl,claim:'Source lists '+p.name}]).map(e=>({source:e.source,url:e.url,claim:e.claim}))};}
 export function saveAIResults(partners,batch,results,{provider,prompt,runId}){
  const byId=new Map(results.map(a=>[a.id,a]));let saved=0;
  for(const ranked of batch){
   const result=byId.get(ranked.id),record=partners.find(p=>p.id===ranked.id);
   if(!record||!result)continue;
-  record.aiAssessment={...result,provider,assessedAt:new Date().toISOString(),factsHash:digest(sourceFacts(record)),promptHash:digest(prompt),runId,
+  record.aiAssessment={...result,rubricVersion:AI_RUBRIC_VERSION,provider,assessedAt:new Date().toISOString(),factsHash:digest(sourceFacts(record)),promptHash:digest(prompt),runId,
    basedOn:record.evidenceEntries?.map(e=>({source:e.source,url:e.url}))||[{source:record.source,url:record.sourceUrl}],method:'Inference from source records'};
   saved++;
  }
@@ -102,12 +102,19 @@ async function discover(s){
   if(AI_PROVIDER!=='template'){
    const candidates=rankPartners(s.partners,numbers(s.settings,s.partners,s.handovers).gapKg)
     .filter(p=>p.status==='suggested'&&p.source!=='Fictional Stitch scenario'&&!p.verified);
-   const pending=chooseForAssessment(candidates.filter(p=>p.aiAssessment?.factsHash!==digest(sourceFacts(p))),24);
+   const pending=chooseForAssessment(candidates.filter(p=>!hasAIFit(p)||p.aiAssessment.factsHash!==digest(sourceFacts(p))),24);
    const batches=[];for(let i=0;i<pending.length;i+=12)batches.push(pending.slice(i,i+12));
    discoveryStatus={active:true,phase:'Assessing Candidates with AI',completed:2,total:3+batches.length,runId};
    for(let i=0;i<batches.length;i++){
     const batch=batches[i],facts=batch.map(sourceFacts);
-    const prompt='Classify POSSIBLE reuse partner leads. You may ONLY use the supplied official/public source facts; do not browse or call tools. No record proves willingness, composting or acceptance of spent coffee grounds. Return JSON with assessments: [{id,priority (high|medium|low),reason (short grounded inference),check (critical question)}]. Never invent activities, contacts or agreements. Source records: '+JSON.stringify(facts);
+    const prompt=[
+      'Evaluate possible spent-coffee-grounds reuse partners from supplied records ONLY. Do not browse, use tools, or invent contacts, willingness, composting activity or agreements.',
+      'Respond with one JSON object: {"assessments":[{"id":"matching id","reuseSuitability":integer,"sourceEvidence":integer,"operationalCompatibility":integer,"reason":"brief source-grounded rationale","check":"one most important unanswered question"}]}.',
+      'Score each lead independently using the same rubric: reuseSuitability 0-40 = plausible technical/organisational use of spent grounds; sourceEvidence 0-35 = strength and specificity of the cited facts, not mere source prestige; operationalCompatibility 0-10 = evidence of ability to manage recurring or trial quantities and appropriate handling.',
+      'Strong scores require specific cited evidence. An organisation listed as a school, park, nursery or garden is NOT proof it composts or accepts grounds. A sustainability programme alone is weak evidence. If operations/capacity are unknown, operationalCompatibility should be 0-2. If coffee grounds are explicitly accepted in a published source, that supports a higher score but not a guaranteed partnership.',
+      'Do NOT assess distance: the application computes proximity and objective operational facts separately. Scores must be integers inside their ranges. Reason should explain the distinction between source evidence and your inference, without generic warnings. Check should target the biggest uncertainty. Assess each supplied id.',
+      'Source facts: '+JSON.stringify(facts)
+    ].join('\\n');
     try{
      run.aiCalls++;
      const response=validateAssessment(await generateJSON(AI_PROVIDER,prompt),batch.map(p=>p.id));

@@ -46,45 +46,38 @@ export function diverseLocations(items,limit){
  }
  return result;
 }
+export const AI_RUBRIC_VERSION='ai-led-v1';
+export function hasAIFit(p){
+ const a=p.aiAssessment;
+ return a?.rubricVersion===AI_RUBRIC_VERSION &&
+  [['reuseSuitability',40],['sourceEvidence',35],['operationalCompatibility',10]]
+   .every(([key,max])=>Number.isInteger(a[key])&&a[key]>=0&&a[key]<=max);
+}
+// Screening is a temporary, explainable fallback, never labelled as AI assessment.
+function screen(p){
+ const cat=String(p.category||'').toLowerCase(),src=String(p.source||'').toLowerCase();
+ const reuse=p.directCoffeeEvidence?38:/compost/.test(cat)?30:/farm|garden|nursery|horticultur/.test(cat)?25:/organic waste recycler/.test(cat)?20:10;
+ const evidence=p.directCoffeeEvidence?33:src.includes('community in bloom')?20:src.includes('nea')?22:src.includes('moe')?15:src.includes('lias')?11:12;
+ return {reuse,evidence,operational:0};
+}
 export function scorePartner(p,gap){
- const category=String(p.category||'').toLowerCase(),use=String(p.use||'').toLowerCase(),src=String(p.source||'').toLowerCase();
- const text=category+' '+use;
- let suitability=12;
- if(p.directCoffeeEvidence) suitability=40;
- else if(/organic waste recycler/.test(category))suitability=/mixed food waste|spent grain|organic/.test(String(p.materialEvidence||'').toLowerCase())?28:18;
- else if(/compost|vermicompost/.test(category))suitability=33;
- else if(/community garden|school garden|urban farm|nursery|horticultur|allotment/.test(category))suitability=30;
- else if(/park/.test(category))suitability=16;
- else if(/garden|farm|grow/.test(text))suitability=25;
- else if(/school programme|sustainab/.test(text))suitability=12;
- else if(/landscap/.test(text))suitability=16;
- const ai=p.aiAssessment?.priority;
- if(ai==='high')suitability=Math.min(40,suitability+4);
- if(ai==='medium')suitability=Math.min(40,suitability+1);
- if(ai==='low')suitability=Math.max(0,suitability-6);
- let evidence=8;
- if(p.directCoffeeEvidence)evidence=35;
- else if(src.includes('nea food waste'))evidence=26;
- else if(src.includes('community in bloom'))evidence=24;
- else if(src.includes('moe school'))evidence=20;
- else if(src.includes('nparks'))evidence=16;
- else if(src.includes('openstreetmap'))evidence=16;
- else if(src.includes('lias'))evidence=13;
- if(p.verified)evidence=Math.min(35,evidence+3);
+ const aiLed=hasAIFit(p),a=p.aiAssessment||{};
+ const q=aiLed?{reuse:a.reuseSuitability,evidence:a.sourceEvidence,operational:a.operationalCompatibility}:screen(p);
  const km=Number(p.distanceKm);
  const proximity=p.distanceKm==null||!Number.isFinite(km)?5:Math.round(Math.max(0,10-0.35*Math.max(0,km)));
- const operations=Math.min(15,(p.verified?5:0)+(p.confirmed&&p.capacityKg>0?5:0)+(p.contactEmail?5:0));
- const score=Math.max(0,Math.min(100,Math.round(suitability+evidence+proximity+operations)));
- const reasons=[
-  p.directCoffeeEvidence?'NEA records used coffee grounds among this facility’s accepted waste materials':
-   /garden|farm|nursery|compost|landscap|recycl/.test(text)?'Source records indicate potentially relevant operations':'Source records a possible outreach lead; the reuse connection needs checking',
-  (p.distanceKm==null?'HQ distance not established':'Approximately '+p.distanceKm+' km straight-line from HQ'),
- ];
- if(ai)reasons.push('AI assessment: '+ai+' potential, based on the recorded sources');
- const checks=['Confirm willingness to accept CoffeeBot spent grounds','Confirm suitable condition, kg/week, transport arrangement and authorised contact'];
- return {score,parts:{suitability,evidence,proximity,operations},reasons,checks};
+ const verifiedReady=(p.contactEmail?2:0)+(p.verified&&p.confirmed&&Number(p.capacityKg)>0?3:0);
+ const operations=Math.min(15,q.operational+verifiedReady);
+ const score=Math.max(0,Math.min(100,q.reuse+q.evidence+proximity+operations));
+ const reasons=[aiLed?a.reason:(p.directCoffeeEvidence?'Source explicitly mentions used coffee grounds':'Preliminary screening based on source category and available evidence')];
+ if(p.distanceKm!=null)reasons.push('Approximately '+p.distanceKm+' km straight-line from HQ');
+ return {score,aiLed,provisional:!aiLed,parts:{suitability:q.reuse,evidence:q.evidence,proximity,operations},
+  reasons,checks:[aiLed?a.check:'Confirm actual grounds reuse and acceptance arrangements']};
 }
-export function rankPartners(partners,gap){return partners.filter(p=>p.status!=='closed'&&p.status!=='regular').map(p=>({...p,match:scorePartner(p,gap)})).sort((a,b)=>b.match.score-a.match.score||a.name.localeCompare(b.name));}
+export function rankPartners(partners,gap){
+ return partners.filter(p=>p.status!=='closed'&&p.status!=='regular')
+ .map(p=>({...p,match:scorePartner(p,gap)}))
+ .sort((a,b)=>Number(b.match.aiLed)-Number(a.match.aiLed)||b.match.score-a.match.score||a.name.localeCompare(b.name));
+}
 
 export function distanceKm(lat1,lon1,lat2,lon2) {
   const rad=Math.PI/180;const dlat=(lat2-lat1)*rad,dlon=(lon2-lon1)*rad;
