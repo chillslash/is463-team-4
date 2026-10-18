@@ -85,3 +85,9 @@ The app is a single-user local prototype using JSON state, not a production mult
 ## Navigation
 
 The sidebar is organised as **Admin** (Dashboard, Log Handover) and **Discovery** (Find Partners, Draft Outreach). Dashboard combines the former This Week forecast, outcomes and five-stage Pipeline board. The previous `/this-week` and `/pipeline` URLs remain aliases for `/dashboard` and do not create separate pages. Sidebar text uses the same font size whether selected or not.
+
+## AI-led partner evaluation
+
+Source discovery, deduplication, distance, contact extraction and pipeline records remain conventional software. Codex/Claude evaluates source-diverse candidates on reuse suitability (0–40), source evidence specificity (0–35) and operational compatibility (0–10). The application adds deterministic HQ proximity (0–10) and up to five operational points for sourced contact or verified capacity, yielding an explainable 100-point Fit Score. It is not an acceptance probability.
+
+AI assessments include reasoning, a verification question, source links, provider, run ID, input/prompt hashes and a versioned rubric. Unassessed candidates show a clearly labelled Preliminary Screening score rather than claiming AI evaluation, and are ordered after AI-reviewed suggestions. Up to 24 candidates across sources are assessed per scan; unchanged assessments are cached and invalidated when supporting facts change. Existing Codex/Claude CLI configuration is preserved.
