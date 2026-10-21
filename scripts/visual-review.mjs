@@ -29,6 +29,11 @@ try{
  });console.log(n+' audit '+JSON.stringify(m));
  if(m.overflow>0||m.labels.some(x=>x!=='12px')||m.nav.some(x=>x.scroll>x.client)||m.historyStyles.length>1||m.outreachLabels.length>1||m.outreachLabels.some(x=>!x.startsWith('12px|')))throw Error('Visual audit failed: '+n+' '+JSON.stringify(m));
  await page.screenshot({path:'data/visual-review/'+n+'.jpg',type:'jpeg',quality:43});console.log(n);}
+ await go('/dashboard');
+ if(await page.locator('.co-overview-stat').count()!==4||await page.locator('.co-overview-panel').count()!==4)throw Error('Dashboard must have four metrics and four sections');
+ if(!(await page.locator('.co-overview').innerText()).includes('Forecast Demand'))throw Error('Forecast Demand missing from dashboard');
+ if(!(await page.locator('.co-overview').innerText()).includes('Handed Over This Week'))throw Error('Actual handovers missing from dashboard');
+ await shot('dashboard');
  await go('/find-partners');await shot('discover');
  if(await page.locator('.co-discovery-card').count()){await page.locator('.co-discovery-card').first().click({position:{x:80,y:80}}).catch(()=>{});await shot('discover-details');}
  await go('/outreach');await shot('initial-outreach');

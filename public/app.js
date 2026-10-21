@@ -52,7 +52,7 @@ function render(){
  if(current==='partner_detail'&&partner(qs.get('partner')))switchManageTab(ui.partnerTab);
 }
 function dashboardView(){
- return base('Dashboard','',`<button class="co-button alt" data-href="/find-partners">Discover Partners</button><button class="co-button" data-href="/log-handover">Log Handover</button>`);
+ return base('Dashboard','',`<button class="co-button alt" data-href="/find-partners">Discover Partners</button><button class="co-button" data-action="handover-select">Log Handover</button>`);
 }
 // Operational overview: use recorded state, not invented historical estimates.
 function weekBody(){
@@ -63,23 +63,29 @@ function weekBody(){
   .sort((a,b)=>a.followUpDate.localeCompare(b.followUpDate)).slice(0,3);
  const stageNames=['suggested','contacted','interested','trial','regular'];
  const handovers=[...(data.handovers||[])].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,3);
- const capacityPct=t.forecastKg?Math.min(100,Math.round(t.confirmedKg/t.forecastKg*100)):0;
+  const forecastDemandKg=data.partners.filter(p=>p.status==='regular'&&Number(p.capacityKg)>0).reduce((total,p)=>total+Number(p.capacityKg),0);
+  const gapKg=Math.max(0,t.forecastKg-forecastDemandKg);
+  const thisWeek=new Date(today+'T12:00:00Z'),day=thisWeek.getUTCDay();
+  thisWeek.setUTCDate(thisWeek.getUTCDate()-(day+6)%7);
+  const weekStart=thisWeek.toISOString().slice(0,10);
+  const weeklyHandoversKg=(data.handovers||[]).filter(h=>h.date>=weekStart&&h.date<=today).reduce((total,h)=>total+(Number(h.kg)||0),0);
+  const capacityPct=t.forecastKg?Math.min(100,Math.round(forecastDemandKg/t.forecastKg*100)):0;
  const stat=(label,value,hint,tone='')=>`<div class="co-overview-stat ${tone}"><span>${label}</span><strong>${value}</strong><small>${hint}</small></div>`;
  return `<section class="co-overview">
   <div class="co-overview-stats">
-   ${stat('Forecast Supply',m(t.forecastKg)+' kg','Projected this week')}
-   ${stat('Confirmed Capacity',m(t.confirmedKg)+' kg','Regular partners (demo)')}
-   ${stat('Projected Gap',m(t.gapKg)+' kg','Not necessarily discarded',t.gapKg?'co-warn':'')}
-   ${stat('Overdue Follow-Ups',overdue.length,'Partners',overdue.length?'co-alert':'')}
+   ${stat('Forecast Supply',m(t.forecastKg)+' kg/week','Projected production')}
+    ${stat('Forecast Demand',m(forecastDemandKg)+' kg/week','Regular partners agreed intake')}
+    ${stat('Handed Over This Week',m(weeklyHandoversKg)+' kg','Recorded transfers')}
+    ${stat('Projected Gap',m(gapKg)+' kg/week','Supply not yet matched',gapKg?'co-warn':'')}
   </div>
   <div class="co-overview-grid">
-   <section class="co-overview-panel co-overview-supply"><div class="co-overview-heading"><h2>Supply vs Capacity</h2><button class="co-overview-link" data-action="settings">Edit Forecast</button></div>
-    <div class="co-supply-numbers"><span>${m(t.confirmedKg)} kg covered</span><strong>${capacityPct}%</strong></div>
+   <section class="co-overview-panel co-overview-supply"><div class="co-overview-heading"><h2>Supply vs Demand</h2><button class="co-overview-link" data-action="settings">Edit Forecast</button></div>
+    <div class="co-supply-numbers"><span>${m(forecastDemandKg)} kg/week planned</span><strong>${capacityPct}%</strong></div>
     <div class="co-supply-track" role="img" aria-label="${capacityPct}% of projected supply covered"><span style="width:${capacityPct}%"></span></div>
-    <div class="co-supply-legend"><span><i></i>Confirmed Capacity</span><span><i></i>Projected Gap</span></div>
-    <p class="co-overview-foot">Based on ${m(s.cupsPerWeek)} cups at ${m(s.gramsPerCup)} g each. Capacity is illustrative until confirmed by CoffeeBot.</p>
+    <div class="co-supply-legend"><span><i></i>Forecast Demand</span><span><i></i>Projected Gap</span></div>
+    <p class="co-overview-foot">Based on ${m(s.cupsPerWeek)} cups at ${m(s.gramsPerCup)} g each. Demand is based on Regular partners' arrangements, not grounds already handed over.</p>
    </section>
-   <section class="co-overview-panel"><div class="co-overview-heading"><h2>Upcoming Follow-Ups</h2><a href="/manage-partners">View All</a></div>
+   <section class="co-overview-panel"><div class="co-overview-heading"><h2>Upcoming Follow-Ups${overdue.length?' ('+overdue.length+' Overdue)':''}</h2><a href="/manage-partners">View All</a></div>
     ${due.length?due.map(p=>`<a class="co-overview-item" href="/partner?partner=${encodeURIComponent(p.id)}"><div><strong>${esc(p.name)}</strong><small>${esc(p.nextAction||titleCase(p.status))}</small></div><time class="${p.followUpDate<today?'co-overdue':''}">${esc(dateLabel(p.followUpDate))}</time></a>`).join(''):'<p class="co-overview-empty">No follow-ups due in the next seven days.</p>'}
    </section>
    <section class="co-overview-panel"><div class="co-overview-heading"><h2>Partner Stages</h2><a href="/manage-partners">Manage Partners</a></div>
@@ -267,7 +273,7 @@ function manageView(){
  const rows=items.map(p=>`<a class="co-manage-row" href="/partner?partner=${encodeURIComponent(p.id)}" aria-label="Manage ${esc(p.name)}"><div class="co-manage-row-head"><strong>${esc(p.name)}</strong>${stageChip(p.status)}</div><div class="co-manage-row-meta">${esc(titleCase(p.category))}${p.source==='Fictional Stitch scenario'?' · Demo':''}</div>${p.nextAction||p.followUpDate?`<div class="co-manage-next"><span class="material-symbols-outlined" aria-hidden="true">event_note</span><span>${p.nextAction?'Next: '+esc(p.nextAction):'Follow-Up'}${p.followUpDate?' · '+esc(dateLabel(p.followUpDate)):''}</span></div>`:''}</a>`).join('');
 
  const main=`<div class="co-discovery-main co-manage-main"><div class="co-manage-list">${rows||'<div class="co-empty">No Partners Match</div>'}</div><div class="co-manage-pages"><button data-action="manage-page" data-page="${ui.managePage-1}" ${ui.managePage===1?'disabled':''}>Previous</button><span>${ui.managePage} / ${pages}</span><button data-action="manage-page" data-page="${ui.managePage+1}" ${ui.managePage===pages?'disabled':''}>Next</button></div></div>`;
- return base('Manage Partners','',`<button class="co-button" data-action="new">Add Partner</button>`)+`<div class="co-page co-manage-page"><div class="co-discovery-layout">${manageSidebar(counts,arr.length,arr.length?start+1:0,Math.min(start+15,arr.length),categories)}${main}</div></div>`;
+ return base('Manage Partners','',`<button class="co-button alt" data-action="handover-select">Log Handover</button><button class="co-button" data-action="new">Add Partner</button>`)+`<div class="co-page co-manage-page"><div class="co-discovery-layout">${manageSidebar(counts,arr.length,arr.length?start+1:0,Math.min(start+15,arr.length),categories)}${main}</div></div>`;
 }
 function switchManageTab(tab){
  if(!['relationship','edit'].includes(tab))return;
@@ -535,6 +541,25 @@ function handoverArrangementFields(p,record=null){
  const current=[p.transportArrangement&&p.transportArrangement!=='unknown'?labels[p.transportArrangement]:null,p.groundsAccepted&&p.groundsAccepted!=='unknown'?labels[p.groundsAccepted]:null].filter(Boolean);const summary=current.length?`<div class="co-arrangement-summary"><strong>Partner Arrangement</strong><span>${current.join(' · ')}</span></div>`:'';
  return summary+`<details class="co-handover-exceptions" ${record?.transportException||record?.groundsException?'open':''}><summary>Change For This Handover</summary><div class="co-field-row">${choices('Collection / Delivery','transportArrangement',transports,record?.transportException?record.transportArrangement:'')}${choices('Grounds Condition','groundsCondition',conditions,record?.groundsException?record.groundsCondition:'')}</div></details>`;
 }
+function openHandoverPicker(){
+ const candidates=data.partners.filter(p=>['contacted','interested','trial','regular'].includes(p.status)).sort((a,b)=>a.name.localeCompare(b.name));
+ if(!candidates.length){notice('No active partners available for a handover.','error');return;}
+ const html='<div class="co-field"><label for="handover-partner-search">Search Partners</label><input id="handover-partner-search" type="search" autocomplete="off" placeholder="Search by name"></div>'+
+   '<div class="co-field"><label for="handover-partner-id">Partner <span class="co-required">*</span></label><select id="handover-partner-id" name="partnerId" required></select></div>';
+ let selected;
+ dialog('Log Handover',html,async values=>{
+  selected=partner(values.partnerId);
+  if(!selected||!candidates.some(p=>p.id===selected.id))throw Error('Select an active partner');
+ },{partnerEditor:true,submitLabel:'Continue',onComplete:()=>openHandoverDialog(selected)});
+ const search=$('#handover-partner-search'),select=$('#handover-partner-id');
+ const populate=()=>{
+  const q=search.value.trim().toLowerCase();
+  const options=candidates.filter(p=>p.name.toLowerCase().includes(q));
+  select.innerHTML='<option value="">Select Partner</option>'+options.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name)+' ('+titleCase(p.status)+')</option>').join('');
+ };
+ search.addEventListener('input',populate);
+ populate();
+}
 function openHandoverDialog(p){
  if(!p)return;
  const html=`<div class="co-journal-modal"><div class="co-field-row"><div class="co-field"><label for="ho-date">Date <span class="co-required">*</span></label><input id="ho-date" name="date" type="date" value="${journalDate()}" required></div><div class="co-field"><label for="ho-time">Time</label><input id="ho-time" name="time" type="time"></div></div><div class="co-field"><label for="ho-kg">Amount (kg) <span class="co-required">*</span></label><input id="ho-kg" name="kg" type="number" min="0.01" step="any" required placeholder="e.g. 5"></div>${handoverArrangementFields(p)}<div class="co-field"><label for="ho-notes">Notes</label><textarea id="ho-notes" name="notes" rows="3"></textarea></div></div>`;
@@ -687,6 +712,7 @@ function toggleListingDetails(card){
 }
 async function handleAction(el){const action=el.dataset.action;
  if(action==='close-dialog'){closeDialog();return;}
+ if(action==='handover-select'){openHandoverPicker();return;}
  if(action==='new'){editPartner();return;}
  if(action==='manage-clear-stage'){ui.manageStage='active';ui.managePage=1;render();return;}
  if(action==='manage-stage-pick'){ui.manageStage=ui.manageStage===el.dataset.stage?'active':el.dataset.stage;ui.managePage=1;render();return;}
