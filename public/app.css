@@ -917,3 +917,11 @@ body>aside nav a[aria-current="page"]{font-size:14px!important;line-height:1.35!
 .co-stage-strip{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px}.co-stage-strip a{border-radius:7px;background:#f0f6f1;text-decoration:none;padding:15px 9px;text-align:center;color:var(--forest)}.co-stage-strip a:hover{background:#deeee2}.co-stage-strip span{font-size:11px;color:var(--sub);display:block}.co-stage-strip strong{font-size:24px;display:block;margin-top:10px}
 @media(max-width:1100px){.co-overview-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.co-overview-grid{grid-template-columns:1fr}}
 @media(max-width:600px){.co-overview-stat{padding:15px}.co-overview-stats{gap:9px}.co-overview-panel{padding:17px}.co-stage-strip{grid-template-columns:repeat(3,minmax(0,1fr))}.co-overview-item{align-items:flex-start}.co-overview-heading{margin-bottom:14px}}
+
+/* Single-field partner picker for dashboard handovers. */
+.co-handover-matches{margin-top:6px;max-height:248px;overflow-y:auto;border:1px solid #dbe7dd;border-radius:8px;background:#fff;padding:4px}
+.co-handover-matches[hidden]{display:none}
+.co-handover-option{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;padding:11px 12px;border:0;border-radius:6px;background:transparent;color:var(--forest);font-size:13px;text-align:left;cursor:pointer}
+.co-handover-option:hover,.co-handover-option.is-active{background:#edf5ef}
+.co-handover-option small{color:var(--sub);font-size:11px;white-space:nowrap}
+.co-handover-empty{padding:12px;color:var(--sub);font-size:12px}
