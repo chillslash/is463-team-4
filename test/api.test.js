@@ -86,21 +86,24 @@ test('manual outreach and lifecycle keep durable activity records',async()=>{
  assert.equal(saved.data.sent,false);
  let state=(await call('/api/state')).data;
  assert.equal(state.outreach.find(x=>x.id===saved.data.id).sent,false);
- assert.equal((await call('/api/outreach/sent','POST',{partnerId:id,body:draft.data.body})).status,200);
+ assert.equal((await call('/api/outreach/sent','POST',{partnerId:id,body:draft.data.body,recipientEmail:'staff@example.org'})).status,200);
  state=(await call('/api/state')).data;
  assert.equal(state.outreach.find(x=>x.id===saved.data.id).sent,true);
  assert.equal(state.outreach.find(x=>x.id===saved.data.id).body,draft.data.body);
+ assert.equal(state.outreach.find(x=>x.id===saved.data.id).recipientEmail,'staff@example.org');
  const patch=await call('/api/partners/'+id,'PATCH',{status:'interested',responseStatus:'positive',nextAction:'Arrange trial',followUpDate:'2026-10-24'});
  assert.equal(patch.status,200);
  assert.equal(patch.data.nextAction,'Arrange trial');
  assert.equal((await call('/api/partners/'+id+'/activity','POST',{type:'response',text:'Partner requested a sample'})).status,201);
  assert.equal((await call('/api/partners/'+id+'/activity','POST',{type:'response',text:''})).status,400);
  assert.equal((await call('/api/partners/'+id,'PATCH',{responseStatus:'invented'})).status,400);
- assert.equal((await call('/api/partners/'+id,'PATCH',{status:'closed'})).status,200);
+ assert.equal((await call('/api/partners/'+id,'PATCH',{status:'closed'})).status,400);
+ assert.equal((await call('/api/partners/'+id,'PATCH',{status:'closed',closeReason:'declined'})).status,200);
  assert.equal((await call('/api/outreach/sent','POST',{partnerId:id})).status,400);
  state=(await call('/api/state')).data;
  assert.ok(state.partnerActivity.some(x=>x.partnerId===id&&x.type==='response'));
  assert.ok(state.partnerActivity.some(x=>x.partnerId===id&&x.text.includes('Closed')));
+ assert.equal(state.partners.find(x=>x.id===id).closeReason,'declined');
  assert.equal(JSON.parse(await readFile(process.env.DATA_FILE,'utf8')).partnerActivity.length,state.partnerActivity.length);
 });
 
@@ -108,7 +111,7 @@ test('closing a confirmed Regular partner clears capacity without erasing histor
  const before=(await call('/api/state')).data;
  const prior=before.metrics.confirmedKg;
  assert.equal(before.partners.find(x=>x.id==='p1').confirmed,true);
- const result=await call('/api/partners/p1','PATCH',{status:'closed'});
+ const result=await call('/api/partners/p1','PATCH',{status:'closed',closeReason:'declined'});
  assert.equal(result.status,200);
  assert.equal(result.data.confirmed,false);
  const after=(await call('/api/state')).data;
@@ -121,7 +124,9 @@ test('Record Sent stores reviewed body even without a saved draft',async()=>{
  assert.equal(created.status,201);
  const id=created.data.id;
  assert.equal((await call('/api/outreach/sent','POST',{partnerId:id})).status,400);
- const sent=await call('/api/outreach/sent','POST',{partnerId:id,body:'Reviewed outreach email sent externally.'});
+ assert.equal((await call('/api/outreach/sent','POST',{partnerId:id,body:'Written but recipient missing'})).status,400);
+ assert.equal((await call('/api/outreach/sent','POST',{partnerId:id,body:'Email',recipientEmail:'not-an-email'})).status,400);
+ const sent=await call('/api/outreach/sent','POST',{partnerId:id,body:'Reviewed outreach email sent externally.',recipientEmail:'staff@example.org'});
  assert.equal(sent.status,200);
  assert.equal(sent.data.outreach.subject,'CoffeeBot | Spent Coffee Grounds Reuse Partnership');
  assert.equal(sent.data.outreach.body,'Reviewed outreach email sent externally.');
@@ -260,7 +265,7 @@ test('partner logistics preferences, editable manual activity and grounded follo
  assert.equal(draft.status,200);
  assert.equal(draft.data.subject,'CoffeeBot | Spent Coffee Grounds Reuse Follow-Up');
  assert.ok(draft.data.body.includes('Dear'));
- const sent=await call('/api/outreach/sent','POST',{partnerId:id,body:draft.data.body,kind:'follow-up'});
+ const sent=await call('/api/outreach/sent','POST',{partnerId:id,body:draft.data.body,recipientEmail:'staff@example.org',kind:'follow-up'});
  assert.equal(sent.status,200);
  assert.equal(sent.data.outreach.kind,'follow-up');
  assert.equal(sent.data.outreach.subject,draft.data.subject);
@@ -288,7 +293,7 @@ test('historical outreach and handover records can be corrected and archived',as
  assert.equal(r.status,201);const id=r.data.id;
  const ev=(await call('/api/state')).data.partnerActivity.find(x=>x.partnerId===id&&x.type==='stage');
  assert.equal((await call('/api/partners/'+id+'/activity/'+ev.id,'PATCH',{text:'Corrected initial stage'})).status,200);
- const out=await call('/api/outreach/sent','POST',{partnerId:id,body:'Initial message'});
+ const out=await call('/api/outreach/sent','POST',{partnerId:id,body:'Initial message',recipientEmail:'staff@example.org'});
  assert.equal(out.status,200);
  const oid=out.data.outreach.id;
  assert.equal((await call('/api/partners/'+id+'/outreach/'+oid,'PATCH',{body:'Corrected recorded copy'})).status,200);

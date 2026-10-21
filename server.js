@@ -89,6 +89,7 @@ function fail(msg){throw Object.assign(new Error(msg),{status:400});}
 const cleanString=(v,n=300)=>String(v ?? '').trim().slice(0,n);
 // Capitalise stage labels in staff-facing audit messages, not in stored stage keys.
 const stageLabel=status=>String(status||'').replace(/^[a-z]/,ch=>ch.toUpperCase());
+const CLOSURE_REASONS=['declined','unresponsive','unsuitable','logistics','other'];
 const validNumber=(v,label,min,max)=>{if(v===null||v===''||!Number.isFinite(Number(v))||Number(v)<min||Number(v)>max)fail(`Invalid ${label}`);return Number(v);};
 function validatePartnerFields(payload,current={}){
  const p={...current};
@@ -100,6 +101,7 @@ function validatePartnerFields(payload,current={}){
   p[key]=value;
  }
  if(Object.hasOwn(payload,'status')){if(!STATUSES.includes(payload.status))fail('Invalid pipeline status');p.status=payload.status;}
+  if(p.status==='closed'&&current.status!=='closed'){const reason=cleanString(payload.closeReason,30);if(!CLOSURE_REASONS.includes(reason))fail('Select a reason for closing this relationship');p.closeReason=reason;p.closeNotes=cleanString(payload.closeNotes,500);p.closedAt=new Date().toISOString();p.nextAction='';p.followUpDate='';}else if(current.status==='closed'&&p.status!=='closed'){delete p.closeReason;delete p.closeNotes;delete p.closedAt;}
  if(Object.hasOwn(payload,'capacityKg'))p.capacityKg=payload.capacityKg===''||payload.capacityKg===null?null:validNumber(payload.capacityKg,'weekly capacity',0,100000);
  if(Object.hasOwn(payload,'verified'))p.verified=payload.verified===true;
  if(Object.hasOwn(payload,'confirmed'))p.confirmed=payload.confirmed===true;
@@ -378,7 +380,7 @@ export function createApp({aiProvider=AI_PROVIDER,assessmentGenerator=generateJS
   if(pm&&req.method==='PATCH'){
    const v=await input(req);const updated=await mutation(s=>{const idx=s.partners.findIndex(p=>p.id===pm[1]);if(idx<0)throw Object.assign(new Error('Partner not found'),{status:404});const before=s.partners[idx],after=validatePartnerFields(v,before);s.partners[idx]=after;
      const changes=[];
-     if(before.status!==after.status)changes.push('Stage: '+stageLabel(before.status)+' to '+stageLabel(after.status));
+     if(before.status!==after.status)changes.push('Stage: '+stageLabel(before.status)+' to '+stageLabel(after.status)+(after.status==='closed'?' (Reason: '+after.closeReason+(after.closeNotes?'; '+after.closeNotes:'')+')':''));
      if((before.contactName||'')!==(after.contactName||''))changes.push('Current contact: '+(before.contactName||'Not Recorded')+' to '+(after.contactName||'Not Recorded'));
      if((before.responseStatus||'none')!==(after.responseStatus||'none'))changes.push('Response: '+(after.responseStatus||'none'));
      if((before.nextAction||'')!==(after.nextAction||''))changes.push(after.nextAction?'Next action: '+after.nextAction:'Next action cleared');
@@ -448,10 +450,10 @@ export function createApp({aiProvider=AI_PROVIDER,assessmentGenerator=generateJS
      items.splice(i,1);
      return {deleted:true,id};
     }
-    const before=kind==='outreach'?{subject:x.subject,body:x.body}:{date:x.date,time:x.time,kg:x.kg,notes:x.notes,transportArrangement:x.transportArrangement,groundsCondition:x.groundsCondition,transportException:x.transportException,groundsException:x.groundsException};
+    const before=kind==='outreach'?{subject:x.subject,body:x.body,recipientEmail:x.recipientEmail}:{date:x.date,time:x.time,kg:x.kg,notes:x.notes,transportArrangement:x.transportArrangement,groundsCondition:x.groundsCondition,transportException:x.transportException,groundsException:x.groundsException};
     if(kind==='outreach'){
-     for(const [k,max] of [['subject',250],['body',10000]])if(Object.hasOwn(v,k)){
-      const value=cleanString(v[k],max);if(!value)fail('Recorded email '+k+' required');x[k]=value;
+     for(const [k,max] of [['subject',250],['body',10000],['recipientEmail',250]])if(Object.hasOwn(v,k)){
+      const value=cleanString(v[k],max);if(!value||(k==='recipientEmail'&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)))fail('Recorded email '+k+' required');x[k]=value;
      }
     }else{
      if(Object.hasOwn(v,'kg'))x.kg=validNumber(v.kg,'kg',0.01,100000);
@@ -544,7 +546,7 @@ export function createApp({aiProvider=AI_PROVIDER,assessmentGenerator=generateJS
      const due=cleanString(v.followUpDate,10);validateDate(due,'follow-up date');p.followUpDate=due;
     }
     const previousStage=p.status;
-    if(stage&&stage!==p.status){p.status=stage;if(stage!=='regular')p.confirmed=false;}
+    if(stage&&stage!==p.status){const update=validatePartnerFields({status:stage,...(stage==='closed'?{closeReason:v.closeReason,closeNotes:v.closeNotes}:{})},p);Object.assign(p,update);if(stage!=='regular')p.confirmed=false;}
     // Outcomes are observations about this interaction; do not overwrite legacy partner responseStatus.
     const now=new Date().toISOString();
     const item={id:randomUUID(),partnerId:am[1],type,text,at:now,entrySource:'manual',
@@ -601,6 +603,8 @@ export function createApp({aiProvider=AI_PROVIDER,assessmentGenerator=generateJS
     if(p.status==='closed')fail('Reopen the partner before recording outreach');
     const body=cleanString(v.body,10000);
     if(!body)fail('Email body required before recording sent outreach');
+     const recipientEmail=cleanString(v.recipientEmail,250);
+     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail))fail('Enter the actual recipient email before recording sent outreach');
     const now=new Date().toISOString();
     const kind=v.kind==='follow-up'?'follow-up':'initial';
    if(kind==='follow-up'&&p.status==='suggested')fail('Record initial outreach before sending follow-ups');
@@ -609,6 +613,7 @@ export function createApp({aiProvider=AI_PROVIDER,assessmentGenerator=generateJS
     entry.kind=kind;
    entry.subject=kind==='follow-up'?FOLLOWUP_SUBJECT:OUTREACH_SUBJECT;
     entry.body=body;
+     entry.recipientEmail=recipientEmail;
     entry.sent=true;
     entry.sentAt=now;
     if(!previous)s.outreach.unshift(entry);

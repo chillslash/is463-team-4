@@ -52,17 +52,44 @@ function render(){
  if(current==='partner_detail'&&partner(qs.get('partner')))switchManageTab(ui.partnerTab);
 }
 function dashboardView(){
- return base('Dashboard','',`<button class="co-button alt" data-action="settings">Edit Forecast</button><button class="co-button" data-href="/find-partners">Discover Partners →</button>`);
+ return base('Dashboard','',`<button class="co-button alt" data-href="/find-partners">Discover Partners</button><button class="co-button" data-href="/log-handover">Log Handover</button>`);
 }
-// Week view uses one shared wrapper; keeping markup separate makes templates easy to extend.
-function weekBody(){const t=data.metrics,s=data.settings;const frac=Math.min(100,Math.round(100*t.confirmedKg/Math.max(1,t.forecastKg)));
- const regular=data.partners.filter(p=>p.status==='regular'&&p.confirmed);
- const portions=[.14,.15,.146,.136,.161,.136,.131];const scale=Math.max(t.forecastKg/182,.1);
- const bars=portions.map((share,i)=>{const forecast=t.forecastKg*share;const conf=forecast*t.confirmedKg/Math.max(1,t.forecastKg);return `<div class="co-bar-col"><div class="co-bar-stack"><div class="co-bar-surplus" style="height:${Math.min(170,Math.max(0,forecast-conf)*5.6/scale)}px"></div><div class="co-bar-regular" style="height:${Math.min(170,conf*5.6/scale)}px"></div></div><div class="co-bar-name">${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][i]}</div></div>`;}).join('');
- return `<div class="co-grid"><div class="co-card"><div class="co-metric-label">Expected Grounds · <span class="co-pill blue">Forecast</span></div><div class="co-metric co-green">${m(t.forecastKg)} <small>kg</small></div><div class="co-note">${m(s.cupsPerWeek)} cups × ${m(s.gramsPerCup)} g per cup</div></div><div class="co-card"><div class="co-metric-label">Simulated Partner Capacity</div><div class="co-metric co-green">${m(t.confirmedKg)} <small>kg</small></div><div class="co-note">${regular.length} Demo Regular Partner(s)</div></div><div class="co-card"><div class="co-metric-label">Unallocated Surplus</div><div class="co-metric co-rust">${m(t.gapKg)} <small>kg</small></div><div class="co-note">Projected gap; not necessarily discarded</div><div style="margin-top:12px"><button class="co-button small" data-href="/find-partners">Discover Partners →</button></div></div></div>
- <details class="co-section co-card co-expand"><summary>Daily Grounds vs Partner Capacity <span>Illustrative Projection · Show Chart</span></summary><div class="co-section-head"><h3>Daily Grounds vs Partner Capacity</h3><span class="co-note"><i class="co-swatch"></i> Simulated Capacity <i class="co-swatch brown"></i> Unallocated</span></div><p class="co-note" style="margin:-5px 0 13px">Illustrative daily distribution of the entered weekly forecast, not measured daily machine data.</p><div class="co-chart">${bars}</div></details>
- <div class="co-section co-grid two"><div class="co-card"><div class="co-section-head"><h3>Simulated Regular Partner Capacity</h3><span class="co-pill">${regular.length} demo partners</span></div><table class="co-table"><thead><tr><th>Partner</th><th>kg / week</th><th>Pickup</th></tr></thead><tbody>${regular.map(p=>`<tr><td>${esc(p.name)}</td><td><strong>${m(p.capacityKg)}</strong></td><td>${esc(p.frequency)}</td></tr>`).join('')||'<tr><td colspan="3">No confirmed arrangements.</td></tr>'}</tbody></table><div class="co-note">These capacity figures are simulated for the prototype.</div></div><div class="co-card"><h3>Traceable Outcomes</h3><div class="co-grid two"><div><div class="co-metric-label">Handed Over</div><div class="co-metric co-green">${m(t.transferredKg)} <small>kg</small></div></div><div><div class="co-metric-label">Reuse Confirmed</div><div class="co-metric co-green">${m(t.evidencedKg)} <small>kg</small></div></div></div><p class="co-note">Handover does not prove end use. Reuse Confirmed requires a separate confirmation choice.</p><div class="co-actions"><button class="co-button alt small" data-href="/manage-partners">Manage Partners</button><button class="co-button ghost small" data-action="reporting">Reporting Inputs</button></div><p class="co-note">Reuse rate: ${t.reuseRate===null?'Not available (enter actual collected kg)':m(t.reuseRate)+'% of collected grounds'}. No estimated CO₂e figure without disposal and emissions factors.</p></div></div>
- `;
+// Operational overview: use recorded state, not invented historical estimates.
+function weekBody(){
+ const t=data.metrics,s=data.settings,today=journalDate();
+ const relevant=data.partners.filter(p=>p.status!=='closed'&&p.status!=='suggested'&&p.followUpDate);
+ const overdue=relevant.filter(p=>p.followUpDate<today);
+ const due=relevant.filter(p=>p.followUpDate<=new Date(Date.now()+7*86400000+8*3600000).toISOString().slice(0,10))
+  .sort((a,b)=>a.followUpDate.localeCompare(b.followUpDate)).slice(0,3);
+ const stageNames=['suggested','contacted','interested','trial','regular'];
+ const handovers=[...(data.handovers||[])].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,3);
+ const capacityPct=t.forecastKg?Math.min(100,Math.round(t.confirmedKg/t.forecastKg*100)):0;
+ const stat=(label,value,hint,tone='')=>`<div class="co-overview-stat ${tone}"><span>${label}</span><strong>${value}</strong><small>${hint}</small></div>`;
+ return `<section class="co-overview">
+  <div class="co-overview-stats">
+   ${stat('Forecast Supply',m(t.forecastKg)+' kg','Projected this week')}
+   ${stat('Confirmed Capacity',m(t.confirmedKg)+' kg','Regular partners (demo)')}
+   ${stat('Projected Gap',m(t.gapKg)+' kg','Not necessarily discarded',t.gapKg?'co-warn':'')}
+   ${stat('Overdue Follow-Ups',overdue.length,'Partners',overdue.length?'co-alert':'')}
+  </div>
+  <div class="co-overview-grid">
+   <section class="co-overview-panel co-overview-supply"><div class="co-overview-heading"><h2>Supply vs Capacity</h2><button class="co-overview-link" data-action="settings">Edit Forecast</button></div>
+    <div class="co-supply-numbers"><span>${m(t.confirmedKg)} kg covered</span><strong>${capacityPct}%</strong></div>
+    <div class="co-supply-track" role="img" aria-label="${capacityPct}% of projected supply covered"><span style="width:${capacityPct}%"></span></div>
+    <div class="co-supply-legend"><span><i></i>Confirmed Capacity</span><span><i></i>Projected Gap</span></div>
+    <p class="co-overview-foot">Based on ${m(s.cupsPerWeek)} cups at ${m(s.gramsPerCup)} g each. Capacity is illustrative until confirmed by CoffeeBot.</p>
+   </section>
+   <section class="co-overview-panel"><div class="co-overview-heading"><h2>Upcoming Follow-Ups</h2><a href="/manage-partners">View All</a></div>
+    ${due.length?due.map(p=>`<a class="co-overview-item" href="/partner?partner=${encodeURIComponent(p.id)}"><div><strong>${esc(p.name)}</strong><small>${esc(p.nextAction||titleCase(p.status))}</small></div><time class="${p.followUpDate<today?'co-overdue':''}">${esc(dateLabel(p.followUpDate))}</time></a>`).join(''):'<p class="co-overview-empty">No follow-ups due in the next seven days.</p>'}
+   </section>
+   <section class="co-overview-panel"><div class="co-overview-heading"><h2>Partner Stages</h2><a href="/manage-partners">Manage Partners</a></div>
+    <div class="co-stage-strip">${stageNames.map(stage=>`<a href="${stage==='suggested'?'/find-partners':'/manage-partners'}"><span>${titleCase(stage)}</span><strong>${data.partners.filter(p=>p.status===stage).length}</strong></a>`).join('')}</div>
+   </section>
+   <section class="co-overview-panel"><div class="co-overview-heading"><h2>Recent Handovers</h2><a href="/manage-partners">View Partners</a></div>
+    ${handovers.length?handovers.map(h=>`<a class="co-overview-item" href="/partner?partner=${encodeURIComponent(h.partnerId)}"><div><strong>${esc(name(h.partnerId))}</strong><small>${esc(dateLabel(h.date))}</small></div><b>${m(h.kg)} kg</b></a>`).join(''):'<p class="co-overview-empty">No handovers recorded yet.</p>'}
+   </section>
+  </div>
+ </section>`;
 }
 function discoveryViewProgress(status){
  const done=Math.max(0,Math.min(4,Number(status?.completed)||0));
@@ -161,14 +188,14 @@ function outreachView(){
  const recent=messages[0];
  const contextPanel=isFollowUp?`<section class="co-followup-context" aria-label="Follow-up context"><h3>Follow-Up Context</h3>${recent?`<div><span>${recent.type==='email'&&recent.emailDirection==='sent'?'Latest Sent Email':'Latest Recorded Communication'}</span><p>${esc((recent.text||'').slice(0,260))}${(recent.text||'').length>260?'…':''}</p></div>`:''}${chosen.nextAction?`<div><span>Next Action</span><p>${esc(chosen.nextAction)}</p></div>`:''}${chosen.followUpDate?`<div><span>Follow-Up Due</span><p>${esc(dateLabel(chosen.followUpDate))}</p></div>`:''}${!recent&&!chosen.nextAction?`<p>No previous conversation or next action recorded. Review the partner before sending.</p>`:''}</section>`:'';
 
- const copyField=(id,label,value,action,disabled=false)=>`<div class="co-field"><label for="${id}">${label}</label><div class="co-copy-field"><input id="${id}" readonly value="${esc(value)}"><button type="button" class="co-icon-copy" aria-label="Copy ${label}" title="Copy ${label}" data-action="${action}" ${disabled?'disabled':''}><span class="material-symbols-outlined" aria-hidden="true">content_copy</span></button></div></div>`;
+ const copyField=(id,label,value,action,disabled=false,editable=false)=>`<div class="co-field"><label for="${id}">${label}</label><div class="co-copy-field"><input id="${id}" ${editable?'type="email" autocomplete="off"':'readonly'} value="${esc(value)}"><button type="button" class="co-icon-copy" aria-label="Copy ${label}" title="Copy ${label}" data-action="${action}" ${disabled?'disabled':''}><span class="material-symbols-outlined" aria-hidden="true">content_copy</span></button></div></div>`;
  return base(isFollowUp?'Draft Follow-Up':'Draft Outreach','',`<button class="co-button alt small co-back-link" data-href="${isFollowUp?'/partner?partner='+encodeURIComponent(chosen.id):'/find-partners'}"><span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>${isFollowUp?'Back to Partner':'Discover Partners'}</button>`)+
  `<div class="co-page co-outreach-page"><div class="co-card co-outreach-editor">
   <div class="co-field"><div class="co-field-heading"><label for="draft-partner-search">Selected Partner</label><button type="button" class="co-button alt co-outreach-edit" data-action="edit" data-id="${esc(chosen.id)}"><span class="material-symbols-outlined" aria-hidden="true">edit</span>Edit Partner</button></div>
    <div class="co-partner-combobox"><div class="co-combobox-control"><input id="draft-partner-search" role="combobox" aria-autocomplete="list" aria-haspopup="listbox" aria-expanded="false" aria-controls="draft-partner-options" autocomplete="off" value="${esc(chosen.name)}" placeholder="Search Partners" ${isFollowUp?'readonly':''}><button type="button" class="co-combobox-toggle" data-action="draft-toggle" aria-label="Show partners" ${isFollowUp?'hidden':''} aria-controls="draft-partner-options"><span class="material-symbols-outlined" aria-hidden="true">expand_more</span></button></div><div class="co-partner-options" id="draft-partner-options" role="listbox" hidden></div></div>
   </div>
   ${contextPanel}<div class="co-outreach-fields">
-  ${copyField('draft-recipient','Recipient',chosen.contactEmail||'Unknown — find an authorised contact first','copy-recipient',!chosen.contactEmail)}
+  ${copyField('draft-recipient','Recipient',chosen.contactEmail||'','copy-recipient',false,true)}
   ${copyField('draft-subject','Subject',isFollowUp?'CoffeeBot | Spent Coffee Grounds Reuse Follow-Up':'CoffeeBot | Spent Coffee Grounds Reuse Partnership','copy-subject')}
   </div>
   <div class="co-field co-outreach-body"><label for="draft-body">Email Body</label><textarea id="draft-body" rows="15" placeholder="Generate a draft to get started.">${esc(d?.body||'')}</textarea></div>
@@ -270,7 +297,7 @@ function journalEvents(p){
  const records=(data.partnerActivity||[])
   .filter(x=>x.partnerId===p.id&&!x.deletedAt&&x.type!=='handover'&&!(x.type==='outreach'&&outbound.length))
   .map(x=>({id:x.id,type:x.type,at:x.occurredAt||x.at,loggedAt:x.at,displayDate:x.date||'',text:x.text,emailDirection:x.emailDirection||'',contact:x.contactPerson||'',outcome:x.outcome||'',next:x.nextAction||'',stage:x.stageTo||'',editable:editableStaffActivity(x),recordKind:'activity',editedAt:x.editedAt||null}));
- records.push(...outbound.map(x=>({id:x.id,type:'outreach',at:x.sentAt||x.preparedAt,text:'Email recorded as sent',kind:x.kind||'initial',subject:x.subject||'',body:x.body||'',editable:true,recordKind:'outreach',editedAt:x.editedAt||null})));
+ records.push(...outbound.map(x=>({id:x.id,type:'outreach',at:x.sentAt||x.preparedAt,text:'Email recorded as sent',kind:x.kind||'initial',subject:x.subject||'',body:x.body||'',recipientEmail:x.recipientEmail||'',editable:true,recordKind:'outreach',editedAt:x.editedAt||null})));
  records.push(...(data.handovers||[]).filter(h=>h.partnerId===p.id).map(h=>({id:h.id,type:'handover',at:h.date+'T'+(h.time||'12:00')+':00+08:00',displayDate:h.time?'':h.date,text:m(h.kg)+' kg transferred',outcome:({'partner-confirmed':'Recipient confirmed'})[h.confirmation]||'',next:h.notes||'',arrangement:[h.transportException?'Collection: '+({'partner-collects':'Partner Collects','coffeebot-delivers':'CoffeeBot Delivers',either:'Either'})[h.transportArrangement]:null,h.groundsException?'Grounds: '+({dry:'Dried',wet:'Wet',either:'Either'})[h.groundsCondition]:null].filter(Boolean).join(' / '),editable:true,recordKind:'handovers',editedAt:h.editedAt||null})));
  return records.sort((a,b)=>(Date.parse(b.at)||0)-(Date.parse(a.at)||0));
 }
@@ -297,7 +324,7 @@ function journalTimeline(p){
   // Collapsed long messages show the event and sender, never a duplicate excerpt of the full message.
   const preview=x.type==='outreach'?subject:(x.contact?'From '+x.contact:'');
   const detail=x.type==='outreach'
-   ?`<div class="co-journal-email"><div><strong>Subject</strong><span>${esc(subject||'Not recorded')}</span></div><div><strong>Sent Email</strong><div class="co-journal-email-body">${esc(x.body||'Email body not available for this historical entry.')}</div></div></div>`
+   ?`<div class="co-journal-email"><div><strong>Subject</strong><span>${esc(subject||'Not recorded')}</span></div>${x.recipientEmail?'<div><strong>To</strong><span>'+esc(x.recipientEmail)+'</span></div>':''}<div><strong>Sent Email</strong><div class="co-journal-email-body">${esc(x.body||'Email body not available for this historical entry.')}</div></div></div>`
    :`<p class="co-journal-full-message">${esc(message)}</p>`;
   return `<article class="co-journal-item"${older?' hidden':''}><details class="co-journal-entry"><summary>${heading}${preview?`<span class="co-journal-preview">${esc(preview)}</span>`:''}<span class="co-journal-expand">View Details <span class="material-symbols-outlined" aria-hidden="true">expand_more</span></span></summary><div class="co-journal-expanded">${x.contact?`<small>With ${esc(x.contact)}</small>`:''}${detail}${x.outcome?`<small>Outcome: ${esc(activityOutcomeLabel(x.outcome))}</small>`:''}${x.stage?`<small>Stage: ${esc(titleCase(x.stage))}</small>`:''}${x.next?`<small>${x.type==='handover'?'Notes':'Next'}: ${esc(x.next)}</small>`:''}${x.arrangement?`<small>${esc(x.arrangement)}</small>`:''}</div></details>${activityMenu}</article>`;
  };
@@ -309,7 +336,7 @@ function manageDetails(p){
  if(!p)return;
  const stages=['suggested','contacted','interested','trial','regular','closed'].map(k=>[k,titleCase(k)]);
  const overview=`<section class="co-journal-overview"><div class="co-relationship-heading"><div><span class="material-symbols-outlined" aria-hidden="true">handshake</span><h3>Relationship Overview</h3></div></div><div class="co-journal-overview-grid"><div><span>Current Contact</span><strong>${esc(p.contactName||'Not Recorded')}</strong>${p.contactEmail?`<small>${esc(p.contactEmail)}</small>`:''}</div><div><span>Next Action</span><strong>${esc(p.nextAction||'Not Scheduled')}</strong></div><div class="${p.followUpDate&&p.followUpDate<=journalDate()?'co-follow-up-attention':''}"><span>Follow-Up Due</span><strong>${esc(p.followUpDate?dateLabel(p.followUpDate):'Not Scheduled')}</strong>${p.followUpDate&&p.followUpDate<=journalDate()?`<small>${p.followUpDate<journalDate()?'Overdue':'Due Today'}</small>`:''} </div></div><div class="co-journal-stage"><div class="co-field"><label for="relationship-stage">Stage</label><select id="relationship-stage">${stages.map(([v,t])=>`<option value="${v}" ${v===p.status?'selected':''}>${t}</option>`).join('')}</select></div><button type="button" class="co-button alt small" data-action="manage-stage-save" data-id="${esc(p.id)}">Update Stage</button></div></section>`;
- const log=`<div id="manage-journal-editor" class="co-journal-editor" hidden><div class="co-field-row"><div class="co-field"><label for="journal-type">Type <span class="co-required">*</span></label><select id="journal-type"><option value="email">Email Received</option><option value="email-sent">Email Sent</option><option value="call">Phone Call</option><option value="text">Text / WhatsApp</option><option value="meeting">Meeting</option><option value="site-visit">Site Visit</option><option value="other">Other</option></select></div><div class="co-field"><label for="journal-date">Date <span class="co-required">*</span></label><input type="date" id="journal-date" max="${journalDate()}" value="${journalDate()}"></div></div><div class="co-field-row"><div class="co-field"><label for="journal-contact">Contact Person</label><input id="journal-contact" autocomplete="off" value="${esc(p.contactName||'')}" placeholder="Who did you speak to?"></div><div class="co-field"><label for="journal-outcome">Outcome</label><select id="journal-outcome"><option value="none">Not Recorded</option><option value="requested-information">Requested Information</option><option value="meeting-agreed">Agreed to Meeting</option><option value="trial-discussed">Discussed Trial</option><option value="follow-up-needed">Follow-Up Needed</option><option value="declined">Declined</option><option value="no-response">No Reply</option><option value="other">Other</option></select></div></div><div class="co-field"><label for="journal-text">Message / Notes <span class="co-required">*</span></label><textarea id="journal-text" maxlength="10000" rows="6" placeholder="Paste a partner reply, or briefly describe the conversation"></textarea></div><div class="co-field-row"><div class="co-field"><label for="journal-next">Next Action</label><input id="journal-next" maxlength="250" placeholder="e.g. Send material specifications"></div><div class="co-field"><label for="journal-due">Follow-Up Date</label><input type="date" id="journal-due"></div></div><div class="co-field"><label for="journal-stage">Stage</label><select id="journal-stage">${stages.map(([v,t])=>`<option value="${v}" ${v===p.status?'selected':''}>${t}</option>`).join('')}</select></div><div class="co-journal-form-actions"><button type="button" class="co-button alt" data-action="manage-log-cancel">Cancel</button><button type="button" class="co-button" data-action="manage-log-save" data-id="${esc(p.id)}">Save Activity</button></div></div>`;
+ const log=`<div id="manage-journal-editor" class="co-journal-editor" hidden><div class="co-field-row"><div class="co-field"><label for="journal-type">Type <span class="co-required">*</span></label><select id="journal-type"><option value="email">Email Received</option><option value="email-sent">Email Sent</option><option value="call">Phone Call</option><option value="text">Text / WhatsApp</option><option value="meeting">Meeting</option><option value="site-visit">Site Visit</option><option value="other">Other</option></select></div><div class="co-field"><label for="journal-date">Date <span class="co-required">*</span></label><input type="date" id="journal-date" max="${journalDate()}" value="${journalDate()}"></div></div><div class="co-field-row"><div class="co-field"><label for="journal-contact">Contact Person</label><input id="journal-contact" autocomplete="off" value="${esc(p.contactName||'')}" placeholder="Who did you speak to?"></div><div class="co-field"><label for="journal-outcome">Outcome</label><select id="journal-outcome"><option value="none">Not Recorded</option><option value="requested-information">Requested Information</option><option value="meeting-agreed">Agreed to Meeting</option><option value="trial-discussed">Discussed Trial</option><option value="follow-up-needed">Follow-Up Needed</option><option value="declined">Declined</option><option value="no-response">No Reply</option><option value="other">Other</option></select></div></div><div class="co-field"><label for="journal-text">Message / Notes <span class="co-required">*</span></label><textarea id="journal-text" maxlength="10000" rows="6" placeholder="Paste a partner reply, or briefly describe the conversation"></textarea></div><div class="co-field-row"><div class="co-field"><label for="journal-next">Next Action</label><input id="journal-next" maxlength="250" placeholder="e.g. Send material specifications"></div><div class="co-field"><label for="journal-due">Follow-Up Date</label><input type="date" id="journal-due"></div></div><div class="co-field"><label for="journal-stage">Stage</label><select id="journal-stage">${stages.filter(([v])=>v!=='closed'||p.status==='closed').map(([v,t])=>`<option value="${v}" ${v===p.status?'selected':''}>${t}</option>`).join('')}</select></div><div class="co-journal-form-actions"><button type="button" class="co-button alt" data-action="manage-log-cancel">Cancel</button><button type="button" class="co-button" data-action="manage-log-save" data-id="${esc(p.id)}">Save Activity</button></div></div>`;
  const actions=`<div class="co-journal-actions"><button type="button" class="co-button alt small" data-action="manage-log-open"><span class="material-symbols-outlined" aria-hidden="true">add</span> Log Activity</button><button type="button" class="co-button alt small" data-action="manage-handover-open" data-id="${esc(p.id)}"><span class="material-symbols-outlined" aria-hidden="true">inventory_2</span> Record Handover</button>${p.status!=='closed'&&p.status!=='suggested'?`<button type="button" class="co-button alt small" data-href="/outreach?partner=${encodeURIComponent(p.id)}&mode=followup"><span class="material-symbols-outlined" aria-hidden="true">edit_note</span> Draft Follow-Up</button>`:''}</div>`;
  const timeline=`<section class="co-journal-history"><div class="co-journal-history-toggle"><span class="co-journal-history-title"><span class="material-symbols-outlined" aria-hidden="true">history</span><strong>Activity History</strong><span class="co-journal-count">${journalEvents(p).length}</span></span></div>${journalTimeline(p)}</section>`;
  const tabs=`<div class="co-manage-tabs" role="tablist" aria-label="Partner management"><button type="button" role="tab" id="manage-tab-button-relationship" aria-controls="manage-tab-relationship" aria-selected="true" data-action="manage-tab" data-tab="relationship">Relationship</button><button type="button" role="tab" id="manage-tab-button-edit" aria-controls="manage-tab-edit" aria-selected="false" data-action="manage-tab" data-tab="edit" tabindex="-1">Edit Partner</button></div>`;
@@ -465,7 +492,7 @@ function editHistoryRecord(a){
  const field=(label,key,value,type='text')=>`<div class="co-field"><label for="historical-${key}">${label}</label>${type==='textarea'?`<textarea name="${key}" id="historical-${key}" rows="5">${esc(value||'')}</textarea>`:`<input id="historical-${key}" name="${key}" type="${type}" value="${esc(value??'')}">`}</div>`;
  let title='Correct History Entry',parts='',help='';
  if(kind==='outreach'){
-  title='Correct Recorded Email';parts=field('Subject','subject',a.subject)+field('Email Body','body',a.body,'textarea');
+  title='Correct Recorded Email';parts=field('Subject','subject',a.subject)+field('Recipient Email','recipientEmail',a.recipientEmail||'')+field('Email Body','body',a.body,'textarea');
   help='Corrects the saved record only. An externally sent email cannot be changed.';
  }else if(kind==='handovers'){
   title='Correct Handover';parts=field('Date','date',a.date,'date')+field('Time','time',a.time,'time')+field('Amount (kg)','kg',a.kg,'number')+field('Notes','notes',a.notes,'textarea')+handoverArrangementFields(partner(a.partnerId),a);
@@ -519,6 +546,11 @@ function openHandoverDialog(p){
 async function saveRelationshipStage(el){
  const id=el.dataset.id,p=partner(id),stage=$('#relationship-stage')?.value;
  if(!p||!stage||p.status===stage){notice('Stage is already up to date.');return;}
+ if(stage==='closed'){
+  const choices=[['','Select Reason'],['declined','Declined'],['unresponsive','No Response'],['unsuitable','Not Suitable'],['logistics','Logistics'],['other','Other']];
+  const fields='<div class="co-field"><label for="close-reason">Reason *</label><select id="close-reason" name="closeReason" required>'+choices.map(([k,v])=>'<option value="'+k+'">'+v+'</option>').join('')+'</select></div><div class="co-field"><label for="close-notes">Additional Notes</label><textarea id="close-notes" name="closeNotes" rows="2"></textarea></div>';
+  dialog('Close Relationship',fields,async values=>request('/api/partners/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({status:'closed',...values})}),{partnerEditor:true,submitLabel:'Close Relationship',onComplete:()=>{location.href='/manage-partners';}});return;
+ }
  el.disabled=true;
  try{
   await request('/api/partners/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({status:stage})});
@@ -628,7 +660,7 @@ function partnerFormFields(v,{includeStage=false}={}){
  const section=(id,icon,title,content)=>`<section class="co-partner-form-section" aria-labelledby="section-${id}"><div class="co-partner-section-title"><span class="material-symbols-outlined" aria-hidden="true">${icon}</span><h3 id="section-${id}">${title}</h3></div><div class="co-partner-fields">${content}</div></section>`;
  const details=field('Name','name',v.name,'text',null,true)+
   (includeStage
-   ?`<div class="co-field-row">${field('Type','category',v.category,'text',categories.map(x=>[x,titleCase(x)]),true)}${field('Stage','status',v.status,'text',stages,true)}</div>`
+   ?`<div class="co-field-row">${field('Type','category',v.category,'text',categories.map(x=>[x,titleCase(x)]),true)}${field('Stage','status',v.status,'text',stages.filter(([v])=>v!=='closed'),true)}</div>`
    :field('Type','category',v.category,'text',categories.map(x=>[x,titleCase(x)]),true))+
   `<div class="co-field-row">${field('Contact / Decision-Maker','contactName',v.contactName)}${field('Contact Email','contactEmail',v.contactEmail,'email',null,false,true)}</div>`+
   field('Location / Collection Area','location',v.location);
@@ -778,16 +810,18 @@ async function handleAction(el){const action=el.dataset.action;
  if(action==='record-sent'){
    const body=$('#draft-body')?.value?.trim()||'';
    if(!body){notice('Generate or enter the email body first.','error');return;}
+   const recipientEmail=$('#draft-recipient')?.value?.trim()||'';
+   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)){notice('Enter the actual recipient email before recording sent outreach.','error');$('#draft-recipient')?.focus();return;}
    const partnerId=ui.selectedId;
    dialog('Confirm Record Sent',`<p class="co-confirm-copy">Record that an email to <strong>${esc(partner(partnerId)?.name||'this partner')}</strong> was sent using your email client? CoffeeBot saves this activity in the partner history but does not send emails.</p>`,async()=>{
-    await request('/api/outreach/sent',{method:'POST',body:JSON.stringify({partnerId,body,kind:qs.get('mode')==='followup'?'follow-up':'initial'})});
+    await request('/api/outreach/sent',{method:'POST',body:JSON.stringify({partnerId,body,recipientEmail,kind:qs.get('mode')==='followup'?'follow-up':'initial'})});
    },{confirmation:true,onComplete:()=>{location.href='/partner?partner='+encodeURIComponent(partnerId);}});
    return;
   }
   if(action==='copy-recipient'||action==='copy-subject'){
   const recipient=action==='copy-recipient';
   const value=(recipient?$('#draft-recipient')?.value:$('#draft-subject')?.value)||'';
-  if(!value.trim()||(recipient&&!partner(ui.selectedId)?.contactEmail)){notice('Nothing to copy yet.','error');return;}
+  if(!value.trim()){notice('Nothing to copy yet.','error');return;}
   try{await navigator.clipboard.writeText(value);notice(recipient?'Recipient copied.':'Subject copied.');}
   catch{notice('Clipboard unavailable; select and copy manually.','error');}
   return;
