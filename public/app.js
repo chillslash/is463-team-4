@@ -52,7 +52,7 @@ function render(){
  if(current==='partner_detail'&&partner(qs.get('partner')))switchManageTab(ui.partnerTab);
 }
 function dashboardView(){
- return base('Dashboard','',`<button class="co-button alt" data-href="/find-partners">Discover Partners</button><button class="co-button" data-action="handover-select">Log Handover</button>`);
+ return base('Dashboard','',`<button class="co-button" data-action="handover-select">Log Handover</button>`);
 }
 // Operational overview: use recorded state, not invented historical estimates.
 function weekBody(){
