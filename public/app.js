@@ -70,20 +70,20 @@ function weekBody(){
   const weekStart=thisWeek.toISOString().slice(0,10);
   const weeklyHandoversKg=(data.handovers||[]).filter(h=>h.date>=weekStart&&h.date<=today).reduce((total,h)=>total+(Number(h.kg)||0),0);
   const capacityPct=t.forecastKg?Math.min(100,Math.round(forecastDemandKg/t.forecastKg*100)):0;
- const stat=(label,value,hint,tone='')=>`<div class="co-overview-stat ${tone}"><span>${label}</span><strong>${value}</strong><small>${hint}</small></div>`;
+ const stat=(label,value,tone='')=>`<div class="co-overview-stat ${tone}"><span>${label}</span><strong>${value}</strong></div>`;
  return `<section class="co-overview">
   <div class="co-overview-stats">
-   ${stat('Forecast Supply',m(t.forecastKg)+' kg/week','Projected production')}
-    ${stat('Forecast Demand',m(forecastDemandKg)+' kg/week','Regular partners agreed intake')}
-    ${stat('Handed Over This Week',m(weeklyHandoversKg)+' kg','Recorded transfers')}
-    ${stat('Projected Gap',m(gapKg)+' kg/week','Supply not yet matched',gapKg?'co-warn':'')}
+   ${stat('Forecast Supply',m(t.forecastKg)+' kg/week')}
+    ${stat('Forecast Demand',m(forecastDemandKg)+' kg/week')}
+    ${stat('Handed Over This Week',m(weeklyHandoversKg)+' kg')}
+    ${stat('Projected Gap',m(gapKg)+' kg/week',gapKg?'co-warn':'')}
   </div>
   <div class="co-overview-grid">
    <section class="co-overview-panel co-overview-supply"><div class="co-overview-heading"><h2>Supply vs Demand</h2><button class="co-overview-link" data-action="settings">Edit Forecast</button></div>
     <div class="co-supply-numbers"><span>${m(forecastDemandKg)} kg/week planned</span><strong>${capacityPct}%</strong></div>
     <div class="co-supply-track" role="img" aria-label="${capacityPct}% of projected supply covered"><span style="width:${capacityPct}%"></span></div>
     <div class="co-supply-legend"><span><i></i>Forecast Demand</span><span><i></i>Projected Gap</span></div>
-    <p class="co-overview-foot">Based on ${m(s.cupsPerWeek)} cups at ${m(s.gramsPerCup)} g each. Demand is based on Regular partners' arrangements, not grounds already handed over.</p>
+    
    </section>
    <section class="co-overview-panel"><div class="co-overview-heading"><h2>Upcoming Follow-Ups${overdue.length?' ('+overdue.length+' Overdue)':''}</h2><a href="/manage-partners">View All</a></div>
     ${due.length?due.map(p=>`<a class="co-overview-item" href="/partner?partner=${encodeURIComponent(p.id)}"><div><strong>${esc(p.name)}</strong><small>${esc(p.nextAction||titleCase(p.status))}</small></div><time class="${p.followUpDate<today?'co-overdue':''}">${esc(dateLabel(p.followUpDate))}</time></a>`).join(''):'<p class="co-overview-empty">No follow-ups due in the next seven days.</p>'}
@@ -273,7 +273,7 @@ function manageView(){
  const rows=items.map(p=>`<a class="co-manage-row" href="/partner?partner=${encodeURIComponent(p.id)}" aria-label="Manage ${esc(p.name)}"><div class="co-manage-row-head"><strong>${esc(p.name)}</strong>${stageChip(p.status)}</div><div class="co-manage-row-meta">${esc(titleCase(p.category))}${p.source==='Fictional Stitch scenario'?' · Demo':''}</div>${p.nextAction||p.followUpDate?`<div class="co-manage-next"><span class="material-symbols-outlined" aria-hidden="true">event_note</span><span>${p.nextAction?'Next: '+esc(p.nextAction):'Follow-Up'}${p.followUpDate?' · '+esc(dateLabel(p.followUpDate)):''}</span></div>`:''}</a>`).join('');
 
  const main=`<div class="co-discovery-main co-manage-main"><div class="co-manage-list">${rows||'<div class="co-empty">No Partners Match</div>'}</div><div class="co-manage-pages"><button data-action="manage-page" data-page="${ui.managePage-1}" ${ui.managePage===1?'disabled':''}>Previous</button><span>${ui.managePage} / ${pages}</span><button data-action="manage-page" data-page="${ui.managePage+1}" ${ui.managePage===pages?'disabled':''}>Next</button></div></div>`;
- return base('Manage Partners','',`<button class="co-button alt" data-action="handover-select">Log Handover</button><button class="co-button" data-action="new">Add Partner</button>`)+`<div class="co-page co-manage-page"><div class="co-discovery-layout">${manageSidebar(counts,arr.length,arr.length?start+1:0,Math.min(start+15,arr.length),categories)}${main}</div></div>`;
+ return base('Manage Partners','',`<button class="co-button" data-action="new">Add Partner</button>`)+`<div class="co-page co-manage-page"><div class="co-discovery-layout">${manageSidebar(counts,arr.length,arr.length?start+1:0,Math.min(start+15,arr.length),categories)}${main}</div></div>`;
 }
 function switchManageTab(tab){
  if(!['relationship','edit'].includes(tab))return;
@@ -542,23 +542,31 @@ function handoverArrangementFields(p,record=null){
  return summary+`<details class="co-handover-exceptions" ${record?.transportException||record?.groundsException?'open':''}><summary>Change For This Handover</summary><div class="co-field-row">${choices('Collection / Delivery','transportArrangement',transports,record?.transportException?record.transportArrangement:'')}${choices('Grounds Condition','groundsCondition',conditions,record?.groundsException?record.groundsCondition:'')}</div></details>`;
 }
 function openHandoverPicker(){
- const candidates=data.partners.filter(p=>['contacted','interested','trial','regular'].includes(p.status)).sort((a,b)=>a.name.localeCompare(b.name));
- if(!candidates.length){notice('No active partners available for a handover.','error');return;}
- const html='<div class="co-field"><label for="handover-partner-search">Search Partners</label><input id="handover-partner-search" type="search" autocomplete="off" placeholder="Search by name"></div>'+
-   '<div class="co-field"><label for="handover-partner-id">Partner <span class="co-required">*</span></label><select id="handover-partner-id" name="partnerId" required></select></div>';
- let selected;
- dialog('Log Handover',html,async values=>{
-  selected=partner(values.partnerId);
-  if(!selected||!candidates.some(p=>p.id===selected.id))throw Error('Select an active partner');
- },{partnerEditor:true,submitLabel:'Continue',onComplete:()=>openHandoverDialog(selected)});
- const search=$('#handover-partner-search'),select=$('#handover-partner-id');
- const populate=()=>{
-  const q=search.value.trim().toLowerCase();
-  const options=candidates.filter(p=>p.name.toLowerCase().includes(q));
-  select.innerHTML='<option value="">Select Partner</option>'+options.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name)+' ('+titleCase(p.status)+')</option>').join('');
+ const partners=data.partners.filter(p=>['contacted','interested','trial','regular'].includes(p.status)).sort((a,b)=>a.name.localeCompare(b.name));
+ if(!partners.length){notice('No active partners available.','error');return;}
+ const html='<div class="co-field"><label for="handover-search">Partner <span class="co-required">*</span></label><input id="handover-search" type="search" role="combobox" aria-autocomplete="list" aria-controls="handover-matches" aria-expanded="false" autocomplete="off" placeholder="Search Partners" required><div id="handover-matches" class="co-handover-matches" role="listbox" hidden></div></div>';
+ let selected=null,matches=[],active=0;
+ dialog('Log Handover',html,async()=>{if(!selected)throw Error('Select a partner from the list');},{partnerEditor:true,submitLabel:'Continue',onComplete:()=>openHandoverDialog(selected)});
+ const input=$('#handover-search'),results=$('#handover-matches');
+ const hide=()=>{results.hidden=true;input.setAttribute('aria-expanded','false');input.removeAttribute('aria-activedescendant');};
+ const draw=()=>{
+  matches=partners.filter(p=>p.name.toLowerCase().includes(input.value.trim().toLowerCase())).slice(0,8);
+  active=Math.max(0,Math.min(active,matches.length-1));
+  results.innerHTML=matches.length?matches.map((p,i)=>'<button type="button" id="handover-option-'+i+'" class="co-handover-option'+(i===active?' is-active':'')+'" role="option" aria-selected="'+(i===active)+'" data-id="'+esc(p.id)+'"><span>'+esc(p.name)+'</span><small>'+titleCase(p.status)+'</small></button>').join(''):'<div class="co-handover-empty">No matching partners</div>';
+  results.hidden=false;input.setAttribute('aria-expanded','true');
+  if(matches.length)input.setAttribute('aria-activedescendant','handover-option-'+active);
+  else input.removeAttribute('aria-activedescendant');
  };
- search.addEventListener('input',populate);
- populate();
+ const choose=p=>{selected=p;input.value=p.name;hide();};
+ input.addEventListener('focus',()=>{if(!selected)draw();});
+ input.addEventListener('input',()=>{selected=null;active=0;draw();});
+ input.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){if(!results.hidden){e.preventDefault();hide();}return;}
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();if(results.hidden){active=0;draw();}else if(matches.length){active=(active+(e.key==='ArrowDown'?1:-1)+matches.length)%matches.length;draw();}return;}
+  if(e.key==='Enter'&&!results.hidden){e.preventDefault();if(matches[active])choose(matches[active]);return;}
+  if(e.key==='Tab')hide();
+ });
+ results.addEventListener('click',e=>{const item=e.target.closest('[data-id]');if(item){const p=matches.find(x=>x.id===item.dataset.id);if(p)choose(p);}});
 }
 function openHandoverDialog(p){
  if(!p)return;
