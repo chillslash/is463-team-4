@@ -11,7 +11,7 @@ function candidate(name,category,description,source,url,claim,extra={}){
  return {id:'directory-'+nameId(source+':'+name),name,category,status:'suggested',capacityKg:null,
  verified:false,confirmed:false,frequency:'unknown',use:description,source,sourceUrl:url,
  location:extra.location||'',lat:null,lon:null,distanceKm:null,contactName:'',contactEmail:'',
- evidenceEntries:[{source,url,claim}],notes:'Contact and collection arrangements require confirmation.', ...extra};
+ evidenceEntries:[{source,url,claim}],notes:'', ...extra};
 }
 export function neaCandidates(html){
  const start=html.toLowerCase().indexOf('local food waste recycling facilities');
@@ -29,7 +29,7 @@ export function neaCandidates(html){
   const claim='NEA lists '+name+' as a recycling facility; accepted materials: '+materials.slice(0,300);
   const extra={directCoffeeEvidence,materialEvidence:materials.slice(0,450),websiteUrl,contactName:person,contactEmail:email,
     ...(email?{contactEvidence:{source:'NEA Food Waste Recycling Facilities',url:NEA_URL,checkedAt:new Date().toISOString(),method:'directory'}}:{})};
-  return candidate(name,'organic waste recycler',directCoffeeEvidence?'NEA explicitly lists used coffee grounds among accepted materials.':'NEA lists accepted materials: '+materials.slice(0,260),
+  return candidate(name,'organic waste recycler','',
    'NEA Food Waste Recycling Facilities',NEA_URL,claim,extra);
  }).filter(Boolean).slice(0,35);
 }
@@ -41,7 +41,7 @@ export function liasCandidates(html){
   const name=plain(nameRaw),address=plain(addressRaw),email=emailFrom(emailRaw),websiteUrl=hyperlink(websiteRaw);
   if(!name||name.length<4)return null;
   return candidate(name,/nurser|garden|horticultur|farm/i.test(name)?'horticultural business':'landscaping business',
-   'Listed LIAS member. Grounds-reuse operations require confirmation.',
+   '',
    'LIAS Member Directory',LIAS_URL,
    'LIAS lists '+name+' as a '+plain(typeRaw)+' member'+(address?' at '+address.slice(0,160):''),
    {location:address.slice(0,190),websiteUrl,contactEmail:email,...(email?{contactEvidence:{source:'LIAS Member Directory',url:LIAS_URL,checkedAt:new Date().toISOString(),method:'directory'}}:{})});

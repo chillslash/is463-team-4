@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {EventEmitter} from 'node:events';
 import {PassThrough} from 'node:stream';
-import {AI_PROVIDERS,cliInvocation,parseAIJSON,generateJSON,validateDraft,validateAssessment} from '../src/ai.js';
+import {AI_PROVIDERS,cliInvocation,parseAIJSON,parseAIOutput,generateJSON,validateDraft,validateAssessment,ensureCoffeeBotSubject} from '../src/ai.js';
 
 test('provider commands are noninteractive and use stdin, never a user prompt in shell arguments',()=>{
  assert.deepEqual(AI_PROVIDERS,['template','codex','claude']);
@@ -47,4 +47,26 @@ test('CODEX_PATH overrides PATH only for Codex, without hardcoded machine fallba
  assert.equal(c.command,'cmd.exe');assert.equal(c.args[3],'claude');
  assert.equal(cliInvocation('codex','linux',{CODEX_PATH:'/opt/custom/codex'}).command,'/opt/custom/codex');
  assert.throws(()=>cliInvocation('codex','win32',{CODEX_PATH:'relative/codex.exe'}),/absolute/);
+});
+
+test('CLI usage parsing reports actual token counts where available',()=>{
+ const message=JSON.stringify({subject:'Hello',body:'Email'});
+ const jsonl=[
+  JSON.stringify({type:'thread.started',thread_id:'sample'}),
+  JSON.stringify({type:'item.completed',item:{type:'agent_message',text:message}}),
+  JSON.stringify({type:'turn.completed',usage:{input_tokens:350,cached_input_tokens:100,output_tokens:88}})
+ ].join('\n');
+ const codex=parseAIOutput(jsonl,'codex');
+ assert.equal(codex.result.subject,'Hello');
+ assert.deepEqual(codex.usage,{inputTokens:350,outputTokens:88,cachedInputTokens:100});
+ const claude=parseAIOutput(JSON.stringify({result:message,usage:{input_tokens:20,output_tokens:15,cache_read_input_tokens:5}}),'claude');
+ assert.deepEqual(claude.usage,{inputTokens:20,outputTokens:15,cachedInputTokens:5});
+ assert.equal(parseAIOutput(message,'codex').usage,null);
+});
+
+test('outreach subjects always feature the CoffeeBot brand',()=>{
+ assert.equal(ensureCoffeeBotSubject('Partnership enquiry'),'CoffeeBot — Partnership enquiry');
+ assert.equal(ensureCoffeeBotSubject('CoffeeBot: A reuse trial'),'CoffeeBot: A reuse trial');
+ assert.equal(ensureCoffeeBotSubject('coffee bot partnership'),'CoffeeBot partnership');
+ assert.equal(ensureCoffeeBotSubject('Coffee-Bot proposal'),'CoffeeBot proposal');
 });

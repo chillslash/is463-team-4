@@ -138,16 +138,17 @@
 .co-scan-primary span{font-size:14px;color:var(--ink);white-space:nowrap}
 .co-scan-meta{font-size:13px;color:var(--sub);text-align:right}
 .co-progress-fill{position:relative;overflow:hidden;min-width:8px}
-.co-progress-fill:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.48),transparent);animation:co-scan-sweep 1.5s ease-in-out infinite}
+.co-progress-track{position:relative}
+.co-progress-track:after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,.68) 50%,transparent 100%);animation:co-scan-sweep 1.5s ease-in-out infinite}
 @keyframes co-scan-sweep{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
-@media(prefers-reduced-motion:reduce){.co-progress-fill:after{animation:none}}
+@media(prefers-reduced-motion:reduce){.co-progress-track:after{animation:none}}
 
 .co-discovery-card{border-color:#d9e5db;transition:border-color .15s ease,box-shadow .15s ease}
 .co-discovery-card:hover{border-color:#b6cdbb;box-shadow:0 2px 10px rgba(18,53,35,.055)}
-.co-discovery-card.co-highlight{border-left:4px solid #498565;background:linear-gradient(90deg,#f6faf6 0%,#fff 25%)}
+
 .co-discovery-card h3{font-size:19px;line-height:1.35}
 .co-fit{font-size:20px;font-weight:800;letter-spacing:-.025em;color:var(--forest)}
-.co-discovery-card .co-card-actions .co-button.alt{background:none;border:0;box-shadow:none;color:var(--leaf);text-decoration:underline;padding:6px 4px;min-height:30px}
+.co-discovery-card .co-card-actions .co-button.alt{background:#fff;border:1px solid #bccfc1;box-shadow:none;color:var(--forest);text-decoration:none;padding:7px 11px;min-height:36px}
 .co-contact{display:flex;align-items:baseline;gap:7px 12px;flex-wrap:wrap;font-size:14px;margin-top:10px}
 .co-contact strong{color:var(--forest)}
 .co-contact a{color:var(--leaf);text-decoration:underline;overflow-wrap:anywhere}
@@ -194,3 +195,711 @@ body>aside nav a[aria-current="page"]{font-size:14px!important;line-height:1.35!
 @media(max-width:650px){.co-fit-legend{grid-template-columns:1fr}.co-dashboard-pipeline>.co-section-head .co-actions{margin-left:0}}
 
 .co-dashboard-pipeline{scroll-margin-top:90px}
+.co-sub:empty{display:none}
+
+#sort-filter, #category-filter, #sort-filter option, #category-filter option{font-weight:400}
+
+
+.co-discovery-card[data-listing-id]{cursor:pointer}
+.co-discovery-card[data-listing-id]:focus-visible{outline:2px solid #498565;outline-offset:2px}
+.co-listing-source{font-size:12px;line-height:1.4;color:var(--leaf);font-weight:550;text-decoration:underline;text-underline-offset:2px;white-space:nowrap}
+.co-listing-source:hover{color:var(--forest)}
+.co-pages{display:flex;justify-content:center;align-items:center;gap:6px;flex-wrap:wrap;margin:20px 0 6px}
+.co-pages button{border:1px solid #cbd8ce;background:#fff;color:var(--forest);font:500 13px Inter,system-ui,sans-serif;min-height:36px;min-width:36px;border-radius:6px;padding:6px 10px;cursor:pointer}
+.co-pages button[aria-current="page"]{background:var(--forest);border-color:var(--forest);color:#fff}
+.co-pages button:hover:not([disabled]):not([aria-current="page"]){background:#edf7ef}
+.co-pages button:disabled{opacity:.35;cursor:default}
+.co-page-ellipsis{padding:0 5px;color:var(--sub)}
+.co-field-heading{display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:20px}
+.co-field-heading label{font-weight:600;font-size:12px;line-height:1.45;color:#405448}
+.co-copy-link{border:0;background:transparent;padding:2px 0;color:var(--leaf);font:550 12px Inter,system-ui,sans-serif;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+.co-copy-link:disabled{opacity:.45;cursor:default;text-decoration:none}
+.co-guidance-item{font-size:13px;line-height:1.45;padding:8px 0;border-bottom:1px solid var(--line)}
+.co-guidance-item:last-child{border-bottom:0}
+
+
+/* Discovery filters: separate control labels from their fields. */
+.co-toolbar label{display:inline-flex;align-items:center;gap:10px}
+
+/* Compact, colour-coded partner score (the numeric value remains accessible). */
+.co-card-actions .co-fit-meter{width:100%;margin:0 0 6px}
+.co-fit-meter-score{text-align:right;color:var(--forest);font-size:20px;line-height:1.15;font-weight:750;font-variant-numeric:tabular-nums;margin-bottom:9px}
+.co-fit-meter-track{width:100%;height:9px;border-radius:999px;background:#e7ede7;overflow:hidden}
+.co-fit-meter-fill{display:block;height:100%;border-radius:999px;transition:width .25s ease}
+.co-fit-good .co-fit-meter-fill{background:linear-gradient(90deg,#6cb284,#29784c)}
+.co-fit-moderate .co-fit-meter-fill{background:linear-gradient(90deg,#e5cb65,#b9952b)}
+.co-fit-low .co-fit-meter-fill{background:linear-gradient(90deg,#eab476,#c46d34)}
+@media (prefers-reduced-motion:reduce){.co-fit-meter-fill{transition:none}}
+
+.co-brand-name{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;line-height:1.12;gap:2px}
+.co-demo-staff{display:flex;align-items:center;justify-content:center;align-self:center;min-height:32px;text-align:center}
+
+.co-progress-meta{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:5px 18px}
+.co-progress-meta #discovery-count{font-weight:650;color:var(--forest)}
+.co-toolbar .co-ai-filter{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;cursor:pointer;font-weight:500}
+.co-ai-filter input{width:16px;height:16px;accent-color:var(--leaf);cursor:pointer;flex-shrink:0}
+.co-fit-meter-method{font-size:11px;line-height:1.35;text-align:right;color:var(--sub);margin:-4px 0 9px;font-weight:500}
+
+/* Discovery two-column layout */
+.co-discovery-layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:26px;align-items:start}
+.co-discovery-main{grid-column:1;grid-row:1;width:100%;max-width:960px;min-width:0;margin-inline:auto}
+.co-discovery-sidebar{grid-column:2;grid-row:1;min-width:0;padding:20px;background:#fff;border:1px solid var(--line);border-radius:10px;position:sticky;top:84px}
+.co-discovery-sidebar-title{font-size:16px;font-weight:700;color:var(--forest);margin:0 0 18px}
+.co-discovery-filter-fields{display:flex;flex-direction:column;gap:16px}
+.co-discovery-filter-field{display:flex;flex-direction:column;gap:7px;font-size:12px;font-weight:650;color:var(--forest)}
+.co-discovery-filter-field input,.co-discovery-filter-field select{box-sizing:border-box;width:100%;min-width:0;height:40px;padding:9px 11px;border:1px solid #cbd8ce;border-radius:6px;background:#fff;color:var(--ink);font:400 13px Inter,system-ui,sans-serif}
+.co-discovery-ai-checkbox{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:500;cursor:pointer;color:var(--forest)}
+.co-discovery-ai-checkbox input{width:16px;height:16px;margin:0;accent-color:var(--leaf);cursor:pointer}
+.co-discovery-result-count{font-size:12px;color:var(--sub)}
+.co-discovery-sidebar-status{border-top:1px solid var(--line);margin-top:20px;padding-top:17px}
+.co-discovery-sidebar .co-last-scan{display:block;background:transparent;border:0;padding:0;margin:0}
+.co-discovery-sidebar .co-scan-primary{flex-direction:column;align-items:flex-start;gap:4px}
+.co-discovery-sidebar .co-scan-primary span{white-space:normal;font-size:13px}
+.co-discovery-sidebar .co-scan-meta{margin-top:10px;text-align:left}
+.co-discovery-sidebar .co-source-caption{font-size:13px;line-height:1.6;margin:12px 0 0}
+.co-discovery-sidebar .co-progress-panel{padding:14px;margin:0}
+@media(max-width:1180px){.co-discovery-layout{grid-template-columns:minmax(0,1fr)}.co-discovery-sidebar{grid-column:1;grid-row:1;position:static}.co-discovery-main{grid-column:1;grid-row:2}.co-discovery-filter-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:620px){.co-discovery-filter-fields{grid-template-columns:1fr}.co-discovery-sidebar{padding:16px}}
+.co-assessment-weights-heading{font-family:Inter,system-ui,Arial,sans-serif;font-size:13px;font-weight:650;line-height:1.5;letter-spacing:normal;color:var(--forest);margin:16px 0 12px}
+.co-assessment-reset{display:flex;justify-content:flex-start;margin-top:18px}
+
+/* Discovery controls on the left; results on the right. */
+@media(min-width:1181px){
+ .co-discovery-layout{grid-template-columns:300px minmax(0,1fr)}
+ .co-discovery-sidebar{grid-column:1;grid-row:1;top:84px;max-height:calc(100vh - 100px);overflow-y:auto}
+ .co-discovery-main{grid-column:2;grid-row:1;max-width:960px;min-width:0}
+}
+.co-manage-page{padding-top:0}
+.co-manage-toolbar{display:grid;grid-template-columns:minmax(0,1.8fr) minmax(150px,.7fr) minmax(150px,.7fr);gap:12px;margin-bottom:18px}
+.co-manage-toolbar input,.co-manage-toolbar select{height:42px;width:100%;background:white;border:1px solid #cbd8ce;border-radius:7px;padding:9px 12px;color:var(--ink);font:400 13px Inter,system-ui,sans-serif}
+.co-manage-list{display:flex;flex-direction:column;gap:10px}
+.co-manage-row{width:100%;text-align:left;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px 15px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:9px;padding:17px 20px;cursor:pointer;color:var(--forest);font-size:15px}
+.co-manage-row:hover,.co-manage-row:focus-visible{border-color:#498565;background:#f6faf6}
+.co-manage-row small{grid-column:1/-1;color:var(--sub);font-size:12px;font-weight:400}
+.co-manage-pages{display:flex;justify-content:center;align-items:center;gap:15px;margin-top:18px;font-size:12px;color:var(--sub)}
+.co-manage-pages button{border:1px solid var(--line);border-radius:6px;padding:8px 12px;background:white;color:var(--forest)}
+.co-manage-pages button:disabled{opacity:.4}
+.co-manage-contact{font-size:12px;color:var(--sub);margin:10px 0 16px}
+.co-manage-event{display:flex;flex-direction:column;gap:3px;padding:11px 0;border-bottom:1px solid var(--line);font-size:12px;overflow-wrap:anywhere}
+.co-manage-event strong{color:var(--forest);font-weight:650}
+.co-manage-event span{color:var(--sub)}
+@media(max-width:760px){.co-manage-toolbar{grid-template-columns:1fr}.co-manage-row{padding:14px}}
+
+/* Compact outreach editor */
+.co-outreach-page{padding-top:0!important}
+.co-outreach-editor{width:100%;max-width:1080px;min-width:0}
+.co-outreach-fields{display:flex;flex-direction:column;gap:17px;margin:18px 0 20px}
+.co-outreach-editor .co-field>label{font-size:12px}
+.co-outreach-body textarea{min-height:330px}
+.co-copy-field{position:relative;display:flex;align-items:center}
+.co-copy-field input{width:100%;padding-right:54px!important;min-width:0}
+.co-icon-copy{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:38px;height:36px;display:flex;align-items:center;justify-content:center;border:0;border-radius:6px;background:transparent;color:var(--leaf);cursor:pointer}
+.co-icon-copy .material-symbols-outlined{font-size:20px}
+.co-icon-copy:hover,.co-combobox-toggle:hover{background:#edf5ef}
+.co-icon-copy:focus-visible,.co-combobox-toggle:focus-visible{outline:2px solid #498565}
+.co-icon-copy:disabled{opacity:.4;cursor:default}
+.co-outreach-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:20px;flex-wrap:wrap}
+.co-outreach-actions-left{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.co-outreach-actions .co-button{min-width:133px}
+.co-partner-combobox{position:relative}
+.co-combobox-control{position:relative}
+.co-combobox-control input{padding-right:50px!important}
+.co-combobox-toggle{position:absolute;top:50%;right:6px;transform:translateY(-50%);display:flex;align-items:center;justify-content:center;width:38px;height:34px;background:transparent;border:0;border-radius:6px;color:var(--forest);cursor:pointer}
+.co-partner-options{position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:50;max-height:300px;overflow:auto;background:white;border:1px solid #cbd8ce;border-radius:8px;box-shadow:0 9px 24px #18382618;padding:5px}
+.co-partner-options[hidden]{display:none}
+.co-partner-option{width:100%;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 12px;background:white;border:0;border-radius:6px;color:var(--forest);text-align:left;font-size:13px;cursor:pointer}
+.co-partner-option small{font-size:11px;color:var(--sub);flex-shrink:0}
+.co-partner-option:hover,.co-partner-option.active{background:#edf5ef}
+.co-partner-no-results{padding:12px;font-size:12px;color:var(--sub)}
+@media(max-width:620px){.co-outreach-actions{align-items:stretch}.co-outreach-actions-left{width:100%}.co-outreach-actions-left .co-button{flex:1}.co-outreach-actions>.co-button{width:100%}}
+
+/* Relationship overview aligned with partner discovery */
+.co-manage-page .co-discovery-layout{align-items:start}
+.co-manage-page .co-manage-main{width:100%;max-width:960px}
+.co-manage-page .co-manage-row{display:block;text-align:left;width:100%;padding:19px 22px;border:1px solid #d9e5db;border-radius:9px;background:#fff;transition:background .15s,border-color .15s,box-shadow .15s}
+.co-manage-page .co-manage-row:hover,.co-manage-page .co-manage-row:focus-visible{border-color:#a6c3af;background:#f6faf6;box-shadow:0 2px 10px #1235230e}
+.co-manage-row-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.co-manage-row-head strong{font-size:17px;font-weight:700;color:var(--forest)}
+.co-manage-row-meta,.co-manage-row small{display:block;font-size:12px;color:var(--sub);margin-top:7px;grid-column:auto}
+.co-stage-chip{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;border-radius:6px;padding:6px 9px;font:600 12px Inter,system-ui,sans-serif}
+.co-stage-chip .material-symbols-outlined{font-size:17px}
+.co-stage-contacted{background:#edf1f4;color:#506579}
+.co-stage-interested{background:#edf2ff;color:#395fa1}
+.co-stage-trial{background:#fff3e6;color:#946018}
+.co-stage-regular{background:#e9f5ed;color:#286c44}
+.co-stage-closed{background:#eff1ef;color:#67726a}
+.co-manage-stage-summary{margin-top:20px;padding-top:17px;border-top:1px solid var(--line)}
+.co-manage-stage-summary h3{margin:0 0 9px;color:var(--forest);font-size:13px;font-weight:700}
+.co-stage-count{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;padding:7px 5px;border:1px solid transparent;border-radius:7px;background:none;cursor:pointer;text-align:left}
+.co-stage-count:hover,.co-stage-count.is-active{background:#f1f7f1;border-color:#d9e7db}
+.co-stage-count .co-stage-chip{font-size:12px}
+.co-stage-number{font:650 12px Inter,system-ui,sans-serif;min-width:24px;text-align:center;color:var(--forest)}
+.co-manage-sidebar .co-discovery-filter-fields{gap:16px}
+@media(min-width:1181px){.co-manage-page .co-discovery-layout{grid-template-columns:300px minmax(0,1fr)}}
+@media(max-width:1180px){.co-manage-stage-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));column-gap:12px}.co-manage-stage-summary h3{grid-column:1/-1}}
+@media(max-width:620px){.co-manage-stage-summary{grid-template-columns:1fr 1fr}.co-manage-page .co-manage-row{padding:15px}}
+
+/* October refinement: compact outreach and unobtrusive stage reset */
+.co-outreach-editor{max-width:900px;margin-inline:auto}
+.co-outreach-actions .material-symbols-outlined{font-size:18px}
+.co-outreach-edit .material-symbols-outlined{font-size:18px}
+.co-outreach-editor .co-field-heading{align-items:center;flex-wrap:wrap;margin-bottom:9px}
+.co-required{font-size:15px;color:#bf3030;font-weight:750}
+.co-optional{font-size:11px;color:var(--sub);font-weight:400}
+.co-manage-stage-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px}
+.co-manage-stage-head h3{margin:0}
+.co-manage-clear{font-size:12px;color:var(--leaf);border:0;background:none;text-decoration:underline;text-underline-offset:2px;cursor:pointer;padding:5px}
+.co-manage-clear:hover{color:var(--forest)}
+@media(max-width:1180px){.co-manage-stage-head{grid-column:1/-1}}
+@media(max-width:620px){.co-outreach-editor{max-width:100%}}
+
+/* Small pictograms strengthen metadata scanning without increasing card height. */
+.co-listing-meta b{display:inline-flex;align-items:center;gap:6px}
+.co-listing-meta b .material-symbols-outlined{font-size:15px;font-weight:400;line-height:1;color:#63816e}
+.co-outreach-page .co-button[data-href="/find-partners"] .material-symbols-outlined,.co-outreach-edit .material-symbols-outlined{font-size:18px}
+@media(min-width:1380px){
+ .co-manage-page .co-manage-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch;gap:13px}
+ .co-manage-page .co-manage-row{height:100%;min-height:125px}
+ .co-manage-row-head{align-items:flex-start}
+ .co-manage-row-head strong{flex:1 1 155px;min-width:0}
+}
+@media(max-width:1379px){.co-manage-page .co-manage-list{display:flex;flex-direction:column}}
+
+.co-stop-discovery{background:#fff!important;color:#8d3428!important;border-color:#cf9c94!important}
+.co-stop-discovery:hover{background:#fdf2ef!important}
+.co-stop-discovery .material-symbols-outlined{font-size:18px}
+.co-stop-discovery:disabled{cursor:wait;opacity:.65}
+
+
+/* Partner editor: distinct sections, fixed actions, independent scrolling. */
+.co-discovery-card .co-card-actions .co-button.alt:hover{background:#edf7ef}
+.co-dialog-titlebar{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.co-dialog-close{width:34px;height:34px;border:0;border-radius:7px;background:transparent;color:var(--sub);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.co-dialog-close:hover{background:#edf4ee;color:var(--forest)}
+.co-dialog-close .material-symbols-outlined{font-size:21px}
+.co-dialog-back{overscroll-behavior:contain}
+.co-dialog-partner{width:min(740px,96vw);height:auto;max-height:min(88vh,820px);display:flex;flex-direction:column;padding:0;overflow:hidden}
+.co-dialog-partner .co-dialog-titlebar{padding:22px 27px 17px;border-bottom:1px solid var(--line);flex-shrink:0}
+.co-dialog-partner .co-dialog-titlebar h2{margin:0;font-size:22px}
+.co-dialog-partner .co-dialog-form{display:flex;flex-direction:column;min-height:0;flex:1}
+.co-dialog-partner .co-dialog-scroll{overflow-y:auto;overscroll-behavior:contain;min-height:0;flex:1;padding:24px 27px;scrollbar-gutter:stable}
+.co-dialog-partner .co-dialog-footer{margin:0;padding:15px 27px;background:#fff;border-top:1px solid var(--line);flex-shrink:0}
+.co-partner-form-section+.co-partner-form-section{margin-top:26px;padding-top:22px;border-top:1px solid var(--line)}
+.co-partner-section-title{display:flex;align-items:center;gap:10px;margin:0 0 18px}
+.co-partner-section-title .material-symbols-outlined{font-size:20px;color:#477b56}
+.co-partner-section-title h3{font-size:15px;font-weight:750;color:var(--forest);margin:0}
+.co-partner-fields{display:flex;flex-direction:column;gap:16px}
+.co-dialog-partner .co-partner-fields .co-field,.co-dialog-partner .co-partner-fields .co-field-row{margin:0}
+.co-dialog-partner .co-field-row{gap:14px}
+.co-dialog-partner .co-field>label{font-size:12px;font-weight:600}
+.co-dialog-partner .co-field input,.co-dialog-partner .co-field select,.co-dialog-partner .co-field textarea{font-size:13px;min-height:41px}
+.co-dialog-partner .co-field textarea{min-height:78px;line-height:1.55;resize:vertical}
+@media(max-width:660px){
+ .co-dialog-back{padding:10px}
+ .co-dialog-partner{width:100%;max-height:calc(100dvh - 20px)}
+ .co-dialog-partner .co-dialog-titlebar{padding:17px 18px 13px}
+ .co-dialog-partner .co-dialog-scroll{padding:18px}
+ .co-dialog-partner .co-dialog-footer{padding:13px 18px}
+ .co-dialog-partner .co-field-row{grid-template-columns:1fr}
+}
+
+
+/* Minimal, branded confirmation for staff-recorded outreach. */
+.co-dialog-confirm{width:min(420px,96vw);padding:0;overflow:hidden}
+.co-dialog-confirm .co-dialog-titlebar{padding:23px 24px 18px;align-items:center}
+.co-dialog-confirm .co-dialog-titlebar h2{font-size:19px;line-height:1.3;margin:0}
+.co-dialog-confirm .co-dialog-scroll{display:none}
+.co-dialog-confirm .co-dialog-footer{margin:0;padding:12px 24px 24px;justify-content:flex-end;border:0}
+.co-dialog-confirm .co-dialog-footer .co-button{min-width:100px}
+@media(max-width:480px){.co-dialog-confirm .co-dialog-titlebar{padding:20px 18px 14px}.co-dialog-confirm .co-dialog-footer{padding:12px 18px 20px}}
+
+
+/* Every Manage Partners result is a native link, not a separate action button. */
+.co-manage-page .co-manage-row{display:block;position:relative;min-height:0;cursor:pointer;min-width:0;text-decoration:none}
+
+
+/* Relationship and Edit Partner within one modal. */
+.co-manage-tabs{display:flex;align-items:center;gap:23px;position:sticky;top:-24px;margin:-24px -27px 22px;padding:7px 27px 0;background:#fff;border-bottom:1px solid var(--line);z-index:2}
+.co-manage-tabs button{appearance:none;background:transparent;color:var(--sub);border:0;border-bottom:2px solid transparent;margin-bottom:-1px;padding:14px 3px 12px;font:600 13px Inter,system-ui,sans-serif;cursor:pointer}
+.co-manage-tabs button:hover{color:var(--forest)}
+.co-manage-tabs button[aria-selected="true"]{border-bottom-color:var(--forest);color:var(--forest)}
+.co-manage-tabs button:focus-visible{outline:2px solid #83ab90;outline-offset:2px;border-radius:2px}
+.co-manage-panel[hidden]{display:none!important}
+.co-manage-panel{min-width:0}
+.co-manage-panel .co-partner-form-section:first-child{padding-top:0;margin-top:0}
+.co-relationship-contact{display:flex;gap:11px;align-items:center;background:#f5f9f5;border-radius:7px;padding:12px 14px;margin:0 0 21px}
+.co-relationship-contact>.material-symbols-outlined{color:#477b56;font-size:21px}
+.co-relationship-contact>div{display:flex;flex-direction:column;gap:4px;min-width:0;overflow-wrap:anywhere}
+.co-relationship-contact strong{color:var(--forest);font-size:12px;font-weight:700}
+.co-relationship-contact>div>span{color:var(--sub);font-size:12px;line-height:1.5}
+.co-relationship-section+.co-relationship-section{border-top:1px solid var(--line);padding-top:21px;margin-top:24px}
+.co-relationship-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:15px}
+.co-relationship-heading>div{display:flex;align-items:center;gap:9px}
+.co-relationship-heading .material-symbols-outlined{font-size:19px;color:#477b56}
+.co-relationship-heading h3{font-size:15px;font-weight:750;color:var(--forest);margin:0}
+.co-manage-field-stack{display:flex;flex-direction:column;gap:14px}
+.co-manage-field-stack .co-field,.co-manage-field-stack .co-field-row{margin:0}
+.co-manage-activity-form{margin-bottom:16px}
+.co-manage-activity-form .co-field-row{grid-template-columns:155px minmax(0,1fr);align-items:start;gap:14px}
+.co-manage-activity-form .co-field,.co-manage-activity-form .co-field-row{margin:0}
+.co-manage-activity-form textarea{min-height:65px;resize:vertical}
+.co-manage-timeline{border-left:1px solid #dce9df;margin:4px 0 0 5px;padding:0 0 0 15px}
+.co-manage-timeline .co-manage-event{border-bottom:0;position:relative;gap:5px;padding:0 0 15px;font-size:12px}
+.co-manage-timeline .co-manage-event:last-child{padding-bottom:0}
+.co-manage-timeline .co-manage-event:before{content:"";position:absolute;top:6px;left:-19px;width:7px;height:7px;border-radius:50%;background:#8dac97}
+.co-manage-timeline .co-manage-event strong span{font-weight:450;color:var(--sub)}
+@media(max-width:660px){
+ .co-manage-tabs{top:-18px;margin:-18px -18px 18px;padding:5px 18px 0}
+ .co-manage-activity-form .co-field-row{grid-template-columns:1fr}
+}
+
+/* Leave the bottom-right Manage control independent of card height. */
+.co-manage-page .co-manage-row>small{padding-right:120px}
+
+
+
+/* Lightweight relationship journal: state first, interaction second, history last. */
+.co-dialog-footer[hidden],.co-journal-editor[hidden]{display:none!important}
+.co-journal-overview{margin:0 0 18px}
+.co-journal-overview-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 22px;padding:17px 18px;border:1px solid #e0e9e1;border-radius:9px;background:#f8fbf8}
+.co-journal-overview-grid>div{min-width:0;display:flex;flex-direction:column;gap:5px}
+.co-journal-overview-grid span{font-size:11px;color:var(--sub);font-weight:600}
+.co-journal-overview-grid strong{font-size:13px;color:var(--forest);font-weight:650;line-height:1.5;overflow-wrap:anywhere}
+.co-journal-overview-grid small{font-size:11px;color:var(--sub);overflow-wrap:anywhere}
+.co-journal-stage{display:flex;gap:12px;align-items:end;margin:14px 0 0}
+.co-journal-stage .co-field{flex:1;min-width:0;margin:0}
+.co-journal-stage .co-button{height:40px;min-height:40px}
+.co-journal-actions{display:flex;gap:10px;flex-wrap:wrap;margin:22px 0}
+.co-journal-actions .material-symbols-outlined{font-size:18px}
+.co-journal-editor{display:flex;flex-direction:column;gap:14px;border:1px solid #d6e5d9;border-radius:10px;padding:20px;background:#f7fbf7;margin:0 0 25px}
+.co-journal-editor h3{font-size:15px;color:var(--forest);margin:0 0 2px}
+.co-journal-editor .co-field,.co-journal-editor .co-field-row{margin:0}
+.co-journal-editor .co-field textarea{min-height:84px}
+.co-journal-form-actions{display:flex;gap:9px;justify-content:flex-end}
+.co-journal-hint{font-size:11px;color:var(--sub);line-height:1.65;margin:0}
+.co-journal-history{border-top:1px solid var(--line);padding-top:21px}
+.co-journal-timeline{border-left:1px solid #dce8df;margin:8px 0 0 7px;padding-left:18px}
+.co-journal-item{position:relative;margin:0 0 18px;min-width:0}
+.co-journal-item:last-child{margin-bottom:0}
+.co-journal-item:before{content:"";position:absolute;left:-22px;top:6px;width:7px;height:7px;border-radius:50%;background:#739b7b}
+.co-journal-item>div:first-child{display:flex;gap:12px;justify-content:space-between;align-items:baseline;flex-wrap:wrap}
+.co-journal-item strong{font-size:12px;color:var(--forest)}
+.co-journal-item time,.co-journal-item small{display:block;font-size:11px;color:var(--sub)}
+.co-journal-item p{font-size:12px;line-height:1.65;overflow-wrap:anywhere;margin:5px 0}
+.co-journal-item small+small{margin-top:3px}
+@media(max-width:660px){
+ .co-journal-overview-grid{grid-template-columns:1fr;gap:12px}
+ .co-journal-editor .co-field-row{grid-template-columns:1fr}
+ .co-journal-stage{align-items:stretch;flex-direction:column}
+ .co-journal-stage .co-field,.co-journal-stage .co-button{width:100%}
+ .co-journal-actions .co-button{flex:1}
+}
+
+/* Even Last Scanned rhythm; source label and statistics have matching spacing. */
+.co-discovery-sidebar .co-scan-meta{margin-top:10px}
+.co-discovery-sidebar .co-source-caption{margin:10px 0 0}
+.co-details-sourced{display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin:14px 0;padding:0;border-bottom:0;font-size:12px;color:var(--sub)}
+.co-details-sourced .material-symbols-outlined{font-size:16px;color:#648170}
+.co-details-sourced strong{color:var(--sub);font-weight:500}
+/* Timeline connectors run dot-to-dot only. */
+.co-journal-timeline{border-left:0}
+.co-journal-item:not(:last-child):after{content:"";position:absolute;left:-19px;top:13px;height:calc(100% + 11px);width:1px;background:#dce8df}
+
+
+/* A dedicated partner workspace; activity and transfers stay in focused dialogs. */
+.co-partner-page{max-width:980px;width:100%;margin:0 auto;padding-top:0}
+.co-partner-profile{background:#fff;border:1px solid #d9e5db;border-radius:11px;overflow:hidden}
+.co-partner-profile-meta{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:18px 27px;background:#fafcf9;border-bottom:1px solid var(--line);font-size:13px;color:var(--sub)}
+.co-partner-page-content{padding:0 27px 28px}
+.co-partner-page .co-manage-tabs{position:sticky;top:64px;z-index:3;margin:0 0 22px;padding:6px 0 0;background:#fff}
+.co-partner-page .co-manage-panel{max-width:100%}
+.co-partner-page-footer{display:flex;align-items:center;justify-content:flex-end;gap:10px;border-top:1px solid var(--line);padding:17px 27px;background:#fff}
+.co-partner-page-footer[hidden]{display:none!important}
+.co-partner-page .co-partner-fields{gap:15px}
+.co-journal-modal{display:flex;flex-direction:column;gap:14px}
+.co-journal-modal .co-field,.co-journal-modal .co-field-row{margin:0}
+.co-journal-modal .co-field-row{gap:14px}
+.co-journal-modal .co-journal-form-actions{display:none}
+.co-journal-modal .co-field textarea{min-height:75px}
+.co-journal-modal>p:first-child{margin:0}
+.co-journal-item:before{z-index:1}
+@media(max-width:660px){
+ .co-partner-page{padding-inline:12px}
+ .co-partner-profile-meta{padding:14px 18px}
+ .co-partner-page-content{padding:0 18px 22px}
+ .co-partner-page-footer{padding:13px 18px}
+ .co-partner-page .co-manage-tabs{top:64px}
+ .co-journal-modal .co-field-row{grid-template-columns:1fr}
+}
+
+
+/* Centre each page heading on exactly the same width as its content body. */
+.co-page-header:has(+ .co-outreach-page) .co-head{width:100%;max-width:900px;margin-left:auto;margin-right:auto}
+.co-page-header:has(+ .co-partner-page) .co-head{width:100%;max-width:980px;margin-left:auto;margin-right:auto}
+.co-partner-page{width:auto;max-width:1440px}
+.co-partner-page .co-partner-profile{width:100%;max-width:980px;margin-left:auto;margin-right:auto}
+
+/* Partner workspace type scale: section title 16, body/value 14, field label 13, metadata 12. */
+.co-partner-page .co-relationship-heading h3,.co-partner-page .co-partner-section-title h3{font-size:16px;line-height:1.4;font-weight:700}
+.co-partner-page .co-manage-tabs button{font-size:14px;line-height:1.5}
+.co-partner-page .co-journal-overview-grid strong{font-size:14px;line-height:1.5}
+.co-partner-page .co-journal-overview-grid span,.co-partner-page .co-journal-overview-grid small{font-size:12px;line-height:1.5}
+.co-partner-page .co-journal-item strong{font-size:14px;line-height:1.45}
+.co-partner-page .co-journal-item p{font-size:14px;line-height:1.6}
+.co-partner-page .co-journal-item time,.co-partner-page .co-journal-item small{font-size:12px;line-height:1.5}
+.co-partner-page .co-journal-history>.co-note,.co-partner-page .co-note{font-size:12px;line-height:1.5}
+.co-partner-page .co-manage-panel .co-field>label{font-size:13px;line-height:1.45;font-weight:600}
+.co-partner-page .co-manage-panel .co-field input,.co-partner-page .co-manage-panel .co-field select,.co-partner-page .co-manage-panel .co-field textarea{font-size:14px;line-height:1.5}
+.co-partner-page .co-partner-profile-meta{font-size:13px;line-height:1.5}
+.co-partner-page .co-journal-actions .co-button,.co-partner-page .co-journal-stage .co-button,.co-partner-page .co-partner-page-footer .co-button{font-size:13px}
+@media(max-width:720px){
+ .co-page-header:has(+ .co-outreach-page) .co-head,.co-page-header:has(+ .co-partner-page) .co-head{max-width:none}
+}
+
+/* Manage Partners: reinforce next step without enlarging the card. */
+.co-manage-page .co-manage-row{box-shadow:0 1px 2px rgba(19,53,34,.035)}
+.co-manage-page .co-manage-row:hover{border-color:#b6cdbb;box-shadow:0 2px 9px rgba(19,53,34,.055)}
+.co-manage-page .co-manage-row-head{gap:9px;align-items:flex-start}
+.co-manage-page .co-manage-row-meta{margin-top:8px;font-size:12px}
+.co-manage-next{display:flex;align-items:flex-start;gap:6px;margin-top:11px;max-width:100%;color:#5a6f61;font-size:12px;line-height:1.45}
+.co-manage-next .material-symbols-outlined{font-size:16px;color:#658671;flex-shrink:0}
+.co-manage-next span:last-child{min-width:0;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}
+
+/* Keep stage selector compact beside its action, instead of spanning the profile width. */
+.co-partner-page .co-journal-stage{justify-content:flex-start}
+.co-partner-page .co-journal-stage .co-field{flex:0 1 230px;max-width:230px}
+.co-partner-page .co-journal-stage select{width:100%;max-width:230px}
+@media(max-width:660px){.co-partner-page .co-journal-stage .co-field,.co-partner-page .co-journal-stage select{width:100%;max-width:none;flex:1}}
+
+/* Two-level activity disclosure: history closed initially, each entry separately expandable. */
+.co-journal-history{padding-top:0}
+.co-journal-history>summary,.co-journal-entry>summary{list-style:none;cursor:pointer}
+.co-journal-history>summary::-webkit-details-marker,.co-journal-entry>summary::-webkit-details-marker{display:none}
+.co-journal-history-toggle{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:19px 0 12px;color:var(--forest)}
+.co-journal-history-title{display:flex;align-items:center;gap:9px}
+.co-journal-history-title>.material-symbols-outlined{font-size:19px;color:#477b56}
+.co-journal-history-title strong{font-size:16px;font-weight:700}
+.co-journal-count{font-size:11px;border-radius:99px;min-width:22px;padding:2px 6px;text-align:center;background:#edf4ee;color:#47644e}
+.co-journal-history-open,.co-journal-expand{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:#52745c;white-space:nowrap}
+.co-journal-history-open>.material-symbols-outlined,.co-journal-expand>.material-symbols-outlined{font-size:16px;transition:transform .16s}
+.co-journal-history[open]>.co-journal-history-toggle .co-journal-history-open>.material-symbols-outlined,.co-journal-entry[open]>summary .co-journal-expand>.material-symbols-outlined{transform:rotate(180deg)}
+.co-journal-history[open]>.co-journal-history-toggle .co-journal-history-open{font-size:0}
+.co-journal-history[open]>.co-journal-history-toggle .co-journal-history-open:before{content:"Hide History";font-size:12px}
+.co-journal-history>summary:hover .co-journal-history-open,.co-journal-entry>summary:hover .co-journal-expand{color:var(--forest)}
+.co-journal-entry>summary{padding:2px 0 0}
+.co-journal-entry-heading{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.co-journal-entry .co-journal-entry-heading strong{font-size:14px;font-weight:650;color:var(--forest)}
+.co-journal-preview{display:block;color:var(--sub);font-size:13px;line-height:1.6;margin:4px 0 3px;overflow-wrap:anywhere}
+.co-journal-expand{font-size:11px}
+.co-journal-expanded{margin:11px 0 3px;padding:12px 14px;background:#f8fbf8;border-radius:7px;border:1px solid #e2ece4}
+.co-journal-expanded>small{display:block;color:var(--sub);margin:0 0 5px}
+.co-journal-expanded>p{margin:0 0 7px;white-space:pre-wrap}
+.co-journal-email{display:flex;flex-direction:column;gap:14px}
+.co-journal-email>div{display:flex;flex-direction:column;gap:5px}
+.co-journal-email strong{font-size:12px;color:var(--forest);font-weight:650}
+.co-journal-email span{font-size:13px;color:var(--ink);overflow-wrap:anywhere}
+.co-journal-email-body{font-size:13px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ink);background:#fff;border:1px solid #e1e9e2;border-radius:6px;padding:13px;max-height:380px;overflow-y:auto}
+.co-journal-item:not(:last-child):after{pointer-events:none}
+@media(prefers-reduced-motion:reduce){.co-journal-expand>.material-symbols-outlined,.co-journal-history-open>.material-symbols-outlined{transition:none}}
+
+
+/* Optional AI assistance for pasted Email and Text/WhatsApp conversations. */
+.co-journal-ai[hidden],.co-journal-ai-result[hidden]{display:none!important}
+.co-journal-ai{border-top:1px solid var(--line);margin-top:8px;padding-top:17px;display:flex;flex-direction:column;gap:10px}
+.co-journal-ai-action{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.co-journal-ai-action>div{flex:1;min-width:200px}
+.co-journal-ai-action strong{font-size:13px;color:var(--forest);font-weight:700}
+.co-journal-ai-action p{font-size:12px;color:var(--sub);line-height:1.5;margin:4px 0 0}
+.co-journal-ai-action .co-button{white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
+.co-journal-ai-action .co-button .material-symbols-outlined{font-size:17px}
+.co-journal-ai-channel{font-size:12px;color:var(--sub);font-weight:500}
+.co-journal-ai-result{border:1px solid #dbe8de;background:#fbfdfb;border-radius:9px;padding:15px;display:flex;flex-direction:column;gap:12px}
+.co-journal-ai-heading{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.co-journal-ai-heading strong{font-size:13px;color:var(--forest)}
+.co-journal-ai-heading span{font-size:11px;color:var(--sub)}
+.co-journal-ai-proposals{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.co-journal-ai-proposals>div{display:flex;flex-direction:column;gap:3px;min-width:0}
+.co-journal-ai-proposals span{color:var(--sub);font-size:11px}
+.co-journal-ai-proposals strong{color:var(--ink);font-size:13px;font-weight:600;line-height:1.45;overflow-wrap:anywhere}
+.co-journal-ai-proposals p{font-size:12px;color:var(--sub);margin:0;grid-column:1/-1}
+.co-journal-ai-rationale{font-size:12px;color:var(--sub);line-height:1.5;margin:0}
+.co-journal-ai-buttons{display:flex;justify-content:flex-end;gap:8px}
+@media(max-width:580px){.co-journal-ai-proposals{grid-template-columns:1fr}.co-journal-ai-action .co-button{width:100%;justify-content:center}}
+
+/* AI assistance follows the pasted message, without a section-break divider. */
+.co-journal-modal .co-journal-ai{border-top:0;margin-top:-5px;padding-top:0;margin-bottom:3px}
+
+
+/* AI review is a suggestion, not an approval or alert: use neutral surfaces and restrained green. */
+.co-journal-ai-action strong,.co-journal-ai-heading strong{color:var(--forest)}
+.co-journal-ai-action .co-button.alt{background:#fff;border-color:#bdd1c2;color:var(--forest)}
+.co-journal-ai-action .co-button.alt:hover{background:#f1f7f2;border-color:#9ab6a3}
+.co-journal-ai-heading span,.co-journal-ai-proposals span{color:var(--sub)}
+.co-journal-ai-proposals strong{color:var(--ink)}
+.co-journal-ai-rationale{color:var(--sub)}
+.co-journal-ai-buttons .co-button:not(.alt){background:var(--forest);border-color:var(--forest);color:#fff}
+.co-journal-ai-buttons .co-button:not(.alt):hover{background:#24543d;border-color:#24543d}
+.co-journal-ai-buttons .co-button.alt{background:#fff;color:var(--forest);border-color:#bdd1c2}
+.co-journal-ai-buttons .co-button.alt:hover{background:#edf7ef;border-color:#9ab6a3}
+
+/* Relationship Overview presents durable status and actions; interaction outcomes appear in the journal. */
+.co-partner-page .co-journal-overview-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media(max-width:850px){.co-partner-page .co-journal-overview-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.co-partner-page .co-journal-overview-grid{grid-template-columns:1fr}}
+
+/* AI progress button provides a clear, reversible cancel affordance. */
+.co-journal-ai-action .co-button[data-action="manage-ai-cancel"]{background:#fff2f0;border-color:#e2b5b0;color:#8d413b}
+.co-journal-ai-action .co-button[data-action="manage-ai-cancel"]:hover{background:#ffe9e6;border-color:#c98d87}
+.co-journal-ai-action .co-button[data-action="manage-ai-cancel"] .material-symbols-outlined{font-size:17px}
+
+
+/* Quiet AI preview: near-neutral background; retain a small indigo accent in the controls. */
+.co-journal-ai-result{box-shadow:0 1px 2px rgba(27,43,35,.03)}
+.co-journal-ai-proposals strong{color:var(--ink)}
+
+/* One activity timeline, visible immediately. Only substantial messages are disclosure controls. */
+.co-journal-history{border-top:1px solid var(--line)}
+.co-journal-history-toggle{padding:19px 0 15px;cursor:default}
+.co-journal-entry-static{padding:2px 0 0}
+.co-journal-static-message{font-size:13px;line-height:1.6;color:var(--sub);white-space:pre-wrap;overflow-wrap:anywhere;margin:5px 0!important}
+.co-journal-entry-meta{display:flex;flex-direction:column;gap:4px;margin-top:8px}
+.co-journal-entry-meta small{font-size:11px;line-height:1.5;color:var(--sub)}
+.co-journal-full-message{white-space:pre-wrap;font-size:13px;line-height:1.6}
+.co-journal-email-body{font-size:13px}
+
+/* Consolidated, compact font scale across partner profile and Log Activity dialog.
+   Headings 15, main text/inputs 13, labels 12, supporting metadata 11-12. */
+.co-page-header:has(+ .co-partner-page) .co-title{font-size:24px;line-height:1.25}
+.co-partner-page .co-relationship-heading h3,
+.co-partner-page .co-partner-section-title h3,
+.co-partner-page .co-journal-history-title strong{font-size:15px;line-height:1.4}
+.co-partner-page .co-manage-tabs button{font-size:13px}
+.co-partner-page .co-journal-overview-grid strong{font-size:13px}
+.co-partner-page .co-journal-overview-grid span,
+.co-partner-page .co-journal-overview-grid small{font-size:11px}
+.co-partner-page .co-journal-entry-heading strong,
+.co-partner-page .co-journal-item strong{font-size:13px}
+.co-partner-page .co-journal-item p{font-size:13px;line-height:1.6}
+.co-partner-page .co-journal-item time,
+.co-partner-page .co-journal-item small{font-size:11px;line-height:1.5}
+.co-partner-page .co-manage-panel .co-field>label{font-size:12px}
+.co-partner-page .co-manage-panel .co-field input,
+.co-partner-page .co-manage-panel .co-field select,
+.co-partner-page .co-manage-panel .co-field textarea{font-size:13px;line-height:1.5}
+.co-partner-page .co-partner-profile-meta{font-size:12px}
+.co-dialog-partner:has(.co-journal-modal) .co-dialog-titlebar h2{font-size:18px;line-height:1.35}
+.co-dialog-partner:has(.co-journal-modal) .co-field>label{font-size:12px}
+.co-dialog-partner:has(.co-journal-modal) .co-field input,
+.co-dialog-partner:has(.co-journal-modal) .co-field select,
+.co-dialog-partner:has(.co-journal-modal) .co-field textarea{font-size:13px;line-height:1.5}
+.co-dialog-partner:has(.co-journal-modal) .co-button{font-size:13px}
+.co-dialog-partner:has(.co-journal-modal) .co-journal-ai-action strong,
+.co-dialog-partner:has(.co-journal-modal) .co-journal-ai-heading strong{font-size:13px}
+@media(max-width:660px){
+ .co-page-header:has(+ .co-partner-page) .co-title{font-size:21px}
+}
+
+
+/* Keep simple activity rows in one column; title left, date consistently right-aligned. */
+.co-partner-page .co-journal-item>.co-journal-entry-static{display:block}
+.co-partner-page .co-journal-entry-heading{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.co-partner-page .co-journal-entry-heading time{margin-left:auto;text-align:right;white-space:nowrap}
+
+
+/* Non-dashboard UI rules. Share proportions where controls have the same job;
+   keep prominent actions, navigational links and status badges distinct. */
+.co-discovery-card .co-card-actions .co-button,
+.co-partner-page .co-journal-actions .co-button,
+.co-partner-page .co-journal-stage .co-button,
+.co-outreach-edit,
+.co-back-link{font-size:13px;min-height:36px;padding:7px 11px}
+.co-back-link .material-symbols-outlined{font-size:17px}
+.co-partner-page .co-journal-stage .co-button{height:40px;min-height:40px}
+.co-partner-page .co-partner-profile-meta{font-size:13px}
+.co-category-tag{display:inline-flex;align-items:center;padding:5px 10px;border-radius:6px;border:1px solid #c9dfce;background:#e2eee5;color:#2c6143;font:600 13px Inter,system-ui,sans-serif}
+.co-journal-item[hidden],.co-journal-ai-state[hidden]{display:none!important}
+.co-journal-entry-static .co-journal-static-message{font:400 13px/1.6 Inter,system-ui,sans-serif;color:var(--sub)}
+/* Move back navigation slightly lower, without changing its size. */
+.co-page-header:has(+ .co-outreach-page) .co-back-link{transform:translateY(4px)}
+.co-partner-page .co-journal-item .co-journal-source{font-size:12px;line-height:1.5}
+/* A manually dated entry shows only its clearly identified logging timestamp, when available. */
+
+.co-show-older{display:block;background:none;border:1px solid #cbd8ce;border-radius:6px;color:var(--leaf);font:600 12px Inter,system-ui,sans-serif;padding:8px 12px;margin:17px 0 0 18px;cursor:pointer}
+.co-show-older:hover{background:#edf7ef}
+.co-journal-ai-state{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--sub);padding:3px 0 1px}
+.co-ai-spinner{display:inline-block;width:16px;height:16px;flex-shrink:0;border:2px solid #d4e5d8;border-top-color:#2e7950;border-radius:50%;animation:co-ai-spin .8s linear infinite}
+@keyframes co-ai-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.co-ai-spinner{animation:none}}
+/* Assessment percentages are a single total, so each editable weight gets one row. */
+.co-assessment-weight-list{display:flex;flex-direction:column;gap:0;margin:20px 0 2px;border-top:1px solid var(--line)}
+.co-assessment-weight-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:9px 0;border-bottom:1px solid #ebf0eb}
+.co-assessment-weight-row label{font-size:13px;font-weight:600;color:var(--forest)}
+.co-assessment-weight-input{display:flex;align-items:center;gap:8px;flex-shrink:0;color:var(--sub);font-size:13px}
+.co-assessment-weight-input input{width:76px;height:37px;min-height:37px;padding:7px 10px;border:1px solid #cbd8ce;border-radius:6px;color:var(--ink);font:500 13px Inter,system-ui,sans-serif;text-align:right}
+.co-assessment-weight-input input:focus{outline:2px solid #88b79b}
+.co-assessment-total{display:flex;justify-content:space-between;align-items:center;gap:15px;padding-top:13px;font-size:13px;color:var(--forest)}
+.co-assessment-total output{font-weight:700;font-variant-numeric:tabular-nums}
+.co-assessment-total output.co-invalid{color:#a33429}
+.co-dialog-confirm .co-dialog-scroll{display:block;padding:0 24px 6px}
+.co-confirm-copy{margin:0;font-size:13px;line-height:1.65;color:var(--sub)}
+.co-confirm-copy strong{color:var(--forest)}
+/* Reversible card-interaction experiment: same left-edge cue on hover/focus only.
+   The inset line preserves layout (no card content shifting on pointer entry). */
+.co-discovery-card:hover,
+.co-discovery-card:focus-visible,
+.co-manage-page .co-manage-row:hover,
+.co-manage-page .co-manage-row:focus-visible{
+ background:linear-gradient(90deg,#f6faf6 0%,#fff 25%);
+ border-color:#b6cdbb;
+ box-shadow:inset 4px 0 #498565,0 2px 10px rgba(18,53,35,.055);
+}
+.co-manage-page .co-manage-row:focus-visible,
+.co-discovery-card:focus-visible{outline:2px solid #498565;outline-offset:2px}
+/* Both partner activity and handover dialogs use a single white form surface. */
+.co-dialog-partner .co-journal-modal.co-journal-editor{
+ background:transparent;
+ border:0;
+ border-radius:0;
+ padding:0;
+ margin:0;
+}
+/* Staff-facing actions stay unobtrusive in a chronological activity log. */
+.co-activity-actions{display:flex;justify-content:flex-end;gap:12px;margin-top:7px}
+.co-activity-link{border:0;background:none;color:var(--sub);font:500 11px Inter,system-ui,sans-serif;padding:3px 2px;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.co-activity-link:hover,.co-activity-link:focus-visible{color:var(--forest)}
+/* Escalate only a follow-up that actually has a due date. */
+.co-journal-overview-grid .co-follow-up-attention{background:#fff7e9;border:1px solid #f0ddbb;border-radius:7px;padding:10px 12px;margin:-11px -13px}
+.co-journal-overview-grid .co-follow-up-attention strong{color:#825915}
+.co-journal-overview-grid .co-follow-up-attention small{color:#946721;font-weight:600}
+/* Compact activity actions; menus stay available when messages are collapsed. */
+.co-journal-item:has(>.co-activity-menu) .co-journal-entry-heading{padding-right:40px}
+.co-activity-menu{position:absolute;top:0;right:0;z-index:2}
+.co-activity-menu[open]{z-index:10}
+.co-activity-menu>summary{list-style:none;display:flex;align-items:center;justify-content:center;width:32px;height:30px;cursor:pointer;border:1px solid transparent;border-radius:7px;color:var(--sub);background:#fff}
+.co-activity-menu>summary::-webkit-details-marker{display:none}
+.co-activity-menu>summary:hover,.co-activity-menu[open]>summary{color:var(--forest);background:#f0f7f1;border-color:#d4e3d8}
+.co-activity-menu>summary .material-symbols-outlined{font-size:20px}
+.co-activity-menu-panel{position:absolute;right:0;top:calc(100% + 5px);display:grid;width:154px;padding:5px;border:1px solid #d4e3d8;border-radius:9px;background:#fff;box-shadow:0 7px 22px #13271924}
+.co-activity-menu-panel button{width:100%;padding:9px 10px;border:0;border-radius:6px;background:transparent;text-align:left;cursor:pointer;color:var(--forest);font:500 12px Inter,system-ui,sans-serif}
+.co-activity-menu-panel button:hover{background:#f0f7f1}
+.co-activity-menu-panel [data-action="manage-activity-delete"]{color:#8c3e35}
+/* Context is staff guidance, not a generated claim or committed agreement. */
+.co-followup-context{background:#f5f9f6;border:1px solid #dfebe1;border-radius:9px;padding:13px 16px;margin:4px 0 20px;display:grid;gap:9px}
+.co-followup-context h3{font-size:13px;font-weight:650;color:var(--forest);margin:0 0 2px}
+.co-followup-context>div{display:grid;gap:2px}
+.co-followup-context span{font-size:12px;line-height:1.5;color:var(--sub);font-weight:600}
+.co-followup-context p{font-size:12px;color:var(--forest);line-height:1.55;margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.co-source-evidence{border:1px solid #dce8df;border-radius:8px;padding:10px 12px;background:#fafcfb;margin:4px 0 0}
+.co-source-evidence summary{cursor:pointer;font-weight:600;font-size:12px;color:var(--forest)}
+.co-source-evidence p{font-size:12px;line-height:1.55;overflow-wrap:anywhere;margin:8px 0}
+.co-source-evidence small{font-size:11px;color:var(--sub)}
+.co-source-evidence a{color:var(--forest);text-decoration:underline}
+.co-history-corrected{font-size:10px;font-weight:550;color:var(--sub);margin-left:8px}
+.co-history-corrected::before{content:"· ";color:var(--sub)}
+/* Corrections do not alter live relationship state unless staff edit the partner itself. */
+/* Shared lifecycle typography — consistent hierarchy for fields and controls. */
+.co-page .co-field>label,.co-outreach-editor .co-field>label,.co-dialog .co-field>label{
+ font-family:Inter,system-ui,sans-serif;font-size:12px;font-weight:600;line-height:1.45;color:#405448;
+}
+.co-page .co-field input,.co-page .co-field select,.co-page .co-field textarea,
+.co-dialog .co-field input,.co-dialog .co-field select,.co-dialog .co-field textarea{
+ font-family:Inter,system-ui,sans-serif;font-size:13px;line-height:1.5;
+}
+.co-discovery-filter-field{font-size:12px;font-weight:600;line-height:1.45;color:#405448}
+.co-discovery-filter-field input,.co-discovery-filter-field select{font-size:13px}
+.co-page .co-button,.co-dialog .co-button{
+ font-family:Inter,system-ui,sans-serif;font-size:13px;font-weight:600;line-height:1.4;
+}
+.co-page .co-button.small,.co-dialog .co-button.small{font-size:12px}
+.co-page .co-note,.co-page .co-discovery-result-count{font-size:12px;line-height:1.5}
+.co-partner-page .co-journal-item time,.co-partner-page .co-journal-item small{font-size:12px;line-height:1.5}
+.co-activity-menu-panel button{font-size:12px}
+.co-page .co-source-evidence p,.co-page .co-source-evidence small{line-height:1.55}
+.co-page .co-head .co-actions{gap:9px}
+/* Mobile shell: one compact navigation row and a short brand bar. */
+@media(max-width:760px){
+ body>aside>div:first-child>div:first-child{display:none!important}
+ body>aside .px-4.py-space-lg{padding:8px 12px!important}
+ body>aside nav{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px!important}
+ body>aside nav a{
+  font-size:12px!important;line-height:1.25!important;padding:9px 3px!important;
+  gap:4px!important;justify-content:center;white-space:nowrap;min-width:0;
+ }
+ body>aside nav a .material-symbols-outlined{font-size:16px!important}
+ body>div.pl-60 header{height:54px!important;min-height:54px!important}
+ body>div.pl-60 header>div{padding-inline:16px!important}
+ body>div.pl-60 header .co-workspace-title{font-size:16px!important;line-height:1.3}
+ body>div.pl-60 header .co-demo-staff{font-size:12px!important}
+ body>div.pl-60 main{padding-top:0!important}
+ body>div.pl-60 main>.co-page:first-child{padding-top:20px}
+ .co-page{padding-inline:15px;padding-bottom:40px}
+ .co-page .co-head{gap:12px;margin-bottom:16px}
+ .co-page .co-title{font-size:23px;line-height:1.2}
+ .co-page .co-head .co-actions{gap:8px}
+ .co-page-header:has(+ .co-outreach-page) .co-back-link{transform:none}
+}
+@media(max-width:380px){
+ body>aside nav a{font-size:11px!important;gap:2px!important}
+ body>aside nav a .material-symbols-outlined{font-size:14px!important}
+}
+/* On narrow screens, search is full width; sorting uses two compact columns. */
+@media(max-width:760px){
+ .co-discovery-sidebar{padding:14px}
+ .co-discovery-filter-fields{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 10px;
+ }
+ .co-discovery-filter-fields>.co-discovery-filter-field:first-child{grid-column:1/-1}
+ .co-discovery-filter-fields>.co-discovery-ai-checkbox{align-self:center;min-height:30px}
+ .co-discovery-result-count{align-self:center;text-align:right}
+ .co-discovery-sidebar-status{margin-top:13px;padding-top:12px}
+ .co-discovery-sidebar .co-source-caption{font-size:12px;line-height:1.45}
+ .co-discovery-filter-field input,.co-discovery-filter-field select{height:38px}
+ .co-manage-stage-summary{margin-top:12px}
+ .co-manage-stage-head{margin-bottom:0}
+}
+@media(max-width:420px){
+ .co-discovery-filter-field input,.co-discovery-filter-field select{padding-inline:8px}
+}
+/* All three mobile navigation labels must fit, including the selected tab. */
+@media(max-width:760px){
+ body>aside nav a,
+ body>aside nav a[aria-current="page"]{
+  display:flex!important;min-width:0!important;justify-content:center!important;
+  padding:10px 2px!important;font-size:12px!important;line-height:1.25!important;
+  white-space:nowrap!important;overflow:hidden;text-overflow:clip;
+ }
+ body>aside nav a .material-symbols-outlined{display:none!important}
+ body>aside nav a span:last-child{font-size:inherit!important;white-space:nowrap}
+}
+@media(max-width:380px){
+ body>aside nav a,body>aside nav a[aria-current="page"]{font-size:11px!important}
+}
+/* One partner-page typography scale; arrangement details follow field rhythm. */
+.co-partner-page .co-relationship-heading h3,.co-partner-page .co-partner-section-title h3,.co-partner-page .co-journal-history-title strong{font-size:15px;line-height:1.4;font-weight:700}
+.co-partner-page .co-manage-tabs button{font-size:13px;font-weight:600}
+.co-partner-page .co-journal-overview-grid>div>span{font-size:12px;line-height:1.5;color:var(--sub)}
+.co-partner-page .co-journal-overview-grid strong{font-size:13px;line-height:1.5;font-weight:650}
+.co-partner-page .co-journal-overview-grid small{font-size:12px;line-height:1.5}
+.co-partner-page .co-journal-entry-heading strong{font-size:13px;font-weight:650}
+.co-partner-page .co-journal-entry-heading time,.co-partner-page .co-journal-item small{font-size:12px;line-height:1.5}
+.co-partner-page .co-journal-item p{font-size:13px;line-height:1.6}
+.co-partner-page .co-manage-panel .co-field>label{font-size:12px;font-weight:600}
+.co-partner-page .co-manage-panel .co-field input,.co-partner-page .co-manage-panel .co-field select,.co-partner-page .co-manage-panel .co-field textarea{font-size:13px;line-height:1.5}
+.co-partner-page .co-partner-profile-meta{font-size:12px;line-height:1.5}
+/* Optional handover-level exceptions, visually subordinate to the amount. */
+.co-arrangement-summary{display:flex;align-items:baseline;justify-content:space-between;gap:6px 12px;flex-wrap:wrap;padding:11px 12px;border:1px solid var(--line);border-radius:7px;background:#f6faf7}
+.co-arrangement-summary strong{font:600 12px/1.5 Inter,system-ui,sans-serif;color:var(--forest)}
+.co-arrangement-summary span{font:400 12px/1.5 Inter,system-ui,sans-serif;color:var(--sub)}
+.co-handover-exceptions{border:1px solid var(--line);border-radius:7px;background:#fff}
+.co-handover-exceptions summary{display:list-item;cursor:pointer;list-style-position:inside;padding:11px 12px;color:var(--forest);font:600 12px/1.5 Inter,system-ui,sans-serif}
+.co-handover-exceptions[open] summary{border-bottom:1px solid var(--line)}
+.co-handover-exceptions .co-field-row{padding:12px}
+.co-handover-exceptions .co-field>label{font-size:12px;font-weight:600}
+/* Matching partner category and stage chips, with no scale jump. */
+.co-partner-page .co-category-tag{font-size:12px;line-height:1.4;padding:6px 9px}
+.co-partner-page .co-stage-chip{font-size:12px;line-height:1.4}
+.co-partner-page .co-journal-history-title strong,.co-partner-page .co-partner-section-title h3,.co-partner-page .co-relationship-heading h3{font-size:15px;line-height:1.4}
+.co-dialog-partner .co-handover-exceptions .co-field>label{font-size:12px;font-weight:600}
+/* Same page-title scale for partner details and the other lifecycle pages. */
+.co-page-header:has(+ .co-partner-page) .co-title{font-size:clamp(24px,2.7vw,36px);line-height:1.15;letter-spacing:-.035em}
+@media(max-width:760px){.co-page-header:has(+ .co-partner-page) .co-title{font-size:23px;line-height:1.2}}

@@ -21,3 +21,18 @@ test('school leads require programme evidence and do not claim an accepting gard
  assert.equal(p[0].evidenceEntries.length,2);
  assert.ok(p[0].evidenceEntries.every(e=>e.url.startsWith('https://data.gov.sg/')));
 });
+import {enrichSchoolGardenLocations, SCHOOL_DIRECTORY_URL} from '../src/moe.js';
+
+test('community garden school location uses official directory without inventing acceptance',()=>{
+ const school={id:'cib-882',name:'Bedok Green Secondary School',category:'school garden',source:'NParks Community in Bloom open dataset (data.gov.sg)',location:'Singapore · registered Community in Bloom location',lat:1.33394,lon:103.935464,evidenceEntries:[],confirmed:false};
+ const manual={...school,id:'cib-abc',name:'Another School',location:'Custom staff-provided address'};
+ const contacts=[{school_name:'BEDOK GREEN SECONDARY SCHOOL',address:'360 BEDOK NORTH AVE 3',postal_code:'469722',email_address:'bgss@moe.edu.sg'}];
+ assert.equal(enrichSchoolGardenLocations([school,manual],contacts),1);
+ assert.equal(school.location,'360 BEDOK NORTH AVE 3 Singapore 469722');
+ assert.equal(school.postalCode,'469722');
+ assert.equal(school.locationSource,SCHOOL_DIRECTORY_URL);
+ assert.equal(school.contactEmail,undefined);
+ assert.equal(school.confirmed,false);
+ assert.ok(school.evidenceEntries.some(x=>x.url===SCHOOL_DIRECTORY_URL));
+ assert.equal(manual.location,'Custom staff-provided address');
+});

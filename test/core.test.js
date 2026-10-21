@@ -1,14 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {initialState,numbers,scorePartner,osmCandidates,nparksCandidates,draftTemplate,rankPartners} from '../src/core.js';
+import {initialState,numbers,scorePartner,nparksCandidates,draftTemplate,rankPartners,validRatingWeights,DEFAULT_RATING_WEIGHTS} from '../src/core.js';
 
 test('midterm scenario recomputes without adding trial capacity',()=>{
  const s=initialState();assert.deepEqual(numbers(s.settings,s.partners,s.handovers),{forecastKg:182,confirmedKg:140,gapKg:42,transferredKg:0,evidencedKg:0,collectedKg:null,discardedKg:null,reuseRate:null});
  s.settings.cupsPerWeek=11000;assert.equal(numbers(s.settings,s.partners,s.handovers).gapKg,80);
 });
 test('unverified candidates do not inherit fees, acceptance or capacity',()=>{
- const c=osmCandidates([{type:'way',id:900,center:{lat:1.302,lon:103.851},tags:{name:'Example Garden',leisure:'garden'}}],initialState().settings);
- assert.equal(c.length,1);assert.equal(c[0].fee,undefined);assert.equal(c[0].capacityKg,null);assert.equal(c[0].confirmed,false);assert.equal(c[0].sourceUrl,'https://www.openstreetmap.org/way/900');
+ const state=initialState(); assert.ok(state.partners.every(p=>p.fee===undefined)); assert.ok(state.partners.filter(p=>p.status!=='regular').every(p=>!p.confirmed));
 });
 test('ranking prioritises relevant, verified partners',()=>{
  const a={category:'community garden',use:'Composting',verified:true,confirmed:true,capacityKg:30,distanceKm:3};
@@ -29,8 +28,8 @@ test('AI controls contextual score, while distance and confirmed facts remain de
 });
 test('draft has relevant caveats and does not promise acceptance',()=>{
  const draft=draftTemplate(initialState().partners[3],42);
- assert.match(draft.body,/moisture content has not been measured/);
- assert.match(draft.body,/handling or collection arrangements/);
+ assert.match(draft.body,/haven't measured their moisture content/);
+ assert.match(draft.body,/collection arrangements/);
  assert.match(draft.mode,/Template fallback/);
 });
 
@@ -38,4 +37,27 @@ test('NParks places remain only potential sites with no acceptance assumed',()=>
  const features={features:[{geometry:{type:'Point',coordinates:[103.84,1.31]},properties:{NAME:'Example Park',OBJECTID:1200}}]};
  const c=nparksCandidates(features,initialState().settings);
  assert.equal(c[0].id,'nparks-1200');assert.equal(c[0].capacityKg,null);assert.equal(c[0].verified,false);assert.equal(c[0].fee,undefined);
+});
+
+test('configurable weights validate totals and deterministically reorder partners',()=>{
+ const a={name:'A',status:'suggested',category:'composting',source:'NEA',directCoffeeEvidence:true,distanceKm:30};
+ const b={name:'B',status:'suggested',category:'garden',source:'LIAS',distanceKm:0};
+ assert.equal(rankPartners([a,b],30)[0].name,'A');
+ const w={suitability:0,evidence:0,proximity:100,operations:0};
+ assert.equal(validRatingWeights(w),true);
+ const ranked=rankPartners([a,b],30,w);
+ assert.equal(ranked[0].name,'B');
+ assert.equal(ranked[0].match.score,100);
+ assert.deepEqual(ranked[0].match.parts,{suitability:0,evidence:0,proximity:100,operations:0});
+ assert.deepEqual(DEFAULT_RATING_WEIGHTS,{suitability:40,evidence:35,proximity:10,operations:15});
+ assert.equal(validRatingWeights({suitability:40,evidence:35,proximity:10,operations:10}),false);
+ assert.equal(validRatingWeights({...DEFAULT_RATING_WEIGHTS,extra:0}),false);
+ const ai={name:'AI',status:'suggested',category:'garden',source:'NParks',distanceKm:5,
+  aiAssessment:{rubricVersion:'ai-led-v1',reuseSuitability:30,sourceEvidence:10,operationalCompatibility:2,reason:'Original evidence',check:'Verify capacity'}};
+ const before=scorePartner(ai,0);
+ const after=scorePartner(ai,0,{suitability:10,evidence:60,proximity:20,operations:10});
+ assert.notEqual(before.score,after.score);
+ assert.equal(after.reasons[0],'Original evidence');
+ assert.equal(ai.aiAssessment.sourceEvidence,10);
+ assert.equal(Object.values(after.parts).reduce((sum,v)=>sum+v,0),after.score);
 });

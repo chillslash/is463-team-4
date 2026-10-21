@@ -4,25 +4,15 @@ import {join} from 'node:path';
 const CACHE_DIR=process.env.SOURCE_CACHE_DIR||join(process.cwd(),'data','source-cache');
 const DAY_MS=24*60*60*1000;
 function cachedResponse(body,savedAt,fromCache){return {json:async()=>JSON.parse(body),text:async()=>body,snapshotAt:savedAt,fromCache};}
-import {cibCandidates, nparksCandidates, osmCandidates} from './core.js';
+import {cibCandidates, nparksCandidates} from './core.js';
 import {DIRECTORY_SOURCES} from './directories.js';
-import {moeSchoolCandidates,parseCSV,SCHOOL_PROGRAMMES_ID,SCHOOL_DIRECTORY_ID} from './moe.js';
+import {moeSchoolCandidates,enrichSchoolGardenLocations,parseCSV,SCHOOL_PROGRAMMES_ID,SCHOOL_DIRECTORY_ID} from './moe.js';
 
 const DATA_URL = 'https://api-open.data.gov.sg/v1/public/api/datasets/';
 const DATASETS = [
   {key:'Community in Bloom', id:'d_f91a8b057cfb2bebf2e531ad8061e1c1', converter:cibCandidates},
   {key:'NParks public parks', id:'d_0542d48f0991541706b58059381a6eca', converter:nparksCandidates}
 ];
-const OSM_ENDPOINTS = ['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter'];
-// Named growing sites, nurseries, urban farms, parks and major gardens / zoos.
-// OSM maps a place; it does not confirm an accepting organisation or approval authority.
-const OSM_QUERY = '[out:json][timeout:14];('+
-  'nwr["shop"~"^(garden_centre|nursery)$"]["name"](1.22,103.60,1.48,104.04);'+
-  'nwr["landuse"~"^(allotments|farmland)$"]["name"](1.22,103.60,1.48,104.04);'+
-  'nwr["leisure"~"^(garden|park)$"]["name"](1.22,103.60,1.48,104.04);'+
-  'nwr["tourism"="zoo"]["name"](1.22,103.60,1.48,104.04);'+
-  'nwr["amenity"="school"]["garden"]["name"](1.22,103.60,1.48,104.04);'+
-  ');out center 140;';
 export function uniqueCandidates(candidates) {
  const result=[];const key=p=>p.name.toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
  for(const p of candidates){
@@ -37,9 +27,9 @@ export function uniqueCandidates(candidates) {
  return result;
 }
 
-async function withDeadline(fn,timeoutMs) {
+async function withDeadline(fn,timeoutMs,signal) {
  const c=new AbortController();const timer=setTimeout(()=>c.abort(),timeoutMs);
- try{return await fn(c.signal);}finally{clearTimeout(timer);}
+ try{signal?.throwIfAborted();return await fn(signal?AbortSignal.any([signal,c.signal]):c.signal);}finally{clearTimeout(timer);}
 }
 async function officialDownload(id,httpFetch,signal,useCache){
  const filename=join(CACHE_DIR,id+'.json');
@@ -63,27 +53,28 @@ async function officialDownload(id,httpFetch,signal,useCache){
  }
 }
 
-async function fetchDataset(item,reference,httpFetch,useCache){
+async function fetchDataset(item,reference,httpFetch,useCache,signal){
  return withDeadline(async signal=>{
  const response=await officialDownload(item.id,httpFetch,signal,useCache);
  const candidates=item.converter(await response.json(),reference);
  if(!candidates.length)throw new Error('no eligible named locations');
  return {key:item.key,candidates,cached:response.fromCache,snapshotAt:response.snapshotAt};
- },15000);
+ },15000,signal);
 }
-async function fetchSchools(reference,httpFetch,useCache){
+async function fetchSchools(reference,httpFetch,useCache,signal){
  return withDeadline(async signal=>{
   const [programmeResponse,directoryResponse]=await Promise.all([
     officialDownload(SCHOOL_PROGRAMMES_ID,httpFetch,signal,useCache),
     officialDownload(SCHOOL_DIRECTORY_ID,httpFetch,signal,useCache)
   ]);
-  const candidates=moeSchoolCandidates(parseCSV(await programmeResponse.text()),parseCSV(await directoryResponse.text()),reference);
+  const directory=parseCSV(await directoryResponse.text());
+  const candidates=moeSchoolCandidates(parseCSV(await programmeResponse.text()),directory,reference);
   if(!candidates.length)throw new Error('no sustainability-related school programmes');
-  return {key:'MOE school programmes',candidates,cached:programmeResponse.fromCache||directoryResponse.fromCache,snapshotAt:programmeResponse.snapshotAt};
- },18000);
+  return {key:'MOE school programmes',candidates,directory,cached:programmeResponse.fromCache||directoryResponse.fromCache,snapshotAt:programmeResponse.snapshotAt};
+ },18000,signal);
 }
 
-async function fetchDirectory(item,httpFetch,useCache){
+async function fetchDirectory(item,httpFetch,useCache,signal){
  return withDeadline(async signal=>{
   const id='directory-'+item.name.toLowerCase().replace(/[^a-z0-9]+/g,'-');
   const filename=join(CACHE_DIR,id+'.json');
@@ -98,39 +89,28 @@ async function fetchDirectory(item,httpFetch,useCache){
     if(useCache){try{await mkdir(CACHE_DIR,{recursive:true});await writeFile(filename,JSON.stringify({body,savedAt}),'utf8');}catch{}}
     return {key:item.name,candidates,cached:false,snapshotAt:savedAt};
   }catch(err){if(old?.body){const candidates=item.parse(old.body);if(candidates.length)return {key:item.name,candidates,cached:true,snapshotAt:old.savedAt};}throw err;}
- },18000);
+ },18000,signal);
 }
 
-async function fetchOSM(reference,httpFetch) {
- let error='';
- for(const endpoint of OSM_ENDPOINTS){
-  try{return await withDeadline(async signal=>{
-    const r=await httpFetch(endpoint,{method:'POST',signal,headers:{'Content-Type':'application/x-www-form-urlencoded','User-Agent':'CoffeeBot-IS463-Prototype/0.2'},body:new URLSearchParams({data:OSM_QUERY})});
-    if(!r.ok)throw new Error('HTTP '+r.status);
-    const json=await r.json();if(!Array.isArray(json.elements))throw new Error('invalid OSM response');
-    const candidates=osmCandidates(json.elements,reference);
-    if(!candidates.length)throw new Error('no relevant named locations');
-    return {key:'OpenStreetMap',candidates};
-   },12000);}
-  catch(e){error=e.name==='AbortError'?'timed out':e.message;}
- }
- throw new Error(error||'OSM service unavailable');
-}
-export async function discoverAll(reference,{httpFetch=fetch,includeOSM=true,includeDirectories=true,useCache=httpFetch===fetch}={}){
- // Independent sources: a failed OSM endpoint must never suppress community gardens or parks.
- const requests=DATASETS.map(item=>fetchDataset(item,reference,httpFetch,useCache));
- requests.push(fetchSchools(reference,httpFetch,useCache));
- if(includeDirectories)requests.push(...DIRECTORY_SOURCES.map(item=>fetchDirectory(item,httpFetch,useCache)));
- if(includeOSM)requests.push(fetchOSM(reference,httpFetch));
+export async function discoverAll(reference,{httpFetch=fetch,includeDirectories=true,useCache=httpFetch===fetch,signal}={}){
+ signal?.throwIfAborted();
+ // Independent sources continue to contribute even when one source fails.
+ const requests=DATASETS.map(item=>fetchDataset(item,reference,httpFetch,useCache,signal));
+ requests.push(fetchSchools(reference,httpFetch,useCache,signal));
+ if(includeDirectories)requests.push(...DIRECTORY_SOURCES.map(item=>fetchDirectory(item,httpFetch,useCache,signal)));
+
  const outcomes=await Promise.allSettled(requests),sources=[],warnings=[],entries=[];
  for(let i=0;i<outcomes.length;i++){
-  const item=outcomes[i];const labels=[...DATASETS.map(item=>item.key),'MOE school programmes',...(includeDirectories?DIRECTORY_SOURCES.map(x=>x.name):[]),...(includeOSM?['OpenStreetMap']:[])];
+  const item=outcomes[i];const labels=[...DATASETS.map(item=>item.key),'MOE school programmes',...(includeDirectories?DIRECTORY_SOURCES.map(x=>x.name):[])];
   const label=labels[i];
   if(item.status==='fulfilled'){
    sources.push({name:item.value.key,found:item.value.candidates.length,cached:!!item.value.cached,snapshotAt:item.value.snapshotAt||new Date().toISOString()});
    entries.push(...item.value.candidates);
   }else warnings.push(label+': '+(item.reason?.message||'unavailable'));
  }
+ const schoolDirectory=outcomes.find(x=>x.status==='fulfilled'&&x.value.key==='MOE school programmes')?.value.directory;
+ if(schoolDirectory)enrichSchoolGardenLocations(entries,schoolDirectory);
+ signal?.throwIfAborted();
  const fetchedAt=new Date().toISOString();
  const candidates=uniqueCandidates(entries).map(p=>({...p,sourcedAt:fetchedAt,lastSeenAt:fetchedAt,evidenceEntries:(p.evidenceEntries?.length?p.evidenceEntries:[{source:p.source,url:p.sourceUrl,claim:'Official or mapped source lists '+p.name}]).map(e=>({...e,checkedAt:fetchedAt}))}));
  if(!candidates.length)throw Object.assign(new Error('No discovery source available: '+warnings.join(' / ')),{status:503});

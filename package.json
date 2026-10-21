@@ -7,9 +7,14 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node --test"
+    "test": "node --test",
+    "setup:geocodes": "node scripts/setup-geocodes.mjs",
+    "visual:review": "node scripts/visual-review.mjs"
   },
   "engines": {
     "node": ">=20.12"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.64.1"
   }
 }

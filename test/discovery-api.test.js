@@ -37,7 +37,8 @@ test('one discovery action persists source citations, run audit and source-cache
  const first=await api('/api/discover','POST',{});
  assert.equal(first.status,200);assert.equal(first.body.added,5);assert.equal(first.body.assessed,0);
  assert.equal(first.body.sources.length,5);
- assert.equal(first.body.warnings.length,1);
+ const done=(await api('/api/discovery-status')).body;assert.equal(done.completed,4);assert.equal(done.total,4);assert.equal(done.phase,'Completed');
+ assert.equal(first.body.warnings.length,0);
  let s=(await api('/api/state')).body;
  assert.equal(s.partners.filter(p=>p.source==='Fictional Stitch scenario'&&p.status==='suggested').length,0);
  const school=s.partners.find(p=>p.source==='MOE School Distinctive Programmes');
@@ -56,4 +57,16 @@ test('one discovery action persists source citations, run audit and source-cache
 test('AI provider cannot be changed through frontend settings API',async()=>{
  const r=await api('/api/settings','PATCH',{aiProvider:'claude'});
  assert.equal(r.status,400);
+});
+
+test('reset suggestions preserves existing pipeline entries and removes discovery history',async()=>{
+ const before=(await api('/api/state')).body;
+ const preserved=before.partners.filter(p=>p.status!=='suggested');
+ const reset=await api('/api/reset-suggestions','POST',{});
+ assert.equal(reset.status,200);
+ assert.equal(reset.body.removed,5);
+ const after=(await api('/api/state')).body;
+ assert.equal(after.partners.length,preserved.length);
+ assert.equal(after.discoveryRuns.length,0);
+ assert.deepEqual(after.partners.map(p=>p.id),preserved.map(p=>p.id));
 });

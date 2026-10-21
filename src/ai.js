@@ -7,7 +7,7 @@ const LIMIT = 120000;
 export function cliInvocation(provider, platform = process.platform, env = process.env) {
   if (!['codex', 'claude'].includes(provider)) throw new Error('Choose Codex or Claude in AI settings');
   const args = provider === 'codex'
-    ? ['exec', '--ephemeral', '--sandbox', 'read-only', '--skip-git-repo-check', '-']
+    ? ['exec', '--ephemeral', '--sandbox', 'read-only', '--skip-git-repo-check', '--json', '-']
     : ['-p', '--output-format', 'json', '--max-turns', '1', '--no-session-persistence', '--tools', '', '--disallowedTools', 'mcp__*'];
   // A teammate may explicitly override Codex's location; otherwise use the normal PATH lookup.
   const codexPath = provider === 'codex' ? env.CODEX_PATH?.trim() : null;
@@ -35,14 +35,43 @@ export function parseAIJSON(text, provider) {
     return JSON.parse(output.slice(start, end + 1));
   }
 }
+export function tokenUsage(raw,provider){
+ if(!raw||typeof raw!=='object')return null;
+ const get=(key)=>Number.isFinite(raw[key])&&raw[key]>=0?raw[key]:null;
+ const input=get('input_tokens'),output=get('output_tokens');
+ return {inputTokens:input,outputTokens:output,cachedInputTokens:provider==='claude'?get('cache_read_input_tokens'):get('cached_input_tokens')};
+}
+export function parseAIOutput(text,provider){
+ if(provider==='claude'){
+  const wrapper=JSON.parse(text.trim());
+  return {result:parseAIJSON(text,provider),usage:tokenUsage(wrapper.usage,provider)};
+ }
+ const lines=text.trim().split(/\r?\n/);
+ let events=[];
+ try{events=lines.map(line=>JSON.parse(line));}catch{}
+ if(events.some(e=>e&&typeof e.type==='string'&&(e.type.startsWith('item.')||e.type.startsWith('turn.')||e.type.startsWith('thread.')))){
+  let answer=null,usage=null;
+  for(const e of events){
+   if(e.type==='item.completed'&&e.item?.type==='agent_message'&&typeof e.item.text==='string')answer=e.item.text;
+   if(e.type==='turn.completed')usage=tokenUsage(e.usage,'codex');
+  }
+  if(!answer)throw new Error('Codex did not return a completed response');
+  return {result:parseAIJSON(answer,'codex'),usage};
+ }
+ return {result:parseAIJSON(text,provider),usage:null};
+}
 // CLIs use the signed-in local user's subscription. Prompts are passed on stdin, never shell-interpolated.
 // Tools are disabled for Claude and Codex is read-only; neither may edit project files.
-export async function generateJSON(provider, prompt, {runner=spawn, timeoutMs=90000} = {}) {
+export async function generateJSON(provider, prompt, {runner=spawn, timeoutMs=90000, withUsage=false, signal} = {}) {
+  signal?.throwIfAborted();
   const {command, args} = cliInvocation(provider);
   return new Promise((resolve, reject) => {
     let child, stdout = '', stderr = '', finished = false;
-    const complete = (err, result) => {if (finished) return; finished = true; clearTimeout(timer); err ? reject(err) : resolve(result);};
+    const complete = (err, result) => {if (finished) return; finished = true; clearTimeout(timer); signal?.removeEventListener('abort',onAbort); err ? reject(err) : resolve(result);};
+    const onAbort=()=>{if(child?.pid&&process.platform==='win32')spawn('taskkill',['/PID',String(child.pid),'/T','/F'],{windowsHide:true,stdio:'ignore'}).on('error',()=>child?.kill());else child?.kill();complete(signal.reason||new Error('AI request stopped'));};
     const timer = setTimeout(() => {child?.kill(); complete(new Error(provider + ' timed out; check your CLI login or try again'));}, timeoutMs);
+    signal?.addEventListener('abort',onAbort,{once:true});
+    if(signal?.aborted){onAbort();return;}
     try {child = runner(command, args, {cwd:process.cwd(), env:process.env, windowsHide:true, stdio:['pipe','pipe','pipe']});}
     catch {complete(new Error('Could not launch ' + provider + '; install and sign in to its CLI on this computer')); return;}
     child.on('error', () => complete(new Error('Could not launch ' + provider + '; install and sign in to its CLI on this computer')));
@@ -51,7 +80,7 @@ export async function generateJSON(provider, prompt, {runner=spawn, timeoutMs=90
     child.on('close', code => {
       if (stdout.length > LIMIT || stderr.length > LIMIT) return complete(new Error('AI output was too long'));
       if (code !== 0) return complete(new Error(provider + ' CLI failed. Confirm it is installed and signed in (run ' + provider + ' in your terminal).'));
-      try {complete(null, parseAIJSON(stdout, provider));}
+      try {const parsed=parseAIOutput(stdout,provider); complete(null,withUsage?parsed:parsed.result);}
       catch {complete(new Error(provider + ' returned an invalid JSON response. Try again.'));}
     });
     child.stdin.on('error', ()=>{});
@@ -61,6 +90,11 @@ export async function generateJSON(provider, prompt, {runner=spawn, timeoutMs=90
 export function validateDraft(o) {
   if (!o || typeof o.subject !== 'string' || typeof o.body !== 'string' || !o.subject.trim() || !o.body.trim()) throw new Error('AI draft was incomplete');
   return {subject:o.subject.slice(0,300),body:o.body.slice(0,8000),guide:typeof o.guide==='string'?o.guide.slice(0,2500):''};
+}
+export function ensureCoffeeBotSubject(subject){
+ const original=String(subject??'').trim();
+ const normalised=original.replace(/\bcoffee[\s-]?bot\b/gi,'CoffeeBot');
+ return (/\bCoffeeBot\b/i.test(normalised)?normalised:'CoffeeBot — '+normalised).slice(0,300);
 }
 export function validateAssessment(o,ids){
  if(!o||!Array.isArray(o.assessments))throw new Error('AI assessment was incomplete');
@@ -76,4 +110,37 @@ export function validateAssessment(o,ids){
  }
  if(!valid.length)throw new Error('AI response contained no valid evidence-grounded scores');
  return valid.slice(0,ids.length);
+}
+
+
+/** Read-only assistant output for staff review. Never commit suggestions automatically. */
+export function validateActivitySuggestion(raw,{currentStage='contacted',today=new Date().toISOString().slice(0,10)}={}){
+ if(!raw||typeof raw!=='object'||Array.isArray(raw))throw new Error('AI activity analysis did not return an object');
+ const pickText=(key,max)=>{const value=raw[key];if(value===null||value===undefined||value==='')return null;if(typeof value!=='string')throw new Error('Invalid AI activity '+key);return value.trim().slice(0,max)||null;};
+ const outcome=pickText('outcome',30);
+ if(outcome&&!['requested-information','meeting-agreed','trial-discussed','follow-up-needed','declined','no-response','other'].includes(outcome))throw new Error('Invalid AI activity outcome');
+ const stage=pickText('stage',30);
+ if(stage&&!['suggested','contacted','interested','trial','regular','closed'].includes(stage))throw new Error('Invalid AI activity stage');
+ const due=pickText('followUpDate',10);
+ if(due){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(due))throw new Error('Invalid AI follow-up date');
+  const [y,m,d]=due.split('-').map(Number);
+  const date=new Date(Date.UTC(y,m-1,d));
+  if(date.getUTCFullYear()!==y||date.getUTCMonth()!==m-1||date.getUTCDate()!==d)throw new Error('Invalid AI follow-up date');
+  if(due<today)throw new Error('AI suggested a past follow-up date');
+ }
+ // The deadline belongs in Follow-Up Date, not repeated in the action.
+ let nextAction=pickText('nextAction',250);
+ if(due&&nextAction){
+  nextAction=nextAction.replace(new RegExp('\\s+(?:by|on|before|due)\\s+'+due+'(?=[\\s.,;:]|$)','gi'),'')
+   .replace(new RegExp('\\s+'+due+'(?=[\\s.,;:]|$)','gi'),'')
+   .replace(/\s+([,.;])/g,'$1').trim()||null;
+ }
+ return {
+  outcome,stage:stage===currentStage?null:stage,
+  nextAction,
+  followUpDate:due,
+  contactPerson:pickText('contactPerson',120),
+  rationale:pickText('rationale',350)
+ };
 }
