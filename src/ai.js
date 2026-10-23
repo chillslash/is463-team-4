@@ -1,8 +1,9 @@
+import {generateLocalJSON} from './ollama.js';
 import {spawn} from 'node:child_process';
 import {isAbsolute as isWinAbsolute} from 'node:path/win32';
 import {isAbsolute as isPosixAbsolute} from 'node:path/posix';
 
-export const AI_PROVIDERS = ['template', 'codex', 'claude'];
+export const AI_PROVIDERS = ['template', 'codex', 'claude', 'qwen', 'llama'];
 const LIMIT = 120000;
 export function cliInvocation(provider, platform = process.platform, env = process.env) {
   if (!['codex', 'claude'].includes(provider)) throw new Error('Choose Codex or Claude in AI settings');
@@ -64,6 +65,7 @@ export function parseAIOutput(text,provider){
 // Tools are disabled for Claude and Codex is read-only; neither may edit project files.
 export async function generateJSON(provider, prompt, {runner=spawn, timeoutMs=90000, withUsage=false, signal} = {}) {
   signal?.throwIfAborted();
+  if(provider==='qwen'||provider==='llama')return generateLocalJSON(provider,prompt,{withUsage,signal,timeoutMs:Math.max(timeoutMs,240000)});
   const {command, args} = cliInvocation(provider);
   return new Promise((resolve, reject) => {
     let child, stdout = '', stderr = '', finished = false;
