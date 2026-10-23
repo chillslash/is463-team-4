@@ -47,3 +47,23 @@ Choose **reliable, source-faithful triage that helps staff act** rather than max
 CoffeeBot still needs to specify tolerable acceptance fees, who collects/delivers, moisture and contamination requirements, acceptable minimum and maximum batch sizes, intake regularity, how institutions authorise grounds use, and credible evidence of final beneficial reuse. In particular, parks and schools are often sites rather than independent counterparties. Treat these as explicit open questions, not scoring facts. A recorded handover is a transfer, not proof of actual reuse.
 
 **Release gate:** full automated tests, source spot check, held-out benchmark coverage, staff-facing ranking explanation, preserved contactability sorting and AI status clarity, and a review of any changes to supplier outreach or handover. No model should be promoted on an incomplete comparison.
+
+## Results and pre-sponsor decision (23 October 2026)
+
+The benchmark ran against the 36-case saved snapshot. The metrics below apply to **held-out source-evidence tiers**, not experimentally demonstrated partner conversions.
+
+| Approach | Valid outputs | Held-out nDCG@10 | Held-out pairwise agreement | Decision |
+| --- | ---: | ---: | ---: | --- |
+| Deterministic source screening | 36/36 | **0.9373** | **0.8678** | **Chosen for numeric ranking** |
+| Codex CLI assessor | 36/36 | 0.6336 | 0.4598 | Advisory use only |
+| Qwen3.5 4B, local CPU (reasoning off) | 36/36 | 0.6199 | 0.4368 | Optional single-lead review / further research, not automatic scoring |
+| Llama 3.2 3B, local CPU | 7 completed before stopping | Not comparable | Not comparable | Stopped under bounded test: repetitive/weak material-specific discrimination |
+
+The Llama trial was stopped early rather than spending more computation on an approach which initially assigned roughly 50–53 to six quite different NEA facilities, including A1, despite the explicit grounds-specific evidence. Its short pilot is a **negative viability screen**, not a statistically comparable 36-item ranking result. An earlier failed local Ollama attempt (HTTP 500 when reading manifests) also reflects environment permissions, **not model performance**. Both models subsequently ran through local `llama.cpp`; Qwen completed all 36.
+
+Qwen correctly distinguished explicit used-coffee-grounds material evidence (A1) from adjacent organic streams (800 Super) in individual examples. Across the entire holdout, however, it sometimes promoted general parks/recyclers over documented growing contexts. Its overall scores were less consistent with the evidence tiers than conservative rules. Codex showed similar weakness. This is enough to **avoid automatic model-scored shortlisting for the current sponsor demo**, but not enough to claim that deterministic rules would outperform either model on real acceptance or reuse outcomes. The reference judgements share our screening philosophy, and no prospective real-world validation exists yet.
+
+**Implementation decision:** numeric Fit Scores and tie-breaking use the source-based deterministic screen for both AI-assessed and unassessed prospects. Historical AI assessments and provenance remain available as *optional staff-readable explanations/check questions* but cannot promote or demote a lead simply by being run. Automatic bulk assessment is disabled unless the operator explicitly sets `AUTO_AI_REVIEW=true`. A staff-triggered AI Review is still available when an operator wants additional questions or rationale; the score itself does not change. This is more consistent, less computationally demanding, and preserves CoffeeBot's role in deciding policy-sensitive constraints.
+
+**Operational and sustainability limitations:** Qwen's measured ~15-minute 36-item local run is a performance observation on one CPU machine under some concurrent inference load. It is **not a fair isolated hardware benchmark**, nor a measured carbon footprint. The rules-only pass is effectively immediate. A measured reduction in AI inference does not automatically establish a net reduction in lifecycle emissions; no carbon accounting has been asserted. The present decision is provisional until CoffeeBot can rate recommendations against actual willingness, fees, transport and acceptance.
+
