@@ -9,7 +9,8 @@ test('benchmark is source-balanced, disjoint and explicit',()=>{
  assert.equal(fixture.cases.length,36);
  assert.equal(new Set(fixture.cases.map(x=>x.id)).size,36);
  assert.equal(fixture.cases.filter(x=>x.split==='holdout').length,18);
- assert.deepEqual(Object.values(Object.groupBy(fixture.cases,x=>x.source)).map(x=>x.length),[6,6,6,6,6,6]);
+ const counts={};for(const x of fixture.cases)counts[x.source]=(counts[x.source]||0)+1;
+ assert.equal(Object.keys(counts).length,6);assert.ok(Object.values(counts).every(n=>n===6));
 });
 test('ranking metric captures inverted relevance',()=>{
  const rows=[{id:'a',tier:3,score:60},{id:'b',tier:2,score:40},{id:'c',tier:1,score:10}];
