@@ -20,6 +20,7 @@ const DB_PATH=process.env.DATA_FILE || join(ROOT,'data','state.json');
 const PORT=Number(process.env.PORT || 4173);
 const FOLLOWUP_SUBJECT='CoffeeBot | Spent Coffee Grounds Reuse Follow-Up';
 const AI_PROVIDER=['codex','claude','qwen','llama'].includes(process.env.AI_PROVIDER)?process.env.AI_PROVIDER:'template';
+const AUTO_AI_REVIEW=/^(1|true)$/i.test(process.env.AUTO_AI_REVIEW||'false');
 let discoveryStatus={active:false,phase:'Idle',completed:0,total:4};
 let discoveryController=null;
 const stoppedError=()=>Object.assign(new Error('Discovery stopped; changes discarded'),{status:409,code:'DISCOVERY_STOPPED'});
@@ -227,8 +228,8 @@ async function discover(s,{provider=AI_PROVIDER,assessmentGenerator=generateJSON
    run.contactPagesChecked+=found.tried||0;
    if(found.email){target.contactEmail=found.email;target.contactEvidence={source:'Organisation Website',url:found.sourceUrl,checkedAt:found.checkedAt,method:'website'};run.contactsFound++;}
   }
-  discoveryStatus={active:true,phase:'Assessing and Ranking Partners',detail:'Ranking sourced leads',completed:2,total:4,runId};
-  if(AI_PROVIDER!=='template'){
+  discoveryStatus={active:true,phase:'Ranking Partners',detail:'Ranking sourced leads',completed:2,total:4,runId};
+  if(AUTO_AI_REVIEW && provider!=='template'){
    const candidates=rankPartners(s.partners,numbers(s.settings,s.partners,s.handovers).gapKg,s.settings.ratingWeights)
     .filter(p=>p.status==='suggested'&&p.source!=='Fictional Stitch scenario');
    const pending=chooseForAssessment(candidates.filter(p=>!hasAIFit(p)||p.aiAssessment.factsHash!==digest(sourceFacts(p))),s.settings.automaticAIAssessments);
