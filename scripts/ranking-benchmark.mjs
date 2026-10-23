@@ -21,13 +21,19 @@ const cases=fixture.cases.filter(x=>split==='all'||x.split===split).slice(0,limi
  return {...x,p:{...p,aiAssessment:null}};
 });
 const fingerprint=createHash('sha256').update(JSON.stringify(cases.map(x=>sourceFacts(x.p)))).digest('hex');
+const folder=join(root,'data','benchmark-results');await mkdir(folder,{recursive:true});
 const all=[];
 for(const model of models){
- const began=Date.now(),scores=new Map(),errors=[],calls=[];
+ const began=Date.now();
+ const checkpoint=join(folder,'checkpoint-'+model+'-'+split+'-'+cases.length+'-'+fingerprint.slice(0,14)+'.json');
+ let saved={};try{saved=JSON.parse(await readFile(checkpoint,'utf8'));}catch(e){if(e.code!=='ENOENT')throw e;}
+ const scores=new Map(Object.entries(saved.scores||{})),errors=[],calls=saved.calls||[];
+ const saveCheckpoint=async()=>{const tmp=checkpoint+'.tmp';await writeFile(tmp,JSON.stringify({inputSha256:fingerprint,model,scores:Object.fromEntries(scores),calls},null,2)); const {rename}=await import('node:fs/promises');await rename(tmp,checkpoint);};
  if(model==='rules'){
   for(const x of cases)scores.set(x.id,{score:scorePartner(x.p,0,DEFAULT_RATING_WEIGHTS).score,reason:'Source-only screening'});
  }else for(let i=0;i<cases.length;i+=batchSize){
-  const group=cases.slice(i,i+batchSize),prompt=assessmentPrompt(group.map(x=>sourceFacts(x.p)));
+  const group=cases.slice(i,i+batchSize).filter(x=>!scores.has(x.id));if(!group.length)continue;
+  const prompt=assessmentPrompt(group.map(x=>sourceFacts(x.p)));
   const t=Date.now();
   console.log(model+' batch '+(Math.floor(i/batchSize)+1)+'/'+Math.ceil(cases.length/batchSize)+' ('+group.length+' records)');
   try{
@@ -38,6 +44,7 @@ for(const model of models){
     scores.set(a.id,{score:scorePartner({...x.p,aiAssessment:{...a,rubricVersion:AI_RUBRIC_VERSION}},0,DEFAULT_RATING_WEIGHTS).score,reason:a.reason,check:a.check});
    }
    calls.push({ids:group.map(x=>x.id),ms:Date.now()-t,usage:raw.usage});
+   await saveCheckpoint();
   }catch(e){errors.push({ids:group.map(x=>x.id),error:e.message});}
  }
  const rows=cases.map(x=>({id:x.id,name:x.p.name,source:x.source,split:x.split,tier:x.tier,
@@ -48,7 +55,6 @@ for(const model of models){
 }
 const report={createdAt:new Date().toISOString(),fixture:fixture.version,scope:fixture.scope,inputSha256:fingerprint,
  models,split,batchSize,limit,caveat:'Source-evidence tiers are reviewer judgements, NOT verified acceptance, impact, carbon savings or sponsor preferences.',results:all};
-const folder=join(root,'data','benchmark-results');await mkdir(folder,{recursive:true});
 const path=join(folder,'ranking-'+new Date().toISOString().replace(/[:.]/g,'-')+'.json');
 await writeFile(path,JSON.stringify(report,null,2)+'\n');
 console.log('Saved '+path);
