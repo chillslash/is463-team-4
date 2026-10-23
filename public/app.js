@@ -108,7 +108,7 @@ function findView(){
  const all=data.ranked.filter(p=>p.status==='suggested'&&p.source!=='Fictional Stitch scenario');
  const categories=[...new Set(all.map(p=>p.category))].sort();
  let matches=all.filter(p=>(!ui.aiAssessedOnly||p.match?.aiLed===true)&&(ui.category==='all'||p.category===ui.category)&&(p.name+' '+p.category+' '+p.use).toLowerCase().includes(ui.search.toLowerCase()));
- if(ui.sort==='fit')matches.sort((a,b)=>b.match.score-a.match.score||Number(b.match.aiLed)-Number(a.match.aiLed)||a.name.localeCompare(b.name));
+ if(ui.sort==='fit')matches.sort((a,b)=>b.match.score-a.match.score||a.name.localeCompare(b.name));
  if(ui.sort==='nearest')matches.sort((a,b)=>(a.distanceKm??Infinity)-(b.distanceKm??Infinity)||b.match.score-a.match.score);
  if(ui.sort==='recent')matches.sort((a,b)=>(Date.parse(b.sourcedAt||'')||0)-(Date.parse(a.sourcedAt||'')||0)||b.match.score-a.match.score);
  const totalPages=Math.max(1,Math.ceil(matches.length/15));
@@ -118,7 +118,7 @@ function findView(){
  const cards=pageItems.map(p=>{
   const sourceHref=[...(p.evidenceEntries||[]).map(e=>e.url),p.sourceUrl].find(url=>typeof url==='string'&&url.startsWith('https://'));
   const sourceLink=sourceHref?`<a class="co-listing-source" href="${esc(sourceHref)}" target="_blank" rel="noopener noreferrer">View source ↗</a>`:'';
-  const recommendation=p.match.aiLed&&p.aiAssessment?`<p class="co-why"><strong>Why Recommended:</strong> ${esc(p.aiAssessment.reason)}</p>`:`<p class="co-why">Preliminary screening based on source category and available evidence.</p>`;
+  const recommendation=p.match.aiLed&&p.aiAssessment?`<p class="co-why"><strong>AI Review Notes:</strong> ${esc(p.aiAssessment.reason)}</p>`:`<p class="co-why">Preliminary screening based on source category and available evidence.</p>`;
   const dimensions=[
    {label:'Reuse Suitability',value:p.match.parts?.suitability??0,max:p.match.weights?.suitability??40,colour:'suitability'},
    {label:'Source Evidence',value:p.match.parts?.evidence??0,max:p.match.weights?.evidence??35,colour:'evidence'},
@@ -127,7 +127,7 @@ function findView(){
   ];
   const filled=dimensions.reduce((total,item)=>total+Math.min(item.max,Math.max(0,item.value)),0);
   const composition=`<div class="co-fit-composition"><div class="co-fit-composition-head"><strong>Fit Score</strong><span>${p.match.score}/100</span></div><div class="co-fit-segments" role="img" aria-label="Fit Score composition: ${dimensions.map(x=>x.label+' '+x.value+' of '+x.max).join(', ')}">${dimensions.map(x=>`<span class="co-fit-segment co-fit-${x.colour}" style="width:${Math.min(x.max,Math.max(0,x.value))}%"></span>`).join('')}<span class="co-fit-segment co-fit-unearned" style="width:${Math.max(0,100-filled)}%"></span></div><div class="co-fit-legend">${dimensions.map(x=>`<div><i class="co-fit-dot co-fit-${x.colour}"></i><span>${x.label}</span><strong>${x.value}/${x.max}</strong></div>`).join('')}</div></div>`;
-  return `<article class="co-discovery-card" data-listing-id="${esc(p.id)}" tabindex="0" aria-label="Toggle details for ${esc(p.name)}" aria-controls="listing-details-${esc(p.id)}" aria-expanded="false"><div><div class="co-listing-head"><h3>${esc(p.name)}</h3>${sourceLink}${pBadge(p)}</div><div class="co-listing-meta"><span><b><span class="material-symbols-outlined" aria-hidden="true">category</span>Category</b>${esc(titleCase(p.category))}</span><span><b><span class="material-symbols-outlined" aria-hidden="true">near_me</span>Distance From HQ</b>${p.distanceKm==null?'Unknown':m(p.distanceKm)+' km'}</span></div>${recommendation}<details class="co-candidate-details" id="listing-details-${esc(p.id)}"><summary>Details</summary><div class="co-details-sourced"><span class="material-symbols-outlined" aria-hidden="true">calendar_today</span><span>Date Sourced</span><strong>${timeLabel(p.sourcedAt)}</strong></div>${composition}</details></div><div class="co-card-actions"><div class="co-fit-meter co-fit-${p.match.score>=75?'good':p.match.score>=50?'moderate':'low'}" role="img" aria-label="Fit score ${p.match.score} out of 100"><div class="co-fit-meter-score">${p.match.score}/100</div><div class="co-fit-meter-method">${p.match.aiLed?'AI-Assessed':'Preliminary Screening'}</div><div class="co-fit-meter-track"><span class="co-fit-meter-fill" style="width:${Math.max(0,Math.min(100,p.match.score))}%"></span></div></div><button class="co-button small" data-href="/outreach?partner=${encodeURIComponent(p.id)}">Draft Outreach</button><button class="co-button alt small" data-action="edit" data-id="${esc(p.id)}">Edit Partner</button><button class="co-button alt small" data-action="ai-review" data-id="${esc(p.id)}" ${ui.reviewingId?'disabled':''}>${ui.reviewingId===p.id?'Reviewing…':'AI Review'}</button></div></article>`;
+  return `<article class="co-discovery-card" data-listing-id="${esc(p.id)}" tabindex="0" aria-label="Toggle details for ${esc(p.name)}" aria-controls="listing-details-${esc(p.id)}" aria-expanded="false"><div><div class="co-listing-head"><h3>${esc(p.name)}</h3>${sourceLink}${pBadge(p)}</div><div class="co-listing-meta"><span><b><span class="material-symbols-outlined" aria-hidden="true">category</span>Category</b>${esc(titleCase(p.category))}</span><span><b><span class="material-symbols-outlined" aria-hidden="true">near_me</span>Distance From HQ</b>${p.distanceKm==null?'Unknown':m(p.distanceKm)+' km'}</span></div>${recommendation}<details class="co-candidate-details" id="listing-details-${esc(p.id)}"><summary>Details</summary><div class="co-details-sourced"><span class="material-symbols-outlined" aria-hidden="true">calendar_today</span><span>Date Sourced</span><strong>${timeLabel(p.sourcedAt)}</strong></div>${composition}</details></div><div class="co-card-actions"><div class="co-fit-meter co-fit-${p.match.score>=75?'good':p.match.score>=50?'moderate':'low'}" role="img" aria-label="Fit score ${p.match.score} out of 100"><div class="co-fit-meter-score">${p.match.score}/100</div><div class="co-fit-meter-method">Source Screening</div><div class="co-fit-meter-track"><span class="co-fit-meter-fill" style="width:${Math.max(0,Math.min(100,p.match.score))}%"></span></div></div><button class="co-button small" data-href="/outreach?partner=${encodeURIComponent(p.id)}">Draft Outreach</button><button class="co-button alt small" data-action="edit" data-id="${esc(p.id)}">Edit Partner</button><button class="co-button alt small" data-action="ai-review" data-id="${esc(p.id)}" ${ui.reviewingId?'disabled':''}>${ui.reviewingId===p.id?'Reviewing…':'AI Review'}</button></div></article>`;
  }).join('');
  const pageNumbers=[...new Set([1,ui.page-1,ui.page,ui.page+1,totalPages].filter(n=>n>=1&&n<=totalPages))].sort((a,b)=>a-b);
  const pageButton=n=>'<button class="co-page-button" data-action="page" data-page="'+n+'" '+(ui.page===n?'aria-current="page"':'')+'>'+n+'</button>';
@@ -752,14 +752,13 @@ async function handleAction(el){const action=el.dataset.action;
    ['Operational Readiness','weightOperations',w.operations]
   ];
   const rows=weightRows.map(([label,key,value])=>`<div class="co-assessment-weight-row"><label for="f-${key}">${label}</label><div class="co-assessment-weight-input"><input id="f-${key}" name="${key}" type="number" min="0" max="100" step="1" value="${esc(value)}" aria-describedby="assessment-weight-total"><span>%</span></div></div>`).join('');
-  const html=formField('Automatic AI Reviews per Discovery','automaticAIAssessments',data.settings.automaticAIAssessments??24,'number')+
-   `<div class="co-assessment-weight-list">${rows}<div class="co-assessment-total"><strong>Total</strong><output id="assessment-weight-total" aria-live="polite">100/100%</output></div></div>`+
+  const html=`<div class="co-assessment-weight-list">${rows}<div class="co-assessment-total"><strong>Total</strong><output id="assessment-weight-total" aria-live="polite">100/100%</output></div></div>`+
    '<div class="co-assessment-reset"><button type="button" class="co-button alt small" id="reset-assessment-settings">Reset to Default Settings</button></div>';
   dialog('Assessment Settings',html,async f=>{
    const weights={suitability:Number(f.weightSuitability),evidence:Number(f.weightEvidence),proximity:Number(f.weightProximity),operations:Number(f.weightOperations)};
    if(Object.values(weights).some(v=>!Number.isInteger(v)||v<0||v>100)||Object.values(weights).reduce((a,b)=>a+b,0)!==100)
     throw Error('Rating weights must be whole percentages adding up to 100.');
-   return request('/api/settings',{method:'PATCH',body:JSON.stringify({automaticAIAssessments:Number(f.automaticAIAssessments),ratingWeights:weights})});
+   return request('/api/settings',{method:'PATCH',body:JSON.stringify({ratingWeights:weights})});
   });
   const updateWeightTotal=()=>{
    const total=['Suitability','Evidence','Proximity','Operations'].reduce((sum,key)=>sum+Number($('#f-weight'+key)?.value||0),0);
@@ -768,7 +767,7 @@ async function handleAction(el){const action=el.dataset.action;
   for(const key of ['Suitability','Evidence','Proximity','Operations'])$('#f-weight'+key)?.addEventListener('input',updateWeightTotal);
   updateWeightTotal();
   $('#reset-assessment-settings')?.addEventListener('click',()=>{
-   const defaults={automaticAIAssessments:24,weightSuitability:40,weightEvidence:35,weightProximity:10,weightOperations:15};
+   const defaults={weightSuitability:40,weightEvidence:35,weightProximity:10,weightOperations:15};
    for(const [name,value] of Object.entries(defaults))$('#f-'+name).value=value;
    updateWeightTotal();
   });
@@ -776,12 +775,12 @@ async function handleAction(el){const action=el.dataset.action;
  } if(action==='ai-review'){
   const id=el.dataset.id,p=partner(id);
   if(!p||ui.reviewingId)return;
-  if(p.aiAssessment&&!confirm('Re-review '+p.name+' with AI? This will use another AI call and replace its current ranking.'))return;
+  if(p.aiAssessment&&!confirm('Re-review '+p.name+' with AI? This will use another AI call and replace its existing AI assessment.'))return;
   ui.reviewingId=id;render();
   try{
    await request('/api/partners/'+encodeURIComponent(id)+'/ai-review',{method:'POST',body:'{}'});
    await refresh();
-   notice('AI review complete. Partner ranking updated.');
+   notice('AI review complete.');
   }catch(err){notice(err.message,'error');}
   finally{ui.reviewingId=null;render();}
   return;
