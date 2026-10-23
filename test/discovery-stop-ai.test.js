@@ -8,6 +8,7 @@ const dir=await mkdtemp(join(tmpdir(),'is463-stop-ai-'));
 process.env.DATA_FILE=join(dir,'state.json');
 process.env.SOURCE_CACHE_DIR=join(dir,'sources');
 process.env.AI_PROVIDER='codex';
+process.env.AUTO_AI_REVIEW='true';
 const {createApp}=await import('../server.js');
 let entering;
 const inAI=new Promise(resolve=>entering=resolve);
