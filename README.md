@@ -21,12 +21,12 @@ AI_PROVIDER=codex
 CODEX_PATH=C:\path\to\codex.exe
 ```
 
-Alternatively set `AI_PROVIDER=claude` for an installed, authenticated Claude Code CLI, or `AI_PROVIDER=template` for no model calls. Each user must sign in to their selected CLI under the same OS account that launches the app. These commands use the local CLI subscription rather than API billing. An absent or failing AI backend leaves sourced, rule-ranked candidates in place; outreach generation reports errors instead of silently claiming AI succeeded.
+Alternatively set `AI_PROVIDER=claude` for an authenticated Claude Code CLI, `AI_PROVIDER=qwen` / `AI_PROVIDER=llama` for locally hosted borrowed models (Ollama or loopback llama.cpp), or `AI_PROVIDER=template` for no model calls. Automatic bulk AI review is **off by default**; only enable it explicitly with `AUTO_AI_REVIEW=true`. Staff-triggered review remains available. See [model evaluation](docs/model-evaluation.md) for setup and evidence. Each user must sign in to their selected CLI under the same OS account that launches the app. These commands use the local CLI subscription rather than API billing. An absent or failing AI backend leaves sourced, rule-ranked candidates in place; outreach generation reports errors instead of silently claiming AI succeeded.
 
 ## Workflow
 
 1. **Dashboard:** Change the illustrative forecast: 9,100 cups × 20 g = 182 kg, simulated regular partner capacity 140 kg and projected surplus 42 kg. These are **demo figures**, not CoffeeBot telemetry or real commitments.
-2. **Find Partners:** Select **Discover Partners**. The app queries source datasets, removes duplicates, adds new candidates, reuses unmodified AI assessments, evaluates a bounded batch of unevaluated leads and ranks them. Progress is shown by completed stages. Only sourced, non-fictional candidates appear in Suggested.
+2. **Find Partners:** Select **Discover Partners**. The app queries source datasets, removes duplicates, adds new candidates, preserves existing review evidence, ranks every prospect with conservative source-screening rules, and optionally reviews a bounded batch when explicitly configured. Progress is shown by completed stages. Only sourced, non-fictional candidates appear in Suggested.
 3. **Draft Outreach:** Generate a reviewable email via the configured local AI CLI, or a transparent rule-based template. The application **does not send emails**.
 4. **Manage Partners:** A unified active list (Contacted, Interested, Trial, Regular), with Closed available as a filter. Staff can update responses, stages, next actions, follow-up dates and dated activity. Demo relationships are not actual commitments.
 5. **Record Handover (within Manage Partners):** Log the collection/transfer date, optional actual handover time, amount (kg) and Notes. Reuse purposes live on the partner profile, not individual batches. No per-batch confirmation is required. A recorded handover is not automatically verified reuse.
@@ -87,8 +87,8 @@ The app is a single-user local prototype using JSON state, not a production mult
 
 ## Discovery and UI refinement
 
-- Fit Score is an explainable 0–100 relevance score, not the probability of acceptance. Weights: reuse suitability 40, source evidence 35, proximity 10, operational readiness 15. AI adds a bounded adjustment. Unknown location receives neutral proximity points without a fabricated distance.
-- Find Partners supports Best Fit, Nearest and Recently Sourced sorting, Why Recommended notes, expandable source and scoring details, and SGT timestamps. The discovery progress bar replaces the last-scan summary only during scanning.
+- Fit Score is an explainable 0–100 relevance score, not the probability of acceptance. Weights: reuse suitability 40, source evidence 35, proximity 10, operational readiness 15. Optional AI review provides independent qualitative notes but does **not** alter the numerical score or tie order. Unknown location earns zero proximity points, not an assumed moderate distance.
+- Find Partners supports Best Fit, Nearest and Recently Sourced sorting, source screening and optional AI Review Notes, expandable source and scoring details, and SGT timestamps. The discovery progress bar replaces the last-scan summary only during scanning.
 - Discovery places search and filters on the left and results on the right. Manage Partners uses a unified alphabetical list, not separate stage columns. Outreach has a fixed CoffeeBot subject, a partner-specific proposed use and a Record Sent action that archives the reviewed message only after staff confirmation.
 - A dated local-state backup is required before resetting the historical Suggested list; later-stage demo partners and the cached public source snapshots are preserved. A subsequent discovery can then regenerate Suggested results and new sourcing dates.
 
