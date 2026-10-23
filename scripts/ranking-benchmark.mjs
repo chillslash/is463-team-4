@@ -11,11 +11,12 @@ const option=(n,d)=>process.argv.find(x=>x.startsWith('--'+n+'='))?.slice(n.leng
 const models=option('models','rules,codex,qwen,llama').split(',');
 const split=option('split','all');
 const batchSize=Number(option('batch','6'));
-if(models.some(x=>!['rules','codex','qwen','llama'].includes(x))||!['all','development','holdout'].includes(split)||batchSize<1||batchSize>12)throw new Error('Invalid benchmark options');
+const limit=Number(option('limit','36'));
+if(models.some(x=>!['rules','codex','qwen','llama'].includes(x))||!['all','development','holdout'].includes(split)||batchSize<1||batchSize>12||!Number.isInteger(limit)||limit<1||limit>36)throw new Error('Invalid benchmark options');
 const fixture=JSON.parse(await readFile(join(root,'scripts/benchmark-cases.json'),'utf8'));
 const state=JSON.parse(await readFile(join(root,'data/state.json'),'utf8'));
 const index=new Map(state.partners.map(p=>[p.id,p]));
-const cases=fixture.cases.filter(x=>split==='all'||x.split===split).map(x=>{
+const cases=fixture.cases.filter(x=>split==='all'||x.split===split).slice(0,limit).map(x=>{
  const p=index.get(x.id);if(!p)throw new Error('Missing saved prospect '+x.id+'; benchmark requires the reviewed discovery snapshot');
  return {...x,p:{...p,aiAssessment:null}};
 });
@@ -28,6 +29,7 @@ for(const model of models){
  }else for(let i=0;i<cases.length;i+=batchSize){
   const group=cases.slice(i,i+batchSize),prompt=assessmentPrompt(group.map(x=>sourceFacts(x.p)));
   const t=Date.now();
+  console.log(model+' batch '+(Math.floor(i/batchSize)+1)+'/'+Math.ceil(cases.length/batchSize)+' ('+group.length+' records)');
   try{
    const raw=await generateJSON(model,prompt,{withUsage:true,timeoutMs:300000});
    const assessments=validateAssessment(raw.result,group.map(x=>x.id));
@@ -45,7 +47,7 @@ for(const model of models){
  console.log(model,JSON.stringify({valid:metrics.valid,holdoutNdcg10:holdout.ndcgAt10,holdoutPairwise:holdout.pairwiseAccuracy,errors:errors.length}));
 }
 const report={createdAt:new Date().toISOString(),fixture:fixture.version,scope:fixture.scope,inputSha256:fingerprint,
- models,split,batchSize,caveat:'Source-evidence tiers are reviewer judgements, NOT verified acceptance, impact, carbon savings or sponsor preferences.',results:all};
+ models,split,batchSize,limit,caveat:'Source-evidence tiers are reviewer judgements, NOT verified acceptance, impact, carbon savings or sponsor preferences.',results:all};
 const folder=join(root,'data','benchmark-results');await mkdir(folder,{recursive:true});
 const path=join(folder,'ranking-'+new Date().toISOString().replace(/[:.]/g,'-')+'.json');
 await writeFile(path,JSON.stringify(report,null,2)+'\n');
