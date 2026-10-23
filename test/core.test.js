@@ -15,15 +15,16 @@ test('ranking prioritises relevant, verified partners',()=>{
  assert.ok(rankPartners(initialState().partners,42).every(p=>p.status!=='regular'));
  assert.ok(initialState().partners.filter(p=>p.source==='Fictional Stitch scenario').every(p=>p.status!=='suggested'));
 });
-test('AI controls contextual score, while distance and confirmed facts remain deterministic',()=>{
+test('AI reviews are advisory, while numeric ranking uses documented evidence and verified facts',()=>{
  const p={category:'public park',distanceKm:10,verified:false,confirmed:false,capacityKg:null,contactEmail:'',aiAssessment:{
   rubricVersion:'ai-led-v1',reuseSuitability:30,sourceEvidence:20,operationalCompatibility:7,reason:'Source-backed activity',check:'Confirm use'
  }};
  const x=scorePartner(p,42);
- assert.deepEqual(x.parts,{suitability:30,evidence:20,proximity:7,operations:7});
- assert.equal(x.score,64);assert.equal(x.aiLed,true);
- assert.equal(scorePartner({...p,distanceKm:0,contactEmail:'info@example.com'},42).score,67);
- assert.equal(scorePartner({...p,verified:true,confirmed:true,capacityKg:25},42).score,69);
+ assert.deepEqual(x.parts,{suitability:7,evidence:5,proximity:7,operations:0});
+ assert.equal(x.score,19);assert.equal(x.aiLed,true);
+ assert.equal(scorePartner({...p,aiAssessment:null},42).score,19);
+ assert.equal(scorePartner({...p,distanceKm:0,contactEmail:'info@example.com'},42).score,22);
+ assert.equal(scorePartner({...p,verified:true,confirmed:true,capacityKg:25},42).score,24);
  assert.equal(scorePartner({...p,aiAssessment:{priority:'high'}},42).provisional,true);
 });
 test('draft has relevant caveats and does not promise acceptance',()=>{
