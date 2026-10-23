@@ -22,8 +22,8 @@ test('AI controls contextual score, while distance and confirmed facts remain de
  const x=scorePartner(p,42);
  assert.deepEqual(x.parts,{suitability:30,evidence:20,proximity:7,operations:7});
  assert.equal(x.score,64);assert.equal(x.aiLed,true);
- assert.equal(scorePartner({...p,distanceKm:0,contactEmail:'info@example.com'},42).score,69);
- assert.equal(scorePartner({...p,verified:true,confirmed:true,capacityKg:25},42).score,67);
+ assert.equal(scorePartner({...p,distanceKm:0,contactEmail:'info@example.com'},42).score,67);
+ assert.equal(scorePartner({...p,verified:true,confirmed:true,capacityKg:25},42).score,69);
  assert.equal(scorePartner({...p,aiAssessment:{priority:'high'}},42).provisional,true);
 });
 test('draft has relevant caveats and does not promise acceptance',()=>{
