@@ -22,6 +22,13 @@ const cases=fixture.cases.filter(x=>split==='all'||x.split===split).slice(0,limi
 });
 const fingerprint=createHash('sha256').update(JSON.stringify(cases.map(x=>sourceFacts(x.p)))).digest('hex');
 const folder=join(root,'data','benchmark-results');await mkdir(folder,{recursive:true});
+// Report a candidate model's rubric score for comparison even when production
+// intentionally uses deterministic scores instead of model scores.
+function diagnosticModelScore(p,a){
+ const baseline=scorePartner({...p,aiAssessment:null},0,DEFAULT_RATING_WEIGHTS);
+ const verifiedReadiness=p.verified&&p.confirmed&&Number(p.capacityKg)>0?5:0;
+ return a.reuseSuitability+a.sourceEvidence+baseline.parts.proximity+Math.min(15,a.operationalCompatibility+verifiedReadiness);
+}
 const all=[];
 for(const model of models){
  const began=Date.now();
@@ -41,7 +48,7 @@ for(const model of models){
    const assessments=validateAssessment(raw.result,group.map(x=>x.id));
    for(const a of assessments){
     const x=group.find(x=>x.id===a.id);
-    scores.set(a.id,{score:scorePartner({...x.p,aiAssessment:{...a,rubricVersion:AI_RUBRIC_VERSION}},0,DEFAULT_RATING_WEIGHTS).score,reason:a.reason,check:a.check});
+    scores.set(a.id,{score:diagnosticModelScore(x.p,a),reason:a.reason,check:a.check});
    }
    calls.push({ids:group.map(x=>x.id),ms:Date.now()-t,usage:raw.usage});
    await saveCheckpoint();
