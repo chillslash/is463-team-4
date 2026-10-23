@@ -15,9 +15,11 @@ test('AI qualitative scores persist and reorder partners numerically',()=>{
  assert.equal(rankPartners(saved,10)[0].id,'b');
  assert.equal(saved[0].aiAssessment.basedOn[0].url,'https://example.org/evidence');
 });
-test('AI assessment selects highest-scoring preliminary candidates',()=>{
+test('AI assessment balances source families while prioritising stronger candidates within each',()=>{
  const pool=[...Array.from({length:30},(_,i)=>p('garden'+i,'Gardens')),...Array.from({length:5},(_,i)=>p('farm'+i,'Farms')),...Array.from({length:5},(_,i)=>p('school'+i,'Schools'))];
  pool.forEach((x,i)=>{x.match={score:i};});
  const top=chooseForAssessment(pool,12);
- assert.equal(top.length,12);assert.deepEqual(top.map(x=>x.id),pool.slice(-12).reverse().map(x=>x.id));
+ assert.equal(top.length,12);
+ assert.equal(top[0].id,'school4');
+ for(const source of ['Gardens','Farms','Schools'])assert.equal(top.filter(x=>x.source===source).length,4);
 });
