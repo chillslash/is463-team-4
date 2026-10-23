@@ -1,3 +1,4 @@
+import {selectSourceBalanced} from './src/assessment-selection.js';
 import {createServer} from 'node:http';
 import {readFile, writeFile, rename, mkdir, stat} from 'node:fs/promises';
 import {existsSync} from 'node:fs';
@@ -186,11 +187,7 @@ export function saveAIResults(partners,batch,results,{provider,prompt,runId,manu
  }
  return saved;
 }
-export function chooseForAssessment(partners,limit=24){
- return partners.slice().sort((a,b)=>(b.match?.score??0)-(a.match?.score??0)
-  ||(a.distanceKm??Infinity)-(b.distanceKm??Infinity)
-  ||a.name.localeCompare(b.name)||a.id.localeCompare(b.id)).slice(0,limit);
-}
+export function chooseForAssessment(partners,limit=24){return selectSourceBalanced(partners,limit);}
 async function discover(s,{provider=AI_PROVIDER,assessmentGenerator=generateJSON,signal}={}){
   const check=()=>{if(signal?.aborted)throw stoppedError();};
  const runId=randomUUID(),startedAt=new Date().toISOString();
