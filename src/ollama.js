@@ -7,6 +7,25 @@ export async function generateLocalJSON(provider,prompt,{withUsage=false,signal,
  if(!/^[\w.:-]{1,80}$/.test(model))throw new Error('Invalid local model identifier');
  const timeout=AbortSignal.timeout(timeoutMs);
  const combined=signal?AbortSignal.any([signal,timeout]):timeout;
+ const directUrl=provider==='qwen'?process.env.QWEN_LLAMA_CPP_URL:process.env.LLAMA_LLAMA_CPP_URL;
+ if(directUrl){
+  const parsed=new URL(directUrl);
+  if(!['127.0.0.1','localhost'].includes(parsed.hostname)||parsed.protocol!=='http:')throw new Error('Local llama.cpp URL must use HTTP loopback');
+  const endpoint=new URL('/v1/chat/completions',parsed);
+  let direct;
+  try{direct=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({model,messages:[{role:'user',content:prompt}],temperature:0,seed:463,
+     max_tokens:2200,response_format:{type:'json_object'}}),signal:combined});
+  }catch(err){if(signal?.aborted)throw signal.reason;throw new Error('Local llama.cpp call failed: '+err.message);}
+  if(!direct.ok)throw new Error('Local llama.cpp '+model+' HTTP '+direct.status+': '+(await direct.text()).slice(0,250));
+  const raw=await direct.json();
+  if(typeof raw.choices?.[0]?.message?.content!=='string')throw new Error('llama.cpp returned no JSON answer');
+  const result=JSON.parse(raw.choices[0].message.content);
+  const usage={inputTokens:raw.usage?.prompt_tokens??null,outputTokens:raw.usage?.completion_tokens??null,
+    cachedInputTokens:raw.usage?.prompt_tokens_details?.cached_tokens??null,model,
+    executionSeconds:raw.timings?.predicted_ms==null?null:(raw.timings.predicted_ms+(raw.timings.prompt_ms||0))/1000};
+  return withUsage?{result,usage}:result;
+ }
  let response;
  try{
   response=await fetch('http://127.0.0.1:11434/api/generate',{
