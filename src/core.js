@@ -136,7 +136,8 @@ function screen(p){
 export function scorePartner(p,gap,ratingWeights=DEFAULT_RATING_WEIGHTS){
  const weights=validRatingWeights(ratingWeights)?ratingWeights:DEFAULT_RATING_WEIGHTS;
  const aiLed=hasAIFit(p),a=p.aiAssessment||{};
- const q=aiLed?{reuse:a.reuseSuitability,evidence:a.sourceEvidence,operational:a.operationalCompatibility}:screen(p);
+ // Numerical screening is source-grounded and invariant to whether an optional AI review ran.
+ const q=screen(p);
  const km=Number(p.distanceKm);
  const proximity=p.distanceKm==null||!Number.isFinite(km)?0:Math.round(Math.max(0,10-0.35*Math.max(0,km)));
  // Contactability is independently displayed/sorted; it is not evidence of operational handling.
@@ -154,7 +155,7 @@ export function scorePartner(p,gap,ratingWeights=DEFAULT_RATING_WEIGHTS){
 export function rankPartners(partners,gap,ratingWeights=DEFAULT_RATING_WEIGHTS){
  return partners.filter(p=>p.status!=='closed'&&p.status!=='regular')
  .map(p=>({...p,match:scorePartner(p,gap,ratingWeights)}))
- .sort((a,b)=>b.match.score-a.match.score||Number(b.match.aiLed)-Number(a.match.aiLed)||a.name.localeCompare(b.name));
+ .sort((a,b)=>b.match.score-a.match.score||a.name.localeCompare(b.name));
 }
 export function distanceKm(lat1,lon1,lat2,lon2) {
   const rad=Math.PI/180;const dlat=(lat2-lat1)*rad,dlon=(lon2-lon1)*rad;
