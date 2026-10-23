@@ -111,19 +111,35 @@ export function hasAIFit(p){
    .every(([key,max])=>Number.isInteger(a[key])&&a[key]>=0&&a[key]<=max);
 }
 // Screening is a temporary, explainable fallback, never labelled as AI assessment.
+// Source-only triage follows the model rubric's evidence thresholds.
+// It never infers willingness, composting, authority, fees or capacity.
 function screen(p){
- const cat=String(p.category||'').toLowerCase(),src=String(p.source||'').toLowerCase();
- const reuse=p.directCoffeeEvidence?38:/compost/.test(cat)?30:/farm|garden|nursery|horticultur/.test(cat)?25:/organic waste recycler/.test(cat)?20:10;
- const evidence=p.directCoffeeEvidence?33:src.includes('community in bloom')?20:src.includes('nea')?22:src.includes('moe')?15:src.includes('lias')?11:12;
- return {reuse,evidence,operational:0};
+ const src=String(p.source||'').toLowerCase(),cat=String(p.category||'').toLowerCase(),mat=String(p.materialEvidence||'').toLowerCase();
+ if(p.directCoffeeEvidence)return {reuse:38,evidence:33,operational:0};
+ if(src.includes('nea')||cat.includes('organic waste recycler')){
+  const broad=/mixed food waste|food waste|organic waste/.test(mat);
+  return {reuse:broad?13:8,evidence:broad?13:10,operational:0};
+ }
+ if(src.includes('community in bloom'))return {reuse:12,evidence:8,operational:0};
+ if(src.includes('moe')||cat.includes('school programme'))return {reuse:7,evidence:6,operational:0};
+ if(src.includes('nparks')||cat.includes('public park'))return {reuse:7,evidence:5,operational:0};
+ if(src.includes('sfa')||cat.includes('crop farm'))return {reuse:12,evidence:10,operational:0};
+ if(src.includes('lias')||cat.includes('landscap')){
+  const equipment=/equipment|machiner|parts|irrigation|technology/.test(String(p.name||'').toLowerCase());
+  return {reuse:equipment?4:11,evidence:8,operational:0};
+ }
+ if(/compost/.test(cat))return {reuse:15,evidence:8,operational:0};
+ if(/garden|nursery|horticultur|farm/.test(cat))return {reuse:11,evidence:7,operational:0};
+ return {reuse:5,evidence:3,operational:0};
 }
 export function scorePartner(p,gap,ratingWeights=DEFAULT_RATING_WEIGHTS){
  const weights=validRatingWeights(ratingWeights)?ratingWeights:DEFAULT_RATING_WEIGHTS;
  const aiLed=hasAIFit(p),a=p.aiAssessment||{};
  const q=aiLed?{reuse:a.reuseSuitability,evidence:a.sourceEvidence,operational:a.operationalCompatibility}:screen(p);
  const km=Number(p.distanceKm);
- const proximity=p.distanceKm==null||!Number.isFinite(km)?5:Math.round(Math.max(0,10-0.35*Math.max(0,km)));
- const verifiedReady=(p.contactEmail?2:0)+(p.verified&&p.confirmed&&Number(p.capacityKg)>0?3:0);
+ const proximity=p.distanceKm==null||!Number.isFinite(km)?0:Math.round(Math.max(0,10-0.35*Math.max(0,km)));
+ // Contactability is independently displayed/sorted; it is not evidence of operational handling.
+ const verifiedReady=p.verified&&p.confirmed&&Number(p.capacityKg)>0?5:0;
  const operations=Math.min(15,q.operational+verifiedReady);
  const rawParts={suitability:q.reuse,evidence:q.evidence,proximity,operations};
  const maxima=DEFAULT_RATING_WEIGHTS;
