@@ -5,7 +5,7 @@ import {PassThrough} from 'node:stream';
 import {AI_PROVIDERS,cliInvocation,parseAIJSON,parseAIOutput,generateJSON,validateDraft,validateAssessment,ensureCoffeeBotSubject} from '../src/ai.js';
 
 test('provider commands are noninteractive and use stdin, never a user prompt in shell arguments',()=>{
- assert.deepEqual(AI_PROVIDERS,['template','codex','claude']);
+ assert.deepEqual(AI_PROVIDERS,['template','codex','claude','qwen','llama']);
  const codex=cliInvocation('codex','linux');assert.equal(codex.command,'codex');assert.equal(codex.args.at(-1),'-');assert.ok(codex.args.includes('read-only'));
  const claude=cliInvocation('claude','win32');assert.ok(claude.args.includes('--tools'));assert.ok(claude.args.includes('--no-session-persistence'));
  assert.throws(()=>cliInvocation('template'));
