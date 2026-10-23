@@ -18,7 +18,7 @@ if(existsSync(localConfig))loadEnvFile(localConfig);
 const DB_PATH=process.env.DATA_FILE || join(ROOT,'data','state.json');
 const PORT=Number(process.env.PORT || 4173);
 const FOLLOWUP_SUBJECT='CoffeeBot | Spent Coffee Grounds Reuse Follow-Up';
-const AI_PROVIDER=['codex','claude'].includes(process.env.AI_PROVIDER)?process.env.AI_PROVIDER:'template';
+const AI_PROVIDER=['codex','claude','qwen','llama'].includes(process.env.AI_PROVIDER)?process.env.AI_PROVIDER:'template';
 let discoveryStatus={active:false,phase:'Idle',completed:0,total:4};
 let discoveryController=null;
 const stoppedError=()=>Object.assign(new Error('Discovery stopped; changes discarded'),{status:409,code:'DISCOVERY_STOPPED'});
@@ -130,7 +130,7 @@ function legacySourceFacts(p){
   sourceEvidence:(p.evidenceEntries||[{source:p.source,url:p.sourceUrl,claim:'Source lists '+p.name}])
    .map(e=>({source:e.source,url:e.url,claim:e.claim}))};
 }
-function sourceFacts(p){
+export function sourceFacts(p){
  return {...legacySourceFacts(p),
   staffSuppliedInformation:{
    location:p.location||null,possibleUse:p.use||null,notes:p.notes||null,
