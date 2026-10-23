@@ -39,7 +39,7 @@ test('discovery cards highlight on hover and toggle details without intercepting
  assert.ok(root.innerHTML.includes('View source'));
  assert.ok(!root.innerHTML.includes('AI Usage'));
  assert.ok(root.innerHTML.includes('Preliminary screening based on source category and available evidence.'));
- assert.ok(root.innerHTML.includes('Why Recommended:'));
+ assert.ok(root.innerHTML.includes('AI Review Notes:'));
  assert.ok(!root.innerHTML.includes('co-highlight'));
  assert.ok(root.innerHTML.includes('Showing 1–15 of 35'));
  await listeners.click({target:{closest(query){
@@ -150,7 +150,7 @@ test('Best Fit sorts numerically and AI-Assessed Only filters with pagination re
  assert.ok(root.innerHTML.includes('id="ai-assessed-filter"'));
  assert.ok(root.innerHTML.includes('AI-Assessed Only'));
  assert.ok(root.innerHTML.includes('co-fit-meter-method'));
- assert.ok(root.innerHTML.includes('Preliminary Screening'));
+ assert.ok(root.innerHTML.includes('Source Screening'));
  runInNewContext('data.ranked.forEach((p,i)=>{p.match.score=i===1?82:i===0?17:10;});render()',context);
  assert.equal(root.innerHTML.match(/data-listing-id="([^"]+)"/)[1],'p1');
  runInNewContext('ui.page=3;ui.aiAssessedOnly=true;render()',context);
@@ -835,4 +835,11 @@ test('handover form shows partner arrangement only when known and permits option
  assert.ok(editing.includes('Keep Recorded'));
  assert.ok(editing.includes('value="coffeebot-delivers" selected'));
  assert.ok(editing.includes('value="wet" selected'));
+});
+
+test('Best Fit tie order is independent of AI review status',async()=>{
+ const {root,context}=await boot('/find-partners');
+ runInNewContext("data.ranked.forEach((p,i)=>{p.match.score=20;p.match.aiLed=i===10;});ui.sort='fit';render()",context);
+ const ids=[...root.innerHTML.matchAll(/data-listing-id="([^"]+)"/g)].map(x=>x[1]);
+ assert.deepEqual(ids.slice(0,3),['p0','p1','p10']);
 });
