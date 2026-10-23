@@ -120,6 +120,7 @@ function screen(p){
   const broad=/mixed food waste|food waste|organic waste/.test(mat);
   return {reuse:broad?13:8,evidence:broad?13:10,operational:0};
  }
+ if(cat.includes('public park'))return {reuse:7,evidence:5,operational:0};
  if(src.includes('community in bloom'))return {reuse:12,evidence:8,operational:0};
  if(src.includes('moe')||cat.includes('school programme'))return {reuse:7,evidence:6,operational:0};
  if(src.includes('nparks')||cat.includes('public park'))return {reuse:7,evidence:5,operational:0};
