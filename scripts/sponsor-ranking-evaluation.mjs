@@ -48,7 +48,6 @@ export function buildBlindedReview(state, {limit = 24} = {}) {
    sourceUrl:p.sourceUrl || '',
    materialEvidence:p.materialEvidence || '',
    publicEvidence:(p.evidenceEntries || []).slice(0,4).map(e => ({source:e.source || '',claim:e.claim || '',url:e.url || ''})),
-   proposedUse:p.use || '',
    approximateDistanceKm:Number.isFinite(p.distanceKm)?p.distanceKm:null,
    review:{
     outreachPriority:null, confidence:null, rationale:'',
