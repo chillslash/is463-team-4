@@ -2,6 +2,8 @@
 
 **Status:** Baseline model comparison completed 23 October 2026; CoffeeBot feedback incorporated 27 October 2026. Results measure source-evidence ordering, not real acceptance.
 
+**New independent sponsor-priority evaluation:** See [sponsor-ranking-evaluation.md](sponsor-ranking-evaluation.md). The existing figures below assess agreement with our internal public-source relevance tiers, **not** CoffeeBot's operational judgement or realised acceptance. The separate blinded review and diagnostics are on this feature branch; a new model winner is not yet established.
+
 ## Operational purpose
 
 Find *credible, contactable and realistically reusable* spent-coffee-grounds recipients with minimal extra staff work. A recommendation is not consent, an agreed intake, or verified beneficial reuse. Discovery still covers NParks Community in Bloom, NParks parks, MOE programmes, NEA recycling facilities, LIAS membership and SFA crop-farm licences. Their evidentiary meaning differs: a programme or mapped site is weaker than a listing explicitly naming spent coffee grounds. A company charging disposal fees may be waste management rather than low-cost circular reuse.
