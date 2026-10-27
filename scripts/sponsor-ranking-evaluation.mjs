@@ -59,6 +59,35 @@ export function buildBlindedReview(state, {limit = 24} = {}) {
  };
 }
 
+export function diagnosePool(state) {
+ const leads=(state.partners || []).filter(p=>p.status==='suggested' && p.source!=='Fictional Stitch scenario');
+ const weights=state.settings?.ratingWeights || DEFAULT_RATING_WEIGHTS;
+ const histogram={},sources={};
+ let zeroOperations=0, unknownCapacity=0, aiReviewed=0, documentedIntake=0;
+ for (const p of leads) {
+  const score=scorePartner(p,0,weights);
+  histogram[score.score]=(histogram[score.score] || 0)+1;
+  const source=p.source || 'Unknown source';
+  if (!sources[source]) sources[source]={total:0, scores:{}};
+  sources[source].total++;
+  sources[source].scores[score.score]=(sources[source].scores[score.score] || 0)+1;
+  if (score.parts.operations===0) zeroOperations++;
+  const capacity=p.capacityKg==null || p.capacityKg===''?null:Number(p.capacityKg);
+  if (!Number.isFinite(capacity) || capacity<=0) unknownCapacity++;
+  else documentedIntake++;
+  if (p.aiAssessment) aiReviewed++;
+ }
+ const sorted=Object.entries(histogram).map(([score,count])=>({score:Number(score),count})).sort((a,b)=>b.count-a.count || a.score-b.score);
+ return {
+  scope:'Suggested prospects in locally saved state',
+  assumption:'Missing operational fields indicate unobserved facts, not zero real-world capacity',
+  total:leads.length, aiReviewed, documentedIntake, unknownCapacity, zeroOperations,
+  distinctNumericScores:sorted.length,
+  mostFrequentScores:sorted.slice(0,10),
+  bySource:Object.fromEntries(Object.entries(sources).sort(([a],[b])=>a.localeCompare(b)).map(([name,info])=>[name,{total:info.total,distinctScores:Object.keys(info.scores).length,scoreHistogram:info.scores}]))
+ };
+}
+
 function requireReview(review) {
  if (review?.version !== 'coffee-sponsor-review-v1' || !Array.isArray(review.cases)) throw new Error('Invalid sponsor review format');
  const ids = new Set();
@@ -140,13 +169,15 @@ async function runCli() {
   if (!m) throw new Error('Expected --name=value arguments');
   return [m[1],m[2]];
  }));
- if (!['prepare','evaluate'].includes(command)) throw new Error('Usage: node scripts/sponsor-ranking-evaluation.mjs prepare|evaluate --state=... [--review=...] [--predictions=...] --out=...');
+ if (!['prepare','evaluate','diagnose'].includes(command)) throw new Error('Usage: node scripts/sponsor-ranking-evaluation.mjs prepare|evaluate|diagnose --state=... [--review=...] [--predictions=...] --out=...');
  if (!options.state || !options.out) throw new Error('--state and --out are required');
  const state = JSON.parse(await readFile(options.state,'utf8'));
  migrateSponsorAssumptions(state); // In memory; never change the saved user state.
  let result;
  if (command === 'prepare') {
   result = buildBlindedReview(state,{limit:options.limit ? Number(options.limit) : 24});
+ } else if (command === 'diagnose') {
+  result = diagnosePool(state);
  } else {
   if (!options.review) throw new Error('--review is required for evaluation');
   const review = JSON.parse(await readFile(options.review,'utf8'));
@@ -156,6 +187,7 @@ async function runCli() {
  await writeFile(options.out, JSON.stringify(result,null,2) + '\n', {flag:'wx'});
  console.log(JSON.stringify(command === 'prepare'
   ? {saved:options.out,cases:result.cases.length,modelScoresHidden:true}
+  : command === 'diagnose' ? {saved:options.out,total:result.total,zeroOperations:result.zeroOperations,mostFrequentScores:result.mostFrequentScores.slice(0,4)}
   : {saved:options.out,status:result.status,labelled:result.labelledCandidates,comparable:result.comparableCases,warnings:result.warnings},null,2));
 }
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
