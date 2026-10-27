@@ -128,9 +128,12 @@ export function evaluateSponsorReview(state, review, predictions = {models:{}}) 
  const sources = new Set(labelled.map(x => x.source));
  const tiers = [...new Set(labelled.map(x => x.review.outreachPriority))];
  const sponsorAttribution = review.reviewerRole === 'CoffeeBot' && !!review.reviewedBy && !!review.reviewedAt;
+ const proxyAttribution = review.reviewerRole === 'Independent proxy' && !!review.reviewedBy && !!review.reviewedAt;
  const allCoverage = Object.values(byModel).every(scores => labelled.every(x => scores.has(x.id)));
  const sufficient = labelled.length >= 12 && sources.size >= 3 && tiers.length >= 2;
- const ready = sponsorAttribution && sufficient && allCoverage && Object.keys(external).length > 0;
+ const modelReady = sufficient && allCoverage && Object.keys(external).length > 0;
+ const ready = sponsorAttribution && modelReady;
+ const proxyReady = proxyAttribution && modelReady;
  const common = labelled.filter(x => Object.values(byModel).every(scores => scores.has(x.id)));
  const result = {};
  for (const [model,scores] of Object.entries(byModel)) {
@@ -146,13 +149,13 @@ export function evaluateSponsorReview(state, review, predictions = {models:{}}) 
  }
  const warnings = [];
  if (!labelled.length) warnings.push('No independent outreach-priority judgements yet');
- if (!sponsorAttribution) warnings.push('CoffeeBot reviewer attribution and date not confirmed');
+ if (!sponsorAttribution) warnings.push(proxyAttribution ? 'Proxy review is not CoffeeBot ground truth; do not claim sponsor validation' : 'CoffeeBot reviewer attribution and date not confirmed');
  if (!sufficient) warnings.push('Need at least 12 labelled cases spanning 3 sources and at least 2 priority grades');
  if (!allCoverage) warnings.push('Models have incomplete coverage; do not compare their individual exploratory metrics');
  if (!Object.keys(external).length) warnings.push('No AI model scores supplied; cannot compare approaches');
  if (!labelled.some(x=>x.review.outreachPriority===3)) warnings.push('No top-priority cases labelled; strong-lead discrimination not assessed');
  return {
-  status: ready?'sponsor-comparison-ready':labelled.length?'provisional':'awaiting-sponsor-ratings',
+  status: ready?'sponsor-comparison-ready':proxyReady?'proxy-comparison-ready':labelled.length?'provisional':'awaiting-sponsor-ratings',
   definition:'Predict reviewer-rated outreach priority, not actual acceptance, intake or reuse',
   totalCandidates:review.cases.length,labelledCandidates:labelled.length,
   sourceCount:sources.size,priorityDistribution:Object.fromEntries([0,1,2,3].map(t=>[t,labelled.filter(x=>x.review.outreachPriority===t).length])),
