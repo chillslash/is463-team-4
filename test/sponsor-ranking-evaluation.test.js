@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {buildBlindedReview, evaluateSponsorReview} from '../scripts/sponsor-ranking-evaluation.mjs';
+import {buildBlindedReview, evaluateSponsorReview, diagnosePool} from '../scripts/sponsor-ranking-evaluation.mjs';
 
 function sampleState() {
  const sources = ['NParks Community in Bloom','NParks Parks','MOE School Programmes','NEA Food Waste Recycling Facilities','LIAS Landscaping','SFA Crop Farms'];
@@ -88,4 +88,21 @@ test('rejects invalid labels, model scores, and source records that cannot be re
  review.cases[0].review.outreachPriority=3;
  assert.throws(()=>evaluateSponsorReview(state,review,{models:{codex:{[review.cases[0].id]:Infinity}}}),/Invalid prediction/);
  assert.throws(()=>evaluateSponsorReview({partners:[],settings:state.settings},review),/missing source record/);
+});
+
+test('diagnostic distinguishes missing evidence from zero actual intake and identifies score ties',()=>{
+ const state=sampleState(), d=diagnosePool(state);
+ assert.equal(d.total,36);
+ assert.equal(d.aiReviewed,36);
+ assert.equal(d.unknownCapacity,36);
+ assert.equal(d.documentedIntake,0);
+ assert.equal(d.zeroOperations,36);
+ assert.equal(Object.keys(d.bySource).length,6);
+ assert.ok(d.mostFrequentScores.length>0);
+ state.partners[0].capacityKg=10;
+ state.partners[0].verified=true;
+ const updated=diagnosePool(state);
+ assert.equal(updated.unknownCapacity,35);
+ assert.equal(updated.documentedIntake,1);
+ assert.equal(updated.zeroOperations,35);
 });
