@@ -1,0 +1,130 @@
+{
+  "version": "coffeebot-proxy-desk-v1",
+  "assessedAt": "2026-10-27",
+  "reviewerRole": "Independent proxy desk review (not CoffeeBot)",
+  "assessor": "OpenAI assistant; source-backed desktop review",
+  "independence": "Assessed without inspecting candidate score outputs; same assessor knows project context, so not an external blinded judge",
+  "target": "Potential priority for initial outreach; not partner acceptance",
+  "cases": [
+    {
+      "id": "directory-2f779686bf9edca",
+      "outreachPriority": 2,
+      "rationale": "Landscape works; plausible land application, no intake evidence"
+    },
+    {
+      "id": "moe-chijprimarytoapayoh",
+      "outreachPriority": 1,
+      "rationale": "STEM programme; no demonstrated gardening recipient"
+    },
+    {
+      "id": "directory-79d8fd79dfa6be2",
+      "outreachPriority": 3,
+      "rationale": "NEA documents actual spent-coffee-grounds processing"
+    },
+    {
+      "id": "cib-535",
+      "outreachPriority": 2,
+      "rationale": "Registered community growing group; capacity unknown"
+    },
+    {
+      "id": "nparks-120223",
+      "outreachPriority": 1,
+      "rationale": "Park site, not authorised receiving organisation"
+    },
+    {
+      "id": "sfa-5fb698b98e7fbd33",
+      "outreachPriority": 1,
+      "rationale": "MEOD mainly hydroponic; direct grounds input unclear"
+    },
+    {
+      "id": "directory-17af2bb59a62580",
+      "outreachPriority": 2,
+      "rationale": "Accredited nursery and landscape operator"
+    },
+    {
+      "id": "moe-horizonprimary",
+      "outreachPriority": 1,
+      "rationale": "Recycling education but no grounds-use garden evidence"
+    },
+    {
+      "id": "directory-c9ad21cf6855320",
+      "outreachPriority": 2,
+      "rationale": "Commercial mixed-food-waste facility; grounds and fees unclear"
+    },
+    {
+      "id": "cib-1240",
+      "outreachPriority": 2,
+      "rationale": "Registered community growing group; capacity unknown"
+    },
+    {
+      "id": "nparks-120379",
+      "outreachPriority": 1,
+      "rationale": "Public park area, no authorised recipient named"
+    },
+    {
+      "id": "sfa-2ec299072ec589b5",
+      "outreachPriority": 2,
+      "rationale": "Bewilder grows fungi using organic by-products; SCG unverified"
+    },
+    {
+      "id": "directory-23851aef1dcd60e",
+      "outreachPriority": 1,
+      "rationale": "KAF focuses rubber flooring, not grounds reuse"
+    },
+    {
+      "id": "moe-holyinnocentsprimary",
+      "outreachPriority": 2,
+      "rationale": "School has an active science garden; approval unknown"
+    },
+    {
+      "id": "directory-e4641e0e9b3ba30",
+      "outreachPriority": 1,
+      "rationale": "Tiong Lam focuses dry manufactured-food streams"
+    },
+    {
+      "id": "cib-787",
+      "outreachPriority": 2,
+      "rationale": "Listed Community in Bloom growing activity; capacity unknown"
+    },
+    {
+      "id": "nparks-120375",
+      "outreachPriority": 1,
+      "rationale": "Memorial park site rather than identified receiving group"
+    },
+    {
+      "id": "sfa-36d1670271e0eb21",
+      "outreachPriority": 1,
+      "rationale": "Vegetable licence only; medium and suitability unknown"
+    },
+    {
+      "id": "directory-7a0be8930f9fd2e",
+      "outreachPriority": 2,
+      "rationale": "Nature Landscapes operates accredited nursery"
+    },
+    {
+      "id": "moe-peitongprimary",
+      "outreachPriority": 1,
+      "rationale": "PLANET sustainability education, not grounds-specific reuse"
+    },
+    {
+      "id": "directory-143752cbac03d92",
+      "outreachPriority": 2,
+      "rationale": "Ento valorises food waste with BSF; fees and SCG unclear"
+    },
+    {
+      "id": "cib-62",
+      "outreachPriority": 2,
+      "rationale": "Documented volunteer community farm; aquaponics may constrain use"
+    },
+    {
+      "id": "nparks-120373",
+      "outreachPriority": 1,
+      "rationale": "Linear park plot alone is not authorised recipient"
+    },
+    {
+      "id": "sfa-59c6ecfc61192a61",
+      "outreachPriority": 1,
+      "rationale": "Vegetable licence only; growing method unknown"
+    }
+  ]
+}
