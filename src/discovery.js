@@ -6,6 +6,7 @@ const DAY_MS=24*60*60*1000;
 function cachedResponse(body,savedAt,fromCache){return {json:async()=>JSON.parse(body),text:async()=>body,snapshotAt:savedAt,fromCache};}
 import {cibCandidates, nparksCandidates} from './core.js';
 import {DIRECTORY_SOURCES} from './directories.js';
+import {SFA_URL,SFA_SOURCE,parseSfaPdf} from './sfa.js';
 import {moeSchoolCandidates,enrichSchoolGardenLocations,parseCSV,SCHOOL_PROGRAMMES_ID,SCHOOL_DIRECTORY_ID} from './moe.js';
 
 const DATA_URL = 'https://api-open.data.gov.sg/v1/public/api/datasets/';
@@ -22,6 +23,8 @@ export function uniqueCandidates(candidates) {
   const extras=p.evidenceEntries||[{source:p.source,url:p.sourceUrl,claim:'Dataset lists '+p.name}];
   existing.evidenceEntries=[...original,...extras].filter((e,i,arr)=>arr.findIndex(x=>x.source===e.source&&x.url===e.url)===i);
   if(!Number.isFinite(existing.lat) && Number.isFinite(p.lat)){existing.lat=p.lat;existing.lon=p.lon;existing.distanceKm=p.distanceKm;existing.location=p.location;}
+  if(!existing.contactEmail&&p.contactEmail){existing.contactEmail=p.contactEmail;existing.contactName||=p.contactName||'';existing.contactEvidence=p.contactEvidence;}
+  if(!existing.websiteUrl&&p.websiteUrl)existing.websiteUrl=p.websiteUrl;
   if(existing.category==='school programme'&&p.category==='school garden')existing.category='school garden';
  }
  return result;
@@ -92,19 +95,47 @@ async function fetchDirectory(item,httpFetch,useCache,signal){
  },18000,signal);
 }
 
-export async function discoverAll(reference,{httpFetch=fetch,includeDirectories=true,useCache=httpFetch===fetch,signal}={}){
+async function fetchSfa(httpFetch,useCache,signal){
+ return withDeadline(async activeSignal=>{
+  const filename=join(CACHE_DIR,'sfa-licensed-crop-farms.json');
+  let previous=null;
+  if(useCache)try{previous=JSON.parse(await readFile(filename,'utf8'));}catch{}
+  const fromCache=old=>({key:SFA_SOURCE,candidates:old.candidates,cached:true,snapshotAt:old.savedAt,registerUpdated:old.registerUpdated});
+  if(previous?.candidates?.length&&Date.now()-Date.parse(previous.savedAt)<DAY_MS)return fromCache(previous);
+  try{
+   activeSignal.throwIfAborted();
+   const resp=await httpFetch(SFA_URL,{signal:activeSignal,headers:{'User-Agent':'CoffeeBot-IS463-Prototype/0.3','Accept':'application/pdf'}});
+   if(!resp.ok)throw Error('SFA register HTTP '+resp.status);
+   const bytes=new Uint8Array(await resp.arrayBuffer());
+   activeSignal.throwIfAborted();
+   const parsed=await parseSfaPdf(bytes);
+   activeSignal.throwIfAborted();
+   if(!parsed.candidates.length)throw Error('SFA register contains no eligible crop farms');
+   const savedAt=new Date().toISOString();
+   if(useCache)try{await mkdir(CACHE_DIR,{recursive:true});await writeFile(filename,JSON.stringify({...parsed,savedAt}),'utf8');}catch{}
+   return {key:SFA_SOURCE,candidates:parsed.candidates,cached:false,snapshotAt:savedAt,registerUpdated:parsed.registerUpdated};
+  }catch(err){
+   activeSignal.throwIfAborted();
+   if(previous?.candidates?.length)return fromCache(previous);
+   throw err;
+  }
+ },25000,signal);
+}
+
+export async function discoverAll(reference,{httpFetch=fetch,includeDirectories=true,includeSfa=true,useCache=httpFetch===fetch,signal}={}){
  signal?.throwIfAborted();
  // Independent sources continue to contribute even when one source fails.
  const requests=DATASETS.map(item=>fetchDataset(item,reference,httpFetch,useCache,signal));
  requests.push(fetchSchools(reference,httpFetch,useCache,signal));
  if(includeDirectories)requests.push(...DIRECTORY_SOURCES.map(item=>fetchDirectory(item,httpFetch,useCache,signal)));
+ if(includeSfa)requests.push(fetchSfa(httpFetch,useCache,signal));
 
  const outcomes=await Promise.allSettled(requests),sources=[],warnings=[],entries=[];
  for(let i=0;i<outcomes.length;i++){
-  const item=outcomes[i];const labels=[...DATASETS.map(item=>item.key),'MOE school programmes',...(includeDirectories?DIRECTORY_SOURCES.map(x=>x.name):[])];
+  const item=outcomes[i];const labels=[...DATASETS.map(item=>item.key),'MOE school programmes',...(includeDirectories?DIRECTORY_SOURCES.map(x=>x.name):[]),...(includeSfa?[SFA_SOURCE]:[])];
   const label=labels[i];
   if(item.status==='fulfilled'){
-   sources.push({name:item.value.key,found:item.value.candidates.length,cached:!!item.value.cached,snapshotAt:item.value.snapshotAt||new Date().toISOString()});
+   sources.push({name:item.value.key,found:item.value.candidates.length,cached:!!item.value.cached,snapshotAt:item.value.snapshotAt||new Date().toISOString(),...(item.value.registerUpdated?{sourceUpdatedAt:item.value.registerUpdated}:{})});
    entries.push(...item.value.candidates);
   }else warnings.push(label+': '+(item.reason?.message||'unavailable'));
  }

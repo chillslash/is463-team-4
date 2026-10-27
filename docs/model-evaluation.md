@@ -1,12 +1,12 @@
 # Evidence-based ranking and borrowed-model review
 
-**Status:** Pre-sponsor evaluation, 23 October 2026. Weighting preferences and operational requirements remain unconfirmed by CoffeeBot. Experimental outputs in `data/benchmark-results/` are local and Git-ignored.
+**Status:** Baseline model comparison completed 23 October 2026; CoffeeBot feedback incorporated 27 October 2026. Results measure source-evidence ordering, not real acceptance.
 
 ## Operational purpose
 
 Find *credible, contactable and realistically reusable* spent-coffee-grounds recipients with minimal extra staff work. A recommendation is not consent, an agreed intake, or verified beneficial reuse. Discovery still covers NParks Community in Bloom, NParks parks, MOE programmes, NEA recycling facilities, LIAS membership and SFA crop-farm licences. Their evidentiary meaning differs: a programme or mapped site is weaker than a listing explicitly naming spent coffee grounds. A company charging disposal fees may be waste management rather than low-cost circular reuse.
 
-The pre-existing score uses four configurable factors: **reuse suitability 40, source evidence 35, HQ proximity 10, operational readiness 15**. These provisional weights stay adjustable. Contactability is separately displayed/sortable, not evidence of material-handling ability. Unknown distance does not earn proximity points. Operational facts such as weekly acceptance volume, fee, collection frequency, approval authority and preparation requirements cannot be inferred from public category membership.
+Original weights were **suitability 40, source evidence 35, proximity 10, operations 15**. The current sponsor-aligned defaults are **30 / 30 / 5 / 35**. Actual intake quantity is the largest operational sub-score, with recurring intake and self-collection considered only when documented. Unknown volume does not disqualify a lead; straight-line proximity has less weight because established delivery routes can be convenient. Contactability is independent.
 
 ## Why recalibration was needed
 
@@ -44,7 +44,12 @@ Choose **reliable, source-faithful triage that helps staff act** rather than max
 
 ## Outstanding sponsor decisions
 
-CoffeeBot still needs to specify tolerable acceptance fees, who collects/delivers, moisture and contamination requirements, acceptable minimum and maximum batch sizes, intake regularity, how institutions authorise grounds use, and credible evidence of final beneficial reuse. In particular, parks and schools are often sites rather than independent counterparties. Treat these as explicit open questions, not scoring facts. A recorded handover is a transfer, not proof of actual reuse.
+**Sponsor-oriented recheck (27 October 2026):** deterministic numeric screening covers all **36/36** historical reviewer-labelled cases. Under updated 30/30/5/35 weights, the prior holdout gives **nDCG@10 = 0.9443** and **pairwise agreement = 0.8391**, versus 0.9373 and 0.8678 under the earlier weights. This is agreement with **our own public-source evidence tiers**, not partner conversion, capacity or sponsor preference. Several candidate weights were compared on the same set; this is **exploratory calibration and no longer a fresh untouched holdout test**. New unit tests cover verified quantity, unknown capacity, recurring arrangements and self-collection. CoffeeBot’s 20 kg Temasek Polytechnic research donation is a useful real-world one-off example, **not** a scored recurring-uptake benchmark. Staff assessment of real prospective partners is still necessary.
+
+The 10 kg/week operational score saturation is a modelling heuristic, not a sponsor-approved threshold. Unknown partner intake must remain unknown rather than invented from public source category or organisation size.
+
+
+CoffeeBot now confirms that meaningful intake, regularity, consistent reuse and convenience matter. There are no immediate categorical exclusions, and either collection at HQ or convenient delivery is possible. Still open: actual delivery routes, minimum viable intake and other numerical thresholds, fees, institutional authorisation, material preparation/moisture constraints, and final beneficial-use evidence.
 
 **Release gate:** full automated tests, source spot check, held-out benchmark coverage, staff-facing ranking explanation, preserved contactability sorting and AI status clarity, and a review of any changes to supplier outreach or handover. No model should be promoted on an incomplete comparison.
 
@@ -66,4 +71,3 @@ Qwen correctly distinguished explicit used-coffee-grounds material evidence (A1)
 **Implementation decision:** numeric Fit Scores and tie-breaking use the source-based deterministic screen for both AI-assessed and unassessed prospects. Historical AI assessments and provenance remain available as *optional staff-readable explanations/check questions* but cannot promote or demote a lead simply by being run. Automatic bulk assessment is disabled unless the operator explicitly sets `AUTO_AI_REVIEW=true`. A staff-triggered AI Review is still available when an operator wants additional questions or rationale; the score itself does not change. This is more consistent, less computationally demanding, and preserves CoffeeBot's role in deciding policy-sensitive constraints.
 
 **Operational and sustainability limitations:** Qwen's measured ~15-minute 36-item local run is a performance observation on one CPU machine under some concurrent inference load. It is **not a fair isolated hardware benchmark**, nor a measured carbon footprint. The rules-only pass is effectively immediate. A measured reduction in AI inference does not automatically establish a net reduction in lifecycle emissions; no carbon accounting has been asserted. The present decision is provisional until CoffeeBot can rate recommendations against actual willingness, fees, transport and acceptance.
-

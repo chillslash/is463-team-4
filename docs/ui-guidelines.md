@@ -1,174 +1,48 @@
-﻿# CoffeeBot UI consistency guide
+# CoffeeBot Circularity Copilot — Current UI Guide
 
-These are practical defaults for **Discover Partners**, **Draft Outreach** and
-**Manage Partners**. They document patterns useful in the current prototype,
-not a requirement to make every screen or button identical. Dashboard is outside
-the October 2026 polish pass.
+**Current as of 23 October 2026.** This guide covers the implemented application. If wording conflicts with source code, inspect public/app.js, public/app.css, src/core.js and tests first.
 
-## Principles
+## Navigation and workflow
 
-1. **Shared meaning, shared treatment.** Buttons with the same role use common
-   font sizes, heights and spacing. A back button may be smaller than a primary
-   action. Do not force equal widths on labels of unequal length.
-2. **Clarity before decoration.** Prefer Inter, forest-green accents, white
-   cards, soft borders and muted metadata. Avoid brightly coloured AI panels.
-3. **Do not imply certainty.** AI recommendations are proposals, not verified
-   reuse, acceptance, capacity or relationship stages.
-4. **Dense where useful.** Show related numeric settings in aligned rows;
-   expand content-heavy activities and emails only when requested.
-5. **Exceptions need a purpose.** Stop actions, copy icons, stage chips and
-   data inputs intentionally differ from ordinary action buttons.
+- Exactly three primary destinations: **Dashboard**, **Discover Partners**, **Manage Partners**. **Draft Outreach** is contextual, and a selected partner has a separate detail page.
+- The Dashboard has the cross-partner **Log Handover** action. Manage Partners cards open the partner page; there is no duplicate Log Handover shortcut on the management list.
+- Discover results contain sourced **Suggested** leads. Cards expose provenance, category, indicative straight-line distance, score and **Contact Route** (Email Available / Contact Page Available / Not Identified). Details show the link, attribution and **Research Contact**. Contactability is a factual status, not a new stage or acceptance guarantee. **Contactable First** is an independent checkbox that partitions available emails first, then published contact pages, then unidentified contacts, while keeping the selected Best Fit/Nearest/Recent order inside each group. AI-Assessed Only stays an independent filter. Never describe an unreachable website as a successful check that found no contact. Keep the score and contactability distinct; do not put a second score on the card.
+- Manage Partners is one filterable list with an explicit **Closed** filter and a partner page with **Relationship** and **Edit Partner** tabs.
+- Relationship pages expose deliberate stage changes, Log Activity, Record Handover, Draft Follow-Up and a single Activity History. Do not create parallel histories or independent handover views.
 
-## Common visual patterns
+## Status labels and scope boundaries
 
-| Component | Default | Examples |
-| --- | --- | --- |
-| Primary action | 40px minimum height, 14px semi-bold | Discover Partners, Add Partner, Record Sent |
-| Compact secondary action | ~36px minimum height, 13px semi-bold | Draft Outreach, Edit Partner, AI Review, Manage, back links |
-| Input / select | ~40px height | Form fields, stage selection |
-| Icon | ~17-18px | Align with label |
-| Control border / radius | 1px muted border, ~6px radius | Quiet, consistent interface |
-| Primary action | Forest green (`#013625`) | Confirmed deliberate actions |
-| Secondary action | White, outlined forest tint | Non-primary actions |
-| Stopping | Muted warm red | Stop Discovery, Stop Analysis |
-| AI review result | White/near-white, soft sage border | Unconfirmed suggestions |
-| Metadata | Muted grey (`--sub`) | Dates, source text, units |
+The visible lifecycle is **Suggested → Contacted → Interested → Pilot → Regular**, plus **Closed**. **Pilot** is the public-facing label for the persisted key `trial`; the API and saved historical statuses remain unchanged. The historical interaction outcome key `trial-discussed` is displayed as **Discussed Pilot**. No data migration is needed; render older stage-audit messages with the current label.
 
-Prefer adjusting shared styles instead of appending one-off overrides. Main
-actions and compact controls are deliberately different. Scope design changes
-to the relevant pages instead of accidentally changing Dashboard.
+Stages change through explicit staff actions. A single interaction outcome does not silently advance a relationship. An AI suggestion always requires the staff member to apply it and save.
 
-## Text and dates
+**Forecast Demand** is agreed weekly intake for Regular partners; **Handed Over This Week** is recorded physical transfer mass. The prototype does **not** capture confirmed beneficial reuse, calculate reuse rate or claim carbon savings. Do not reintroduce reuse-confirmation inputs into Record Handover. Partner-level **Potential Use** and **Agreed Use** remain relevant.
 
-- Capitalise human-readable values: `Unknown`, `Weekly (Demo)`,
-  `Organic Waste Recycler`, `Partner Discovered`.
-- Keep machine-oriented values such as `status: "contacted"` stable.
-  Format them for display without rewriting historical records.
-- Interpret timestamps in Singapore time but **never append SGT**.
-- Use `19 October 2026, 5:13 p.m.` for timestamps and
-  `19 October 2026` for date-only fields. Never invent a time for
-  a follow-up date or staff-entered activity date.
-  For manually dated activities, show only the precise **Logged**
-  timestamp in Activity History rather than stacking a date and timestamp.
-  It marks when staff logged the entry, not necessarily when the email
-  arrived or the event occurred; the original activity date remains stored.\n- Reuse `dateLabel()` and `timeLabel()` from `public/app.js`.
-  Supporting date labels and their values should use muted grey.
-- Use one Inter typography scale for Activity History, including
-  Partner Discovered source descriptions.
+Use language such as **initial collection**, **pilot arrangement** and **discussing ongoing reuse** in outreach rather than describing the recipient as being tested. No generic 10 kg pilot quantity is assumed.
 
-## Form and activity behaviour
+## Visual rules
 
-- Assessment weights appear on four horizontal rows. Show the live
-  **Total / 100%**, and reject totals that are not exactly 100.
-- Newly logged received/sent emails record direction explicitly. Keep the
-  neutral `Email` label for legacy records without direction; do not guess.
-- Collapsed long messages show event, date and optionally sender or subject,
-  **not a duplicate excerpt** of the expanded email. Show the full message
-  only when expanded. Provide Show Older Activity after the latest 24.
-- Record Sent identifies the partner and explains the app **does not send**
-  emails. Staff copy the outreach into their email client, where they may
-  edit and add attachments. Do **not** add unsaved-draft warnings.
-- AI activity analysis is explicitly requested and never autosaves.
-  While running, show an indeterminate spinner rather than a fabricated
-  percentage. Use the same stop-circle icon as Discover Partners.
-  A stopping state remains visible until cancellation resolves.
-- Stage changes are deliberate; a response outcome does not automatically
-  advance a relationship.
+- Clean, readable Inter type, green primary actions, restrained secondary outlines, white cards and muted metadata. Apply shared style rules before adding one-off CSS.
+- Shared dialog headings use **20px** across Add/Edit, Log Activity, Record Handover and confirmation dialogs. Single-line dialog inputs and selects have a consistent **42px** height; labels and multiline fields retain their own hierarchy. The visual-review script checks these dimensions on desktop and mobile.
+- Deliberate differences are okay: page titles, section headings, body text and metadata have distinct hierarchies. Preserve consistent hierarchy within Partner, Log Activity and Record Handover.
+- Discover and Manage lists use a soft hover/focus affordance. Discover card surfaces toggle Details, but buttons, links and disclosure summaries retain independent actions. Manage cards are links, not nested Manage buttons.
+- Keep descriptions short. Prefer meaningful labels and values over duplicate help text, multiple summaries or decorative boxes.
+- Show dates and timestamps in Singapore local time, without appending a timezone suffix. Never fabricate time for date-only events. Existing `dateLabel()` and `timeLabel()` are the shared formatters.
+- Controls need visible labels, keyboard access, correct focus and usable narrow-screen layout. Assess at desktop and mobile widths.
 
-## Change checklist
+## Forms, history and AI behaviour
 
-1. Inspect the shared CSS component first, before adding a new override.
-2. Check Discover, Draft Outreach, Manage list, partner profile, Activity
-   History, Assessment Settings and Log Activity after UI changes.
-3. Verify keyboard usage, readable labels, responsive layouts and reduced
-   motion support.
-4. Update the expected UI/API tests when changing copy or behaviour.
-   Run `npm test` and inspect the diff.
-5. Use this document as a **guide**, not a rigid template. Preserve
-   useful differences between statuses, navigation and main actions.
+- **Record Handover:** require Date and Amount (kg); Time and Notes are optional. Existing partner transport/grounds conditions can be shown compactly, with exceptional changes disclosed as needed. No per-batch reuse declaration, verification selector, or fabricated handover time.
+- **Add/Edit Partner:** Name and Type are required; Stage is required on Add. Reuse purpose, frequency, weekly intake and other unknowns are editable and may remain blank. Do not invent verified facts.
+- **Activity History:** show concrete staff interactions, recorded sent outreach, stage changes and handovers in one chronological view. Long communications may expand; the most recent 24 display initially with an option to show older entries. Correct or archive records through their dedicated controls without silently editing current relationship status.
+- **Outreach:** generated or edited messages never send themselves. Staff copy the text to their email client, then deliberately confirm **Record Sent**.
+- **AI:** configure Codex/Claude/Qwen/Llama/Template locally in the repository, not a settings page. AI activity assistance is opt-in for Email/Text, gives review-only suggestions, and can be cancelled. Do not pass AI-generated acceptance or capacity off as partner-confirmed.
+- **Assessment:** display all four score weights and their total (100%). Fit Score is a relevance aid, not the probability of agreement. Ranking policy is still awaiting sponsor criteria.
 
-`design/DESIGN.md` is an earlier Stitch design reference containing older
-bean-to-cup machine terminology. This document reflects the current partner
-discovery and lightweight relationship-management prototype, and takes
-precedence for its current UI patterns. The tested CSS and JavaScript remain
-the implementation source of truth.
+## Change discipline
 
-
-## Trial: hover-highlighted, full-surface cards (October 2026)
-
-This is a **visual experiment**, not a rigid default for all screens:
-
-- On Discover Partners and Manage Partners, hovering a card reveals the
-  same soft green left-edge cue; keyboard focus has a matching indicator.
-  The cue is **not** a persistent selected state.
-- Clicking a Discover Partners card toggles its Details panel. The native
-  Details summary works independently; outreach, edit, AI review and source
-  links retain their own actions.
-- Manage Partners cards are native links to each partner workspace with no
-  redundant Manage button. The freed-up space belongs to the content.
-- Draft Outreach's back button retains its size and moves **down 4px**
-  visually, rather than reducing its height.
-
-For a possible rollback, pre-experiment copies of the four touched files
-are stored in the Git-ignored `data/ui-hover-experiment-backup/` folder,
-with their relative paths (the test backup has a `.bak` suffix to avoid accidental execution). If additional edits are made after this trial,
-revert the individual trial changes rather than overwriting newer work.
-
-
-
-## Handover form and reuse claims (October 2026)
-
-Keep the handover dialog short: **Date**, **Time**, **Amount (kg)** and
-**Notes**. Only Date and Amount are required; do not add an "Optional"
-label to unstarred fields. Partner-level reuse purposes stay under
-**Potential Use / Agreed Use** in the partner profile. Do not reinstate
-per-handover confirmation levels or demanding "Evidence" labels.
-Receipt of grounds is separate from confirmed beneficial reuse, but that
-distinction belongs in careful reporting logic, not extra questions to
-staff who are simply recording a collection. Actual handover times
-are entered by staff; a blank time displays as date-only.
-
-Partners may report consistent reuse or cumulative reused kilograms on a
-different cadence from individual collections. Record these statements
-as ordinary activities or notes, not guessed batch-level confirmations.
-
-Use the same white, uncluttered form background for Log Activity and
-Record Handover (no inner green card). Focus the Close button when the
-handover dialog opens so the date's day segment is not selected.
-Manage Partners shows a Category filter after Sort; combine it with Search
-and Stage, resetting pagination on category changes.
-
-
-## Staff follow-ups and historical corrections
-
-Use a modest amber treatment only for **actual overdue or due-today**
-follow-up dates on the partner Relationship page. Keep normal tasks and
-unscheduled relationships subdued. Cross-partner prioritisation belongs
-in the future Dashboard, not a duplicate Manage Partners filter.
-
-After Confirm Record Sent, return to that partner's page. Provide
-**Draft Follow-Up** from managed partner pages using the existing outreach
-form (same editable body, copy controls and staff-confirmed Record Sent),
-with an explicit subject identifying it as a follow-up. Do not offer it
-before initial contact, and do not claim an email was sent automatically.
-
-Use a compact three-dot **Edit / Delete** menu for recorded Activity History
-entries, with dedicated correction forms for sent outreach and handovers. Deletions preserve a soft-deleted record internally;
-editing old activity details does not implicitly overwrite the current
-stage or follow-up task. Historic emails of unspecified direction must
-remain unspecified rather than becoming "received" after editing.
-
-## Activity actions and non-duplicative partner notes
-
-On every recorded Activity History entry, keep Edit and Delete
-accessible even when a message's Details are collapsed. Place controls
-outside the expandable content, with the same subdued treatment for short
-notes, calls, emails, and long messages. Historical stage changes, recorded sent emails and handovers use their own
-correction forms. Handover edits recalculate kilograms; deletion archives
-the original record without silently altering live relationship stages.
-
-Partner **Notes** should store additional operational information not
-captured by Stage, Next Action, Potential Use / Agreed Use, Transport
-Arrangement, Grounds Accepted, or other profile fields. Leave the field
-blank when there is nothing extra to record. Demo records must not inject
-boilerplate summaries of the very fields already visible elsewhere.
+1. Before UI changes, inspect the current screen, shared styles, event handlers and relevant tests.
+2. Verify the intended function through the API and browser; preserve historical source/handovers.
+3. Run `npm test`, and `npm run visual:review` for layout-sensitive edits; check desktop and mobile views.
+4. Update **README.md**, **docs/prototype.md**, and this guide only when their current behaviour changes. Do not append a chronological list of each tweak here.
+5. Treat older screenshots and presentation materials as historical context, not implementation requirements. Do not reintroduce retired features without a current operational reason.

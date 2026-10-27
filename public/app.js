@@ -6,7 +6,7 @@ const qs = new URLSearchParams(location.search);
 let data=null;
 let journalSuggestion=null;
 let journalAnalysisRun=null;
-let ui={category:'all',sort:'fit',aiAssessedOnly:false,search:'',page:1,discoveryRunning:false,discoveryStopping:false,discoveryStatus:null,reviewingId:null,draft:null,selectedId:qs.get('partner')||null,manageSearch:'',manageCategory:'all',manageStage:'active',manageSort:'name',managePage:1,partnerTab:'relationship'};
+let ui={category:'all',sort:'fit',aiAssessedOnly:false,contactableFirst:false,search:'',page:1,discoveryRunning:false,discoveryStopping:false,discoveryStatus:null,reviewingId:null,draft:null,selectedId:qs.get('partner')||null,manageSearch:'',manageCategory:'all',manageStage:'active',manageSort:'name',managePage:1,partnerTab:'relationship'};
 const nav={ '/':'dashboard','/dashboard':'dashboard','/this-week':'dashboard','/find-partners':'find_partners','/outreach':'outreach_draft','/pipeline':'manage_partners','/manage-partners':'manage_partners','/partner':'partner_detail'};
 const current=nav[location.pathname]||'dashboard';
 const partner=id=>data.partners.find(p=>p.id===id);
@@ -26,20 +26,21 @@ function dateLabel(v){if(!v)return 'Not Recorded';const raw=String(v);const d=ne
 function timeLabel(v){if(!v)return 'Never';const d=new Date(v);return isNaN(d)?'Unknown':new Intl.DateTimeFormat('en-SG',{day:'numeric',month:'long',year:'numeric',hour:'numeric',minute:'2-digit',hour12:true,timeZone:'Asia/Singapore'}).format(d).replace(' at ', ', ').replace(/\b(am|pm)\b/gi,(_match,period)=>period.toLowerCase()==='am'?'a.m.':'p.m.');}
 const ACTIVITY_OUTCOME_LABELS={
  'none':'Not Recorded','requested-information':'Requested Information','meeting-agreed':'Agreed to Meeting',
- 'trial-discussed':'Discussed Trial','follow-up-needed':'Follow-Up Needed','declined':'Declined',
+ 'trial-discussed':'Discussed Pilot','follow-up-needed':'Follow-Up Needed','declined':'Declined',
  'no-response':'No Reply','other':'Other','positive':'Positive (Historical)','awaiting-reply':'Awaiting Reply (Historical)'
 };
 const activityOutcomeLabel=outcome=>ACTIVITY_OUTCOME_LABELS[outcome]||titleCase(String(outcome||'').replaceAll('-',' '));
 const titleCase=s=>String(s||'').replace(/\b[a-z][a-z']*/gi,w=>({hq:'HQ',ai:'AI',id:'ID',kg:'kg',api:'API'}[w.toLowerCase()]||w[0].toUpperCase()+w.slice(1)));
+const stageLabel=s=>String(s||'').toLowerCase()==='trial'?'Pilot':titleCase(s);
 // Render legacy and current automatic stage changes consistently, without rewriting stored history.
 function activityDisplayText(text,type){
  const value=String(text||'');
  if(type!=='update'&&type!=='stage')return value;
  const names='suggested|contacted|interested|trial|regular|closed';
  return value
-  .replace(new RegExp('\\bstage:\\s*('+names+')\\s+to\\s+('+names+')\\b','gi'),(_match,from,to)=>'Stage: '+titleCase(from)+' to '+titleCase(to))
-  .replace(new RegExp('\\b(added as\\s+)('+names+')\\b','gi'),(_match,prefix,stage)=>'Added as '+titleCase(stage))
-  .replace(new RegExp('\\b(progressed the relationship to\\s+)('+names+')\\b','gi'),(_match,prefix,stage)=>'progressed the relationship to '+titleCase(stage))
+  .replace(new RegExp('\\bstage:\\s*('+names+')\\s+to\\s+('+names+')\\b','gi'),(_match,from,to)=>'Stage: '+stageLabel(from)+' to '+stageLabel(to))
+  .replace(new RegExp('\\b(added as\\s+)('+names+')\\b','gi'),(_match,prefix,stage)=>'Added as '+stageLabel(stage))
+  .replace(new RegExp('\\b(progressed the relationship to\\s+)('+names+')\\b','gi'),(_match,prefix,stage)=>'progressed the relationship to '+stageLabel(stage))
    .replace(/\b\d{4}-\d{2}-\d{2}\b/g,iso=>dateLabel(iso));
 }
 
@@ -63,8 +64,8 @@ function weekBody(){
   .sort((a,b)=>a.followUpDate.localeCompare(b.followUpDate)).slice(0,3);
  const stageNames=['suggested','contacted','interested','trial','regular'];
  const handovers=[...(data.handovers||[])].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,3);
-  const forecastDemandKg=data.partners.filter(p=>p.status==='regular'&&Number(p.capacityKg)>0).reduce((total,p)=>total+Number(p.capacityKg),0);
-  const gapKg=Math.max(0,t.forecastKg-forecastDemandKg);
+  const forecastDemandKg=t.confirmedKg;
+  const gapKg=t.gapKg;
   const thisWeek=new Date(today+'T12:00:00Z'),day=thisWeek.getUTCDay();
   thisWeek.setUTCDate(thisWeek.getUTCDate()-(day+6)%7);
   const weekStart=thisWeek.toISOString().slice(0,10);
@@ -83,13 +84,13 @@ function weekBody(){
     <div class="co-supply-numbers"><span>${m(forecastDemandKg)} kg/week planned</span><strong>${capacityPct}%</strong></div>
     <div class="co-supply-track" role="img" aria-label="${capacityPct}% of projected supply covered"><span style="width:${capacityPct}%"></span></div>
     <div class="co-supply-legend"><span><i></i>Forecast Demand</span><span><i></i>Projected Gap</span></div>
-    
+
    </section>
    <section class="co-overview-panel"><div class="co-overview-heading"><h2>Upcoming Follow-Ups${overdue.length?' ('+overdue.length+' Overdue)':''}</h2><a href="/manage-partners">View All</a></div>
-    ${due.length?due.map(p=>`<a class="co-overview-item" href="/partner?partner=${encodeURIComponent(p.id)}"><div><strong>${esc(p.name)}</strong><small>${esc(p.nextAction||titleCase(p.status))}</small></div><time class="${p.followUpDate<today?'co-overdue':''}">${esc(dateLabel(p.followUpDate))}</time></a>`).join(''):'<p class="co-overview-empty">No follow-ups due in the next seven days.</p>'}
+    ${due.length?due.map(p=>`<a class="co-overview-item" href="/partner?partner=${encodeURIComponent(p.id)}"><div><strong>${esc(p.name)}</strong><small>${esc(p.nextAction||stageLabel(p.status))}</small></div><time class="${p.followUpDate<today?'co-overdue':''}">${esc(dateLabel(p.followUpDate))}</time></a>`).join(''):'<p class="co-overview-empty">No follow-ups due in the next seven days.</p>'}
    </section>
    <section class="co-overview-panel"><div class="co-overview-heading"><h2>Partner Stages</h2><a href="/manage-partners">Manage Partners</a></div>
-    <div class="co-stage-strip">${stageNames.map(stage=>`<a href="${stage==='suggested'?'/find-partners':'/manage-partners'}"><span>${titleCase(stage)}</span><strong>${data.partners.filter(p=>p.status===stage).length}</strong></a>`).join('')}</div>
+    <div class="co-stage-strip">${stageNames.map(stage=>`<a href="${stage==='suggested'?'/find-partners':'/manage-partners'}"><span>${stageLabel(stage)}</span><strong>${data.partners.filter(p=>p.status===stage).length}</strong></a>`).join('')}</div>
    </section>
    <section class="co-overview-panel"><div class="co-overview-heading"><h2>Recent Handovers</h2><a href="/manage-partners">View Partners</a></div>
     ${handovers.length?handovers.map(h=>`<a class="co-overview-item" href="/partner?partner=${encodeURIComponent(h.partnerId)}"><div><strong>${esc(name(h.partnerId))}</strong><small>${esc(dateLabel(h.date))}</small></div><b>${m(h.kg)} kg</b></a>`).join(''):'<p class="co-overview-empty">No handovers recorded yet.</p>'}
@@ -104,6 +105,20 @@ function discoveryViewProgress(status){
  const stage=status?.phase?.startsWith('Completed')?4:Math.min(4,done+1);
  return {percentage,stage,phase:status?.phase||'Discovering Partners',detail:status?.detail||'',label:'Stage '+stage+' of 4'};
 }
+function contactRouteBlock(p){
+ const email=String(p.contactEmail||'').trim();
+ const hasEmail=/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+ const page=p.contactPageUrl&&/^https:\/\//i.test(p.contactPageUrl)?p.contactPageUrl:'';
+ const label=hasEmail?'Email available':page?'Contact page available':'Not identified';
+ const source=p.contactEvidence;
+ const channel=hasEmail?'<a href="mailto:'+encodeURIComponent(email)+'">'+esc(email)+'</a>':page?'<a href="'+esc(page)+'" target="_blank" rel="noopener noreferrer">Open contact page ↗</a>':'No public contact recorded';
+ const attribution=hasEmail&&source?.method==='staff'?'Staff entered':hasEmail&&source?.url&&/^https:\/\//.test(source.url)?'<a href="'+esc(source.url)+'" target="_blank" rel="noopener noreferrer">'+esc(source.source||'Email source')+' ↗</a>':hasEmail?'Source not recorded':page?'Organisation website':'';
+ const checked=p.contactSearch?.checkedAt?'Checked '+esc(dateLabel(p.contactSearch.checkedAt)):'';
+ const search=!hasEmail?'<a href="https://www.google.com/search?q='+encodeURIComponent(p.name+' official contact Singapore')+'" target="_blank" rel="noopener noreferrer">Search web ↗</a>':'';
+ const html='<div class="co-contact-route"><strong>Contact</strong><div>'+channel+'</div><div class="co-contact-route-meta">'+attribution+' '+checked+' '+search+'</div><button type="button" class="co-button alt small" data-action="research-contact" data-id="'+esc(p.id)+'">Research Contact</button></div>';
+ return {label,html};
+}
+
 function findView(){
  const all=data.ranked.filter(p=>p.status==='suggested'&&p.source!=='Fictional Stitch scenario');
  const categories=[...new Set(all.map(p=>p.category))].sort();
@@ -111,23 +126,31 @@ function findView(){
  if(ui.sort==='fit')matches.sort((a,b)=>b.match.score-a.match.score||a.name.localeCompare(b.name));
  if(ui.sort==='nearest')matches.sort((a,b)=>(a.distanceKm??Infinity)-(b.distanceKm??Infinity)||b.match.score-a.match.score);
  if(ui.sort==='recent')matches.sort((a,b)=>(Date.parse(b.sourcedAt||'')||0)-(Date.parse(a.sourcedAt||'')||0)||b.match.score-a.match.score);
+  // Stable partition: preserve selected sort order within each contactability tier.
+  if(ui.contactableFirst){
+   const rank=p=>p.contactEmail?2:p.contactPageUrl?1:0;
+   matches.sort((a,b)=>rank(b)-rank(a));
+  }
  const totalPages=Math.max(1,Math.ceil(matches.length/15));
  ui.page=Math.min(Math.max(1,ui.page),totalPages);
  const pageStart=(ui.page-1)*15;
  const pageItems=matches.slice(pageStart,pageStart+15);
  const cards=pageItems.map(p=>{
+  const contact=contactRouteBlock(p);
   const sourceHref=[...(p.evidenceEntries||[]).map(e=>e.url),p.sourceUrl].find(url=>typeof url==='string'&&url.startsWith('https://'));
   const sourceLink=sourceHref?`<a class="co-listing-source" href="${esc(sourceHref)}" target="_blank" rel="noopener noreferrer">View source ↗</a>`:'';
   const recommendation=p.match.aiLed&&p.aiAssessment?`<p class="co-why"><strong>AI Review Notes:</strong> ${esc(p.aiAssessment.reason)}</p>`:`<p class="co-why">Preliminary screening based on source category and available evidence.</p>`;
+   const claim=(p.evidenceEntries||[]).find(e=>typeof e.claim==='string'&&e.claim.trim())?.claim?.trim()||p.materialEvidence||'';
+   const evidenceSummary=claim?'<div class="co-compact-source-evidence"><strong>Source Evidence</strong><span>'+esc(claim.length>220?claim.slice(0,217)+'…':claim)+'</span></div>':'';
   const dimensions=[
    {label:'Reuse Suitability',value:p.match.parts?.suitability??0,max:p.match.weights?.suitability??40,colour:'suitability'},
    {label:'Source Evidence',value:p.match.parts?.evidence??0,max:p.match.weights?.evidence??35,colour:'evidence'},
    {label:'HQ Proximity',value:p.match.parts?.proximity??0,max:p.match.weights?.proximity??10,colour:'proximity'},
-   {label:'Operational Readiness',value:p.match.parts?.operations??0,max:p.match.weights?.operations??15,colour:'readiness'}
+   {label:'Intake & Operations',value:p.match.parts?.operations??0,max:p.match.weights?.operations??35,colour:'readiness'}
   ];
   const filled=dimensions.reduce((total,item)=>total+Math.min(item.max,Math.max(0,item.value)),0);
   const composition=`<div class="co-fit-composition"><div class="co-fit-composition-head"><strong>Fit Score</strong><span>${p.match.score}/100</span></div><div class="co-fit-segments" role="img" aria-label="Fit Score composition: ${dimensions.map(x=>x.label+' '+x.value+' of '+x.max).join(', ')}">${dimensions.map(x=>`<span class="co-fit-segment co-fit-${x.colour}" style="width:${Math.min(x.max,Math.max(0,x.value))}%"></span>`).join('')}<span class="co-fit-segment co-fit-unearned" style="width:${Math.max(0,100-filled)}%"></span></div><div class="co-fit-legend">${dimensions.map(x=>`<div><i class="co-fit-dot co-fit-${x.colour}"></i><span>${x.label}</span><strong>${x.value}/${x.max}</strong></div>`).join('')}</div></div>`;
-  return `<article class="co-discovery-card" data-listing-id="${esc(p.id)}" tabindex="0" aria-label="Toggle details for ${esc(p.name)}" aria-controls="listing-details-${esc(p.id)}" aria-expanded="false"><div><div class="co-listing-head"><h3>${esc(p.name)}</h3>${sourceLink}${pBadge(p)}</div><div class="co-listing-meta"><span><b><span class="material-symbols-outlined" aria-hidden="true">category</span>Category</b>${esc(titleCase(p.category))}</span><span><b><span class="material-symbols-outlined" aria-hidden="true">near_me</span>Distance From HQ</b>${p.distanceKm==null?'Unknown':m(p.distanceKm)+' km'}</span></div>${recommendation}<details class="co-candidate-details" id="listing-details-${esc(p.id)}"><summary>Details</summary><div class="co-details-sourced"><span class="material-symbols-outlined" aria-hidden="true">calendar_today</span><span>Date Sourced</span><strong>${timeLabel(p.sourcedAt)}</strong></div>${composition}</details></div><div class="co-card-actions"><div class="co-fit-meter co-fit-${p.match.score>=75?'good':p.match.score>=50?'moderate':'low'}" role="img" aria-label="Fit score ${p.match.score} out of 100"><div class="co-fit-meter-score">${p.match.score}/100</div><div class="co-fit-meter-method">Source Screening</div><div class="co-fit-meter-track"><span class="co-fit-meter-fill" style="width:${Math.max(0,Math.min(100,p.match.score))}%"></span></div></div><button class="co-button small" data-href="/outreach?partner=${encodeURIComponent(p.id)}">Draft Outreach</button><button class="co-button alt small" data-action="edit" data-id="${esc(p.id)}">Edit Partner</button><button class="co-button alt small" data-action="ai-review" data-id="${esc(p.id)}" ${ui.reviewingId?'disabled':''}>${ui.reviewingId===p.id?'Reviewing…':'AI Review'}</button></div></article>`;
+  return `<article class="co-discovery-card" data-listing-id="${esc(p.id)}" tabindex="0" aria-label="Toggle details for ${esc(p.name)}" aria-controls="listing-details-${esc(p.id)}" aria-expanded="false"><div><div class="co-listing-head"><h3>${esc(p.name)}</h3>${sourceLink}${pBadge(p)}</div><div class="co-listing-meta"><span><b><span class="material-symbols-outlined" aria-hidden="true">category</span>Category</b>${esc(titleCase(p.category))}</span><span><b><span class="material-symbols-outlined" aria-hidden="true">near_me</span>Distance From HQ</b>${p.distanceKm==null?'Unknown':m(p.distanceKm)+' km'}</span><span><b><span class="material-symbols-outlined" aria-hidden="true">alternate_email</span>Contact Route</b>${esc(contact.label)}</span></div>${recommendation}<details class="co-candidate-details" id="listing-details-${esc(p.id)}"><summary>Details</summary><div class="co-details-sourced"><span class="material-symbols-outlined" aria-hidden="true">calendar_today</span><span>Date Sourced</span><strong>${timeLabel(p.sourcedAt)}</strong></div>${composition}${evidenceSummary}${contact.html}</details></div><div class="co-card-actions"><div class="co-fit-meter co-fit-${p.match.score>=75?'good':p.match.score>=50?'moderate':'low'}" role="img" aria-label="Fit score ${p.match.score} out of 100"><div class="co-fit-meter-score">${p.match.score}/100</div><div class="co-fit-meter-method">Source Screening</div><div class="co-fit-meter-track"><span class="co-fit-meter-fill" style="width:${Math.max(0,Math.min(100,p.match.score))}%"></span></div></div><button class="co-button small" data-href="/outreach?partner=${encodeURIComponent(p.id)}">Draft Outreach</button><button class="co-button alt small" data-action="edit" data-id="${esc(p.id)}">Edit Partner</button><button class="co-button alt small" data-action="ai-review" data-id="${esc(p.id)}" ${ui.reviewingId?'disabled':''}>${ui.reviewingId===p.id?'Reviewing…':'AI Review'}</button></div></article>`;
  }).join('');
  const pageNumbers=[...new Set([1,ui.page-1,ui.page,ui.page+1,totalPages].filter(n=>n>=1&&n<=totalPages))].sort((a,b)=>a-b);
  const pageButton=n=>'<button class="co-page-button" data-action="page" data-page="'+n+'" '+(ui.page===n?'aria-current="page"':'')+'>'+n+'</button>';
@@ -161,12 +184,13 @@ function findView(){
       ${categories.map(c=>`<option value="${esc(c)}" ${c===ui.category?'selected':''}>${esc(titleCase(c))}</option>`).join('')}
      </select>
     </label>
+    <label class="co-discovery-ai-checkbox"><input type="checkbox" id="contactable-first-filter" ${ui.contactableFirst?'checked':''}>Contactable First</label>
     <label class="co-discovery-ai-checkbox"><input type="checkbox" id="ai-assessed-filter" ${ui.aiAssessedOnly?'checked':''}>AI-Assessed Only</label>
     <div class="co-discovery-result-count">Showing ${matches.length?pageStart+1:0}–${Math.min(pageStart+15,matches.length)} of ${matches.length}</div>
    </div>
    <div class="co-discovery-sidebar-status">
     ${ui.discoveryRunning?progress:idle}
-    <p class="co-source-caption">Sources: Community in Bloom · NParks · MOE · NEA · LIAS</p>
+    <p class="co-source-caption">Sources: Community in Bloom · NParks · MOE · NEA · LIAS · SFA</p>
    </div>
   </aside>`;
    return base('Discover Partners','',`${ui.discoveryRunning?`<button class="co-button alt co-stop-discovery" data-action="stop-discovery" ${ui.discoveryStopping?'disabled':''}><span class="material-symbols-outlined" aria-hidden="true">stop_circle</span>${ui.discoveryStopping?'Stopping...':'Stop Discovery'}</button>`:`<button class="co-button" data-action="discover">Discover Partners</button>`}<button class="co-button alt" data-action="assessment-settings" ${ui.discoveryRunning?'disabled':''}>Assessment Settings</button>`)+
@@ -237,7 +261,7 @@ function chooseDraftPartner(id){
 const manageStages=[
  {key:'contacted',icon:'outgoing_mail',label:'Contacted'},
  {key:'interested',icon:'chat_bubble',label:'Interested'},
- {key:'trial',icon:'science',label:'Trial'},
+ {key:'trial',icon:'rocket_launch',label:'Pilot'},
  {key:'regular',icon:'autorenew',label:'Regular'},
  {key:'closed',icon:'archive',label:'Closed'}
 ];
@@ -304,7 +328,7 @@ function journalEvents(p){
   .filter(x=>x.partnerId===p.id&&!x.deletedAt&&x.type!=='handover'&&!(x.type==='outreach'&&outbound.length))
   .map(x=>({id:x.id,type:x.type,at:x.occurredAt||x.at,loggedAt:x.at,displayDate:x.date||'',text:x.text,emailDirection:x.emailDirection||'',contact:x.contactPerson||'',outcome:x.outcome||'',next:x.nextAction||'',stage:x.stageTo||'',editable:editableStaffActivity(x),recordKind:'activity',editedAt:x.editedAt||null}));
  records.push(...outbound.map(x=>({id:x.id,type:'outreach',at:x.sentAt||x.preparedAt,text:'Email recorded as sent',kind:x.kind||'initial',subject:x.subject||'',body:x.body||'',recipientEmail:x.recipientEmail||'',editable:true,recordKind:'outreach',editedAt:x.editedAt||null})));
- records.push(...(data.handovers||[]).filter(h=>h.partnerId===p.id).map(h=>({id:h.id,type:'handover',at:h.date+'T'+(h.time||'12:00')+':00+08:00',displayDate:h.time?'':h.date,text:m(h.kg)+' kg transferred',outcome:({'partner-confirmed':'Recipient confirmed'})[h.confirmation]||'',next:h.notes||'',arrangement:[h.transportException?'Collection: '+({'partner-collects':'Partner Collects','coffeebot-delivers':'CoffeeBot Delivers',either:'Either'})[h.transportArrangement]:null,h.groundsException?'Grounds: '+({dry:'Dried',wet:'Wet',either:'Either'})[h.groundsCondition]:null].filter(Boolean).join(' / '),editable:true,recordKind:'handovers',editedAt:h.editedAt||null})));
+ records.push(...(data.handovers||[]).filter(h=>h.partnerId===p.id).map(h=>({id:h.id,type:'handover',at:h.date+'T'+(h.time||'12:00')+':00+08:00',displayDate:h.time?'':h.date,text:m(h.kg)+' kg transferred',outcome:'',next:h.notes||'',arrangement:[h.transportException?'Collection: '+({'partner-collects':'Partner Collects','coffeebot-delivers':'CoffeeBot Delivers',either:'Either'})[h.transportArrangement]:null,h.groundsException?'Grounds: '+({dry:'Dried',wet:'Wet',either:'Either'})[h.groundsCondition]:null].filter(Boolean).join(' / '),editable:true,recordKind:'handovers',editedAt:h.editedAt||null})));
  return records.sort((a,b)=>(Date.parse(b.at)||0)-(Date.parse(a.at)||0));
 }
 function journalTimeline(p){
@@ -321,7 +345,7 @@ function journalTimeline(p){
    const correction=x.editedAt?' <span class="co-history-corrected">Edited</span>':'';
   const heading=`<div class="co-journal-entry-heading"><strong>${esc(label)}${correction}</strong><time>${esc(displayedTime)}</time></div>`;
   const activityMenu=x.editable?`<details class="co-activity-menu"><summary title="Activity options" aria-label="Options for ${esc(label)}"><span class="material-symbols-outlined" aria-hidden="true">more_horiz</span></summary><div class="co-activity-menu-panel"><button type="button" data-action="manage-activity-edit" data-id="${esc(x.id)}">Edit Activity</button><button type="button" data-action="manage-activity-delete" data-id="${esc(x.id)}">Delete Activity</button></div></details>`:'';
-    const extra=`${x.contact?`<small>With ${esc(x.contact)}</small>`:''}${x.outcome?`<small>Outcome: ${esc(activityOutcomeLabel(x.outcome))}</small>`:''}${x.stage?`<small>Stage: ${esc(titleCase(x.stage))}</small>`:''}${x.next?`<small>${x.type==='handover'?'Notes':'Next'}: ${esc(x.next)}</small>`:''}${x.arrangement?`<small>${esc(x.arrangement)}</small>`:''}`;
+    const extra=`${x.contact?`<small>With ${esc(x.contact)}</small>`:''}${x.outcome?`<small>Outcome: ${esc(activityOutcomeLabel(x.outcome))}</small>`:''}${x.stage?`<small>Stage: ${esc(stageLabel(x.stage))}</small>`:''}${x.next?`<small>${x.type==='handover'?'Notes':'Next'}: ${esc(x.next)}</small>`:''}${x.arrangement?`<small>${esc(x.arrangement)}</small>`:''}`;
   if(!expandable){
    const content=x.type==='outreach'&&subject?subject:message;
    const sourceClass=x.type==='discovery'?' co-journal-source':'';
@@ -332,7 +356,7 @@ function journalTimeline(p){
   const detail=x.type==='outreach'
    ?`<div class="co-journal-email"><div><strong>Subject</strong><span>${esc(subject||'Not recorded')}</span></div>${x.recipientEmail?'<div><strong>To</strong><span>'+esc(x.recipientEmail)+'</span></div>':''}<div><strong>Sent Email</strong><div class="co-journal-email-body">${esc(x.body||'Email body not available for this historical entry.')}</div></div></div>`
    :`<p class="co-journal-full-message">${esc(message)}</p>`;
-  return `<article class="co-journal-item"${older?' hidden':''}><details class="co-journal-entry"><summary>${heading}${preview?`<span class="co-journal-preview">${esc(preview)}</span>`:''}<span class="co-journal-expand">View Details <span class="material-symbols-outlined" aria-hidden="true">expand_more</span></span></summary><div class="co-journal-expanded">${x.contact?`<small>With ${esc(x.contact)}</small>`:''}${detail}${x.outcome?`<small>Outcome: ${esc(activityOutcomeLabel(x.outcome))}</small>`:''}${x.stage?`<small>Stage: ${esc(titleCase(x.stage))}</small>`:''}${x.next?`<small>${x.type==='handover'?'Notes':'Next'}: ${esc(x.next)}</small>`:''}${x.arrangement?`<small>${esc(x.arrangement)}</small>`:''}</div></details>${activityMenu}</article>`;
+  return `<article class="co-journal-item"${older?' hidden':''}><details class="co-journal-entry"><summary>${heading}${preview?`<span class="co-journal-preview">${esc(preview)}</span>`:''}<span class="co-journal-expand">View Details <span class="material-symbols-outlined" aria-hidden="true">expand_more</span></span></summary><div class="co-journal-expanded">${x.contact?`<small>With ${esc(x.contact)}</small>`:''}${detail}${x.outcome?`<small>Outcome: ${esc(activityOutcomeLabel(x.outcome))}</small>`:''}${x.stage?`<small>Stage: ${esc(stageLabel(x.stage))}</small>`:''}${x.next?`<small>${x.type==='handover'?'Notes':'Next'}: ${esc(x.next)}</small>`:''}${x.arrangement?`<small>${esc(x.arrangement)}</small>`:''}</div></details>${activityMenu}</article>`;
  };
  const latest=records.slice(0,24).map(x=>itemHtml(x)).join('');
  const older=records.slice(24).map(x=>itemHtml(x,true)).join('');
@@ -340,9 +364,9 @@ function journalTimeline(p){
 }
 function manageDetails(p){
  if(!p)return;
- const stages=['suggested','contacted','interested','trial','regular','closed'].map(k=>[k,titleCase(k)]);
+ const stages=['suggested','contacted','interested','trial','regular','closed'].map(k=>[k,stageLabel(k)]);
  const overview=`<section class="co-journal-overview"><div class="co-relationship-heading"><div><span class="material-symbols-outlined" aria-hidden="true">handshake</span><h3>Relationship Overview</h3></div></div><div class="co-journal-overview-grid"><div><span>Current Contact</span><strong>${esc(p.contactName||'Not Recorded')}</strong>${p.contactEmail?`<small>${esc(p.contactEmail)}</small>`:''}</div><div><span>Next Action</span><strong>${esc(p.nextAction||'Not Scheduled')}</strong></div><div class="${p.followUpDate&&p.followUpDate<=journalDate()?'co-follow-up-attention':''}"><span>Follow-Up Due</span><strong>${esc(p.followUpDate?dateLabel(p.followUpDate):'Not Scheduled')}</strong>${p.followUpDate&&p.followUpDate<=journalDate()?`<small>${p.followUpDate<journalDate()?'Overdue':'Due Today'}</small>`:''} </div></div><div class="co-journal-stage"><div class="co-field"><label for="relationship-stage">Stage</label><select id="relationship-stage">${stages.map(([v,t])=>`<option value="${v}" ${v===p.status?'selected':''}>${t}</option>`).join('')}</select></div><button type="button" class="co-button alt small" data-action="manage-stage-save" data-id="${esc(p.id)}">Update Stage</button></div></section>`;
- const log=`<div id="manage-journal-editor" class="co-journal-editor" hidden><div class="co-field-row"><div class="co-field"><label for="journal-type">Type <span class="co-required">*</span></label><select id="journal-type"><option value="email">Email Received</option><option value="email-sent">Email Sent</option><option value="call">Phone Call</option><option value="text">Text / WhatsApp</option><option value="meeting">Meeting</option><option value="site-visit">Site Visit</option><option value="other">Other</option></select></div><div class="co-field"><label for="journal-date">Date <span class="co-required">*</span></label><input type="date" id="journal-date" max="${journalDate()}" value="${journalDate()}"></div></div><div class="co-field-row"><div class="co-field"><label for="journal-contact">Contact Person</label><input id="journal-contact" autocomplete="off" value="${esc(p.contactName||'')}" placeholder="Who did you speak to?"></div><div class="co-field"><label for="journal-outcome">Outcome</label><select id="journal-outcome"><option value="none">Not Recorded</option><option value="requested-information">Requested Information</option><option value="meeting-agreed">Agreed to Meeting</option><option value="trial-discussed">Discussed Trial</option><option value="follow-up-needed">Follow-Up Needed</option><option value="declined">Declined</option><option value="no-response">No Reply</option><option value="other">Other</option></select></div></div><div class="co-field"><label for="journal-text">Message / Notes <span class="co-required">*</span></label><textarea id="journal-text" maxlength="10000" rows="6" placeholder="Paste a partner reply, or briefly describe the conversation"></textarea></div><div class="co-field-row"><div class="co-field"><label for="journal-next">Next Action</label><input id="journal-next" maxlength="250" placeholder="e.g. Send material specifications"></div><div class="co-field"><label for="journal-due">Follow-Up Date</label><input type="date" id="journal-due"></div></div><div class="co-field"><label for="journal-stage">Stage</label><select id="journal-stage">${stages.filter(([v])=>v!=='closed'||p.status==='closed').map(([v,t])=>`<option value="${v}" ${v===p.status?'selected':''}>${t}</option>`).join('')}</select></div><div class="co-journal-form-actions"><button type="button" class="co-button alt" data-action="manage-log-cancel">Cancel</button><button type="button" class="co-button" data-action="manage-log-save" data-id="${esc(p.id)}">Save Activity</button></div></div>`;
+ const log=`<div id="manage-journal-editor" class="co-journal-editor" hidden><div class="co-field-row"><div class="co-field"><label for="journal-type">Type <span class="co-required">*</span></label><select id="journal-type"><option value="email">Email Received</option><option value="email-sent">Email Sent</option><option value="call">Phone Call</option><option value="text">Text / WhatsApp</option><option value="meeting">Meeting</option><option value="site-visit">Site Visit</option><option value="other">Other</option></select></div><div class="co-field"><label for="journal-date">Date <span class="co-required">*</span></label><input type="date" id="journal-date" max="${journalDate()}" value="${journalDate()}"></div></div><div class="co-field-row"><div class="co-field"><label for="journal-contact">Contact Person</label><input id="journal-contact" autocomplete="off" value="${esc(p.contactName||'')}" placeholder="Who did you speak to?"></div><div class="co-field"><label for="journal-outcome">Outcome</label><select id="journal-outcome"><option value="none">Not Recorded</option><option value="requested-information">Requested Information</option><option value="meeting-agreed">Agreed to Meeting</option><option value="trial-discussed">Discussed Pilot</option><option value="follow-up-needed">Follow-Up Needed</option><option value="declined">Declined</option><option value="no-response">No Reply</option><option value="other">Other</option></select></div></div><div class="co-field"><label for="journal-text">Message / Notes <span class="co-required">*</span></label><textarea id="journal-text" maxlength="10000" rows="6" placeholder="Paste a partner reply, or briefly describe the conversation"></textarea></div><div class="co-field-row"><div class="co-field"><label for="journal-next">Next Action</label><input id="journal-next" maxlength="250" placeholder="e.g. Send material specifications"></div><div class="co-field"><label for="journal-due">Follow-Up Date</label><input type="date" id="journal-due"></div></div><div class="co-field"><label for="journal-stage">Stage</label><select id="journal-stage">${stages.filter(([v])=>v!=='closed'||p.status==='closed').map(([v,t])=>`<option value="${v}" ${v===p.status?'selected':''}>${t}</option>`).join('')}</select></div><div class="co-journal-form-actions"><button type="button" class="co-button alt" data-action="manage-log-cancel">Cancel</button><button type="button" class="co-button" data-action="manage-log-save" data-id="${esc(p.id)}">Save Activity</button></div></div>`;
  const actions=`<div class="co-journal-actions"><button type="button" class="co-button alt small" data-action="manage-log-open"><span class="material-symbols-outlined" aria-hidden="true">add</span> Log Activity</button><button type="button" class="co-button alt small" data-action="manage-handover-open" data-id="${esc(p.id)}"><span class="material-symbols-outlined" aria-hidden="true">inventory_2</span> Record Handover</button>${p.status!=='closed'&&p.status!=='suggested'?`<button type="button" class="co-button alt small" data-href="/outreach?partner=${encodeURIComponent(p.id)}&mode=followup"><span class="material-symbols-outlined" aria-hidden="true">edit_note</span> Draft Follow-Up</button>`:''}</div>`;
  const timeline=`<section class="co-journal-history"><div class="co-journal-history-toggle"><span class="co-journal-history-title"><span class="material-symbols-outlined" aria-hidden="true">history</span><strong>Activity History</strong><span class="co-journal-count">${journalEvents(p).length}</span></span></div>${journalTimeline(p)}</section>`;
  const tabs=`<div class="co-manage-tabs" role="tablist" aria-label="Partner management"><button type="button" role="tab" id="manage-tab-button-relationship" aria-controls="manage-tab-relationship" aria-selected="true" data-action="manage-tab" data-tab="relationship">Relationship</button><button type="button" role="tab" id="manage-tab-button-edit" aria-controls="manage-tab-edit" aria-selected="false" data-action="manage-tab" data-tab="edit" tabindex="-1">Edit Partner</button></div>`;
@@ -400,7 +424,7 @@ function showJournalAISuggestion(suggestion,currentStage){
  const result=$('#journal-ai-result');if(!result)return;
  const options=[
   ['Outcome',suggestion.outcome?activityOutcomeLabel(suggestion.outcome):null],
-  ['Stage',suggestion.stage?titleCase(currentStage)+' → '+titleCase(suggestion.stage):null],
+  ['Stage',suggestion.stage?stageLabel(currentStage)+' → '+stageLabel(suggestion.stage):null],
   ['Next Action',suggestion.nextAction],
   ['Follow-Up Date',suggestion.followUpDate?dateLabel(suggestion.followUpDate):null],
   ['Contact Person',suggestion.contactPerson]
@@ -552,7 +576,7 @@ function openHandoverPicker(){
  const draw=()=>{
   matches=partners.filter(p=>p.name.toLowerCase().includes(input.value.trim().toLowerCase())).slice(0,8);
   active=Math.max(0,Math.min(active,matches.length-1));
-  results.innerHTML=matches.length?matches.map((p,i)=>'<button type="button" id="handover-option-'+i+'" class="co-handover-option'+(i===active?' is-active':'')+'" role="option" aria-selected="'+(i===active)+'" data-id="'+esc(p.id)+'"><span>'+esc(p.name)+'</span><small>'+titleCase(p.status)+'</small></button>').join(''):'<div class="co-handover-empty">No matching partners</div>';
+  results.innerHTML=matches.length?matches.map((p,i)=>'<button type="button" id="handover-option-'+i+'" class="co-handover-option'+(i===active?' is-active':'')+'" role="option" aria-selected="'+(i===active)+'" data-id="'+esc(p.id)+'"><span>'+esc(p.name)+'</span><small>'+stageLabel(p.status)+'</small></button>').join(''):'<div class="co-handover-empty">No matching partners</div>';
   results.hidden=false;input.setAttribute('aria-expanded','true');
   if(matches.length)input.setAttribute('aria-activedescendant','handover-option-'+active);
   else input.removeAttribute('aria-activedescendant');
@@ -592,21 +616,13 @@ async function saveRelationshipStage(el){
   notice('Stage updated.');
  }catch(err){notice(err.message,'error');el.disabled=false;}
 }
-function pipelineBody(){const stages=[['suggested','Suggested'],['contacted','Contacted'],['interested','Interested'],['trial','Trial'],['regular','Regular']];const count=data.partners.filter(p=>p.status!=='closed').length;const t=data.metrics;
- const lanes=stages.map(([key,label])=>{
-  const full=key==='suggested'?data.ranked.filter(p=>p.status==='suggested'):data.partners.filter(p=>p.status===key);
-  const arr=key==='suggested'?full.slice(0,5):full;
-  const cards=arr.map(p=>`<div class="co-mini"><button class="co-partner-name" data-action="edit" data-id="${esc(p.id)}">${esc(p.name)}</button><div class="co-note">${esc(titleCase(p.category))} · ${key==='suggested'?'Fit '+(p.match?.score??0)+'/100':p.capacityKg==null?'Capacity Unknown':m(p.capacityKg)+' kg/week'}</div>${p.source==='Fictional Stitch scenario'?'<span class="co-pill warn">Demo</span>':''}${p.status!=='regular'?`<button class="co-next-stage" data-action="advance" data-id="${esc(p.id)}">Move to Next Stage →</button>`:''}</div>`).join('');
-  return `<section class="co-lane"><h3>${label} <span>${full.length}</span></h3>${cards||'<div class="co-note">No Partners Yet</div>'}${key==='suggested'&&full.length>5?`<a class="co-view-all" href="/find-partners">View All ${full.length} Suggested Partners →</a>`:''}</section>`;
- }).join('');
- return `<section id="pipeline" class="co-section co-dashboard-pipeline"><div class="co-section-head"><h2>Partner Pipeline</h2><span class="co-note">${count} Active Leads</span><div class="co-actions"><button class="co-button alt small" data-href="/find-partners">Discover Partners →</button><button class="co-button small" data-action="new">+ Add Lead</button></div></div><div class="co-section co-board" aria-label="Partnership pipeline; scroll horizontally for more stages">${lanes}</div></section>`;
-}
 const controlBind = new WeakSet();
 function bindControls(){
  // The week dashboard is built separately to keep Stitch's navigation shell intact.
  if(current==='dashboard')$('#view').innerHTML=weekBody();
  $('#sort-filter')?.addEventListener('change',e=>{ui.sort=e.target.value;ui.page=1;render()});
  $('#ai-assessed-filter')?.addEventListener('change',e=>{ui.aiAssessedOnly=e.target.checked;ui.page=1;render()});
+  $('#contactable-first-filter')?.addEventListener('change',e=>{ui.contactableFirst=e.target.checked;ui.page=1;render()});
   $('#category-filter')?.addEventListener('change',e=>{ui.category=e.target.value;ui.page=1;render()});
  $('#search-filter')?.addEventListener('input',e=>{ui.search=e.target.value;ui.page=1;const pos=e.target.selectionStart;render();const x=$('#search-filter');x.focus();x.setSelectionRange(pos,pos);});
   $('#draft-partner-search')?.addEventListener('focus',e=>{ui.draftOptionIndex=0;draftOptions('');e.target.select();});
@@ -678,8 +694,10 @@ function dialog(title,body,onSubmit,{partnerEditor=false,confirmation=false,onCo
  else if(partnerEditor)wrap.querySelector('#f-name,[name="text"],[name="date"],input,select,textarea')?.focus?.();
 }
 function partnerFormFields(v,{includeStage=false}={}){
- const categories=['community garden','urban farm','park','public park','garden','school garden','school programme','organic waste recycler','composting','nursery','zoo','business','other'];
- const stages=[['suggested','Suggested'],['contacted','Contacted'],['interested','Interested'],['trial','Trial'],['regular','Regular'],['closed','Closed']];
+ const categories=['community garden','urban farm','crop farm','mixed crop/aquaculture farm','park','public park','garden','school garden','school programme','organic waste recycler','composting','nursery','zoo','business','other'];
+ // Preserve any sourced category the dropdown does not explicitly list.
+ if(v.category&&!categories.includes(v.category))categories.push(v.category);
+ const stages=[['suggested','Suggested'],['contacted','Contacted'],['interested','Interested'],['trial','Pilot'],['regular','Regular'],['closed','Closed']];
  const field=(label,key,val='',type='text',options=null,required=false,optional=false)=>{
   const labelText=esc(label)+(required?' <span class="co-required" aria-label="required">*</span>':'');
   const id='f-'+key,req=required?'required':'';
@@ -739,17 +757,16 @@ async function handleAction(el){const action=el.dataset.action;
  if(action==='manage-show-older'){document.querySelectorAll('.co-journal-item[hidden]').forEach(item=>item.hidden=false);el.remove();return;}
  if(action==='manage-page'){ui.managePage=Math.max(1,Number(el.dataset.page)||1);render();return;}
  if(action==='page'){ui.page=Math.max(1,Number(el.dataset.page)||1);render();$('#discovery-results')?.scrollIntoView({behavior:'smooth',block:'start'});return;}
- if(action==='advance'){const p=partner(el.dataset.id),stages=['suggested','contacted','interested','trial','regular'];const next=stages[stages.indexOf(p?.status)+1];if(!p||!next)return;if(p.status==='suggested'&&!confirm('Only mark Contacted after outreach has actually been sent. Continue?'))return;try{await request('/api/partners/'+encodeURIComponent(p.id),{method:'PATCH',body:JSON.stringify({status:next})});await refresh();notice('Moved to '+titleCase(next)+'.');}catch(err){notice(err.message,'error');}return;}
  if(action==='edit'){editPartner(partner(el.dataset.id));return;}
- if(action==='settings'){const settings=data.settings;const html=`<div class="co-field-row">${formField('Expected Cups Per Week','cupsPerWeek',settings.cupsPerWeek,'number')}${formField('Grams of Grounds Per Cup','gramsPerCup',settings.gramsPerCup,'number')}</div>`;dialog('Edit Forecast',html,async f=>request('/api/settings',{method:'PATCH',body:JSON.stringify(f)}));return;}
- if(action==='reporting'){const s=data.settings;const html=`<p class="co-note">Only enter actual measured volumes for the reporting period. Leave blank if unavailable; don't use the weekly cup forecast as actual collection data.</p><div class="co-field-row">${formField('Actual grounds collected (kg)','reportingCollectedKg',s.reportingCollectedKg,'number')}${formField('Actual grounds discarded (kg)','reportingDiscardedKg',s.reportingDiscardedKg,'number')}</div><p class="co-note">The reuse numerator is handovers specifically marked as reuse-confirmed, not projected matches.</p>`;dialog('Reporting Inputs',html,async f=>request('/api/settings',{method:'PATCH',body:JSON.stringify(f)}));return;}
+ if(action==='settings'){const settings=data.settings;const ref=data.sponsorReference;const refHtml=ref?'<details class="co-source-evidence"><summary>CoffeeBot Reference Volumes</summary><p>Estimated total beverages per month:</p><p>'+ref.locations.map(x=>esc(x.location)+': '+m(x.minCups)+(x.maxCups!==x.minCups?'–'+m(x.maxCups):'')).join(' · ')+'</p></details>':'';const html=`<div class="co-field-row">${formField('Total Beverages per Week','cupsPerWeek',settings.cupsPerWeek,'number')}${formField('Coffee-Based Beverages (%)','coffeeSharePercent',settings.coffeeSharePercent??60,'number')}</div>${formField('Grounds per Coffee (g)','gramsPerCup',settings.gramsPerCup,'number')}${refHtml}`;dialog('Edit Forecast',html,async f=>request('/api/settings',{method:'PATCH',body:JSON.stringify(f)}));return;}
+
  if(action==='assessment-settings'){
-  const w=data.settings.ratingWeights||{suitability:40,evidence:35,proximity:10,operations:15};
+  const w=data.settings.ratingWeights||{suitability:30,evidence:30,proximity:5,operations:35};
   const weightRows=[
    ['Reuse Suitability','weightSuitability',w.suitability],
    ['Source Evidence','weightEvidence',w.evidence],
    ['HQ Proximity','weightProximity',w.proximity],
-   ['Operational Readiness','weightOperations',w.operations]
+   ['Intake & Operations','weightOperations',w.operations]
   ];
   const rows=weightRows.map(([label,key,value])=>`<div class="co-assessment-weight-row"><label for="f-${key}">${label}</label><div class="co-assessment-weight-input"><input id="f-${key}" name="${key}" type="number" min="0" max="100" step="1" value="${esc(value)}" aria-describedby="assessment-weight-total"><span>%</span></div></div>`).join('');
   const html=`<div class="co-assessment-weight-list">${rows}<div class="co-assessment-total"><strong>Total</strong><output id="assessment-weight-total" aria-live="polite">100/100%</output></div></div>`+
@@ -767,12 +784,20 @@ async function handleAction(el){const action=el.dataset.action;
   for(const key of ['Suitability','Evidence','Proximity','Operations'])$('#f-weight'+key)?.addEventListener('input',updateWeightTotal);
   updateWeightTotal();
   $('#reset-assessment-settings')?.addEventListener('click',()=>{
-   const defaults={weightSuitability:40,weightEvidence:35,weightProximity:10,weightOperations:15};
+   const defaults={weightSuitability:30,weightEvidence:30,weightProximity:5,weightOperations:35};
    for(const [name,value] of Object.entries(defaults))$('#f-'+name).value=value;
    updateWeightTotal();
   });
   return;
- } if(action==='ai-review'){
+ }   if(action==='research-contact'){
+   const p=partner(el.dataset.id);if(!p)return;
+   const webSearch='https://www.google.com/search?q='+encodeURIComponent(p.name+' official contact Singapore');
+   const html='<div class="co-field"><label for="contact-website">Organisation Website <span class="co-required" aria-label="required">*</span></label><input id="contact-website" name="websiteUrl" type="url" placeholder="https://example.org" value="'+esc(p.websiteUrl||'')+'" required autocomplete="off"></div><p class="co-note">Only published contact details are saved; contact does not imply acceptance.</p><a href="'+esc(webSearch)+'" target="_blank" rel="noopener noreferrer">Search for the organisation’s website ↗</a>';
+   let result=null;
+   dialog('Research Contact',html,async f=>{result=await request('/api/partners/'+encodeURIComponent(p.id)+'/research-contact',{method:'POST',body:JSON.stringify({websiteUrl:f.websiteUrl})});},{submitLabel:'Research Contact',onComplete:async()=>{await refresh();notice(result?.result==='email-found'?'Published email found.':result?.result==='contact-page'?'Contact page found.':result?.result==='unavailable'?'The website could not be checked. Try again or search the web.':'No public contact found on the checked pages.');}});
+   return;
+  }
+  if(action==='ai-review'){
   const id=el.dataset.id,p=partner(id);
   if(!p||ui.reviewingId)return;
   if(p.aiAssessment&&!confirm('Re-review '+p.name+' with AI? This will use another AI call and replace its existing AI assessment.'))return;
@@ -895,7 +920,7 @@ document.addEventListener('keydown',e=>{
   $('#manage-tab-button-'+next)?.focus?.();
   return;
  }
- if((e.key==='Enter'||e.key===' ')&&e.target.matches('.co-discovery-card[data-listing-id]')){e.preventDefault();toggleListingDetails(e.target);}if((e.key==='Enter'||e.key===' ')&&e.target.matches('.co-mini')){e.preventDefault();editPartner(partner(e.target.dataset.id));}if(e.key==='Escape'){document.querySelectorAll?.('.co-activity-menu[open]').forEach(m=>m.open=false);closeDialog();}});
+ if((e.key==='Enter'||e.key===' ')&&e.target.matches('.co-discovery-card[data-listing-id]')){e.preventDefault();toggleListingDetails(e.target);}if(e.key==='Escape'){document.querySelectorAll?.('.co-activity-menu[open]').forEach(m=>m.open=false);closeDialog();}});
 if(current==='outreach_draft'&&qs.get('mode')==='followup'){
  const d=document.querySelector('nav[aria-label="Main navigation"] a[data-path="find-partners"]');
  const m=document.querySelector('nav[aria-label="Main navigation"] a[data-path="manage-partners"]');

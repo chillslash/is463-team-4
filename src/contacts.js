@@ -29,7 +29,7 @@ export async function researchPublicContact(partner,{httpFetch=fetch,timeoutMs=4
  signal?.throwIfAborted();
  const start=publicWebUrl(partner.websiteUrl);
  if(!start)return {email:'',checkedAt:new Date().toISOString(),sourceUrl:''};
- let urls=[start.href];let tried=0;
+ let urls=[start.href];let tried=0;let pagesRead=0;let contactPageUrl='';
  for(let i=0;i<urls.length&&i<3;i++){
   signal?.throwIfAborted();const url=urls[i];tried++;
   try{
@@ -37,11 +37,12 @@ export async function researchPublicContact(partner,{httpFetch=fetch,timeoutMs=4
    if(!res.ok||res.status>=300)continue;
    const mime=res.headers?.get?.('content-type')||'text/html';
    if(!/html|text/.test(mime))continue;
-   const html=(await res.text()).slice(0,MAX_PAGE);
+   const html=(await res.text()).slice(0,MAX_PAGE);pagesRead++;
    const email=findPublishedEmail(html);
-   if(email)return {email,sourceUrl:url,checkedAt:new Date().toISOString(),tried};
+   if(i>0&&!contactPageUrl)contactPageUrl=url;
+   if(email)return {email,sourceUrl:url,contactPageUrl,checkedAt:new Date().toISOString(),tried,pagesRead};
    if(i===0)urls=[...urls,...findContactPages(html,start)];
   }catch{ signal?.throwIfAborted(); /* One site must not halt discovery. */ }
  }
- return {email:'',sourceUrl:'',checkedAt:new Date().toISOString(),tried};
+ return {email:'',sourceUrl:'',contactPageUrl,checkedAt:new Date().toISOString(),tried,pagesRead};
 }
