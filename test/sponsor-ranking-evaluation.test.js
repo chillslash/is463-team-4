@@ -39,7 +39,7 @@ test('blinded review is source-balanced, reproducible, and does not expose model
  assert.deepEqual(sourceCounts.sort(),[4,4,4,4,4,4]);
  assert.ok(a.cases.some(x=>x.id==='s3-0'),'Explicit used-coffee-grounds evidence must appear');
  assert.ok(a.cases.every(x=>x.review.outreachPriority===null));
- assert.ok(a.cases.every(x=>!Object.hasOwn(x,'match')&&!Object.hasOwn(x,'aiAssessment')&&!Object.hasOwn(x,'score')));
+ assert.ok(a.cases.every(x=>!Object.hasOwn(x,'match')&&!Object.hasOwn(x,'aiAssessment')&&!Object.hasOwn(x,'score')&&!Object.hasOwn(x,'proposedUse')));
  assert.doesNotMatch(JSON.stringify(a),/An AI opinion that must not be shown/);
 });
 
