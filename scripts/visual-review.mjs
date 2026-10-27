@@ -24,9 +24,15 @@ try{
   const previews=computed('.co-journal-preview');
   const selectedPartner=computed('.co-field-heading label');
   const otherFields=computed('.co-outreach-fields .co-field>label');
-  return {overflow:document.documentElement.scrollWidth-innerWidth,labels:[...new Set(labels)],firstCardY:Math.round(first?.getBoundingClientRect().top??-1),nav,historyStyles:[...new Set([...descriptions,...previews])],outreachLabels:[...new Set([...selectedPartner,...otherFields])]};
+  const dialog=document.querySelector('.co-dialog-back .co-dialog');
+  const heading=dialog?.querySelector('.co-dialog-titlebar h2, h2');
+  const dialogTitlePx=heading?getComputedStyle(heading).fontSize:null;
+  const dialogControlHeights=dialog?[...dialog.querySelectorAll('.co-field input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),.co-field select')].filter(x=>x.getClientRects().length&&x.closest('[hidden]')===null).map(x=>Math.round(x.getBoundingClientRect().height)):[];
+  return {overflow:document.documentElement.scrollWidth-innerWidth,labels:[...new Set(labels)],firstCardY:Math.round(first?.getBoundingClientRect().top??-1),nav,historyStyles:[...new Set([...descriptions,...previews])],outreachLabels:[...new Set([...selectedPartner,...otherFields])],dialogTitlePx,dialogControlHeights};
 
  });console.log(n+' audit '+JSON.stringify(m));
+ if(m.dialogTitlePx&&m.dialogTitlePx!=='20px')throw Error('Dialog title size inconsistent: '+n+' '+m.dialogTitlePx);
+ if(m.dialogControlHeights.some(h=>h!==42))throw Error('Single-line dialog field heights inconsistent: '+n+' '+m.dialogControlHeights);
  if(m.overflow>0||m.labels.some(x=>x!=='12px')||m.nav.some(x=>x.scroll>x.client)||m.historyStyles.length>1||m.outreachLabels.length>1||m.outreachLabels.some(x=>!x.startsWith('12px|')))throw Error('Visual audit failed: '+n+' '+JSON.stringify(m));
  await page.screenshot({path:'data/visual-review/'+n+'.jpg',type:'jpeg',quality:43});console.log(n);}
  await go('/dashboard');

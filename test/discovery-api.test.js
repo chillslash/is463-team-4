@@ -33,12 +33,13 @@ globalThis.fetch=async(url,opts)=>{
 };
 test.after(async()=>{globalThis.fetch=httpFetch;server.close();await once(server,'close');await rm(temp,{recursive:true,force:true});});
 const api=async(path,method='GET',body)=>{const r=await fetch(base+path,{method,headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});return {status:r.status,body:await r.json()};};
-test('one discovery action persists source citations, run audit and source-cache reuse',async()=>{
+test('discovery retains source citations and caching when SFA is unavailable',async()=>{
  const first=await api('/api/discover','POST',{});
  assert.equal(first.status,200);assert.equal(first.body.added,5);assert.equal(first.body.assessed,0);
  assert.equal(first.body.sources.length,5);
  const done=(await api('/api/discovery-status')).body;assert.equal(done.completed,4);assert.equal(done.total,4);assert.equal(done.phase,'Completed');
- assert.equal(first.body.warnings.length,0);
+ assert.equal(first.body.warnings.length,1);
+ assert.match(first.body.warnings[0],/^SFA Licensed Crop Farms:/,'Other source results survive an SFA outage');
  let s=(await api('/api/state')).body;
  assert.equal(s.partners.filter(p=>p.source==='Fictional Stitch scenario'&&p.status==='suggested').length,0);
  const school=s.partners.find(p=>p.source==='MOE School Distinctive Programmes');

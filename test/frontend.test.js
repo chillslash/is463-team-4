@@ -39,7 +39,7 @@ test('discovery cards highlight on hover and toggle details without intercepting
  assert.ok(root.innerHTML.includes('View source'));
  assert.ok(!root.innerHTML.includes('AI Usage'));
  assert.ok(root.innerHTML.includes('Preliminary screening based on source category and available evidence.'));
- assert.ok(root.innerHTML.includes('Why Recommended:'));
+ assert.ok(root.innerHTML.includes('AI Review Notes:'));
  assert.ok(!root.innerHTML.includes('co-highlight'));
  assert.ok(root.innerHTML.includes('Showing 1–15 of 35'));
  await listeners.click({target:{closest(query){
@@ -113,7 +113,7 @@ test('listing fit uses a tiered coloured bar and copy controls have capitalised 
 });
 
 test('all navigation pages use the updated two-line brand and centred staff label',()=>{
- for(const page of ['find_partners','this_week','log_handover','outreach_draft','pipeline']){
+ for(const page of ['find_partners','this_week','outreach_draft','manage_partners','partner']){
   const html=readFileSync(new URL('../public/'+page+'.html',import.meta.url),'utf8');
   assert.match(html,/class="co-brand-name[^"]*"><span>Circularity<\/span><span>Copilot<\/span><\/span>/);
   assert.match(html,/<span class="co-workspace-title[^"]*">CoffeeBot Singapore<\/span>/);
@@ -150,7 +150,7 @@ test('Best Fit sorts numerically and AI-Assessed Only filters with pagination re
  assert.ok(root.innerHTML.includes('id="ai-assessed-filter"'));
  assert.ok(root.innerHTML.includes('AI-Assessed Only'));
  assert.ok(root.innerHTML.includes('co-fit-meter-method'));
- assert.ok(root.innerHTML.includes('Preliminary Screening'));
+ assert.ok(root.innerHTML.includes('Source Screening'));
  runInNewContext('data.ranked.forEach((p,i)=>{p.match.score=i===1?82:i===0?17:10;});render()',context);
  assert.equal(root.innerHTML.match(/data-listing-id="([^"]+)"/)[1],'p1');
  runInNewContext('ui.page=3;ui.aiAssessedOnly=true;render()',context);
@@ -232,6 +232,7 @@ test('manage partners mirrors discovery controls and stage counts filter the lis
  assert.ok(html.indexOf('co-manage-sidebar')<html.indexOf('co-manage-main'));
  assert.ok(html.includes('Partner Stages'));
  assert.ok(html.includes('data-stage="trial"'));
+ assert.ok(html.includes('Pilot'),'Stage trial must display as Pilot');
  for(const stage of ['contacted','interested','trial','regular','closed']){
   assert.ok(html.includes('co-stage-'+stage));
  }
@@ -323,7 +324,7 @@ test('Record Sent confirms locally then opens the selected partner page',()=>{
 
 test('Manage Partners allows reverting the stage to Suggested',()=>{
  const js=readFileSync(new URL('../public/app.js',import.meta.url),'utf8');
- const modal=js.slice(js.indexOf('function manageDetails('),js.indexOf('function pipelineBody('));
+ const modal=js.slice(js.indexOf('function manageDetails('),js.indexOf('const controlBind = new WeakSet();'));
  assert.ok(modal.includes("['suggested','contacted','interested','trial','regular','closed']"));
  assert.ok(modal.includes('id="relationship-stage"'));
  const listing=js.slice(js.indexOf('function manageView('),js.indexOf('function manageDetails('));
@@ -343,7 +344,7 @@ test('Manage Partners cards are whole-card links and no longer show Manage butto
 test('Relationship and Edit Partner are two panels, with Stage only in Relationship for existing partners',()=>{
  const js=readFileSync(new URL('../public/app.js',import.meta.url),'utf8');
  const css=readFileSync(new URL('../public/app.css',import.meta.url),'utf8');
- const fn=js.slice(js.indexOf('function manageDetails('),js.indexOf('function pipelineBody('));
+ const fn=js.slice(js.indexOf('function manageDetails('),js.indexOf('const controlBind = new WeakSet();'));
  assert.ok(fn.includes('role="tablist"'));
  assert.ok(fn.includes('role="tab"'));
  assert.ok(fn.includes('role="tabpanel"'));
@@ -402,7 +403,7 @@ test('Date Sourced is in Details and Last Scanned spacing and timeline endpoints
  const css=readFileSync(new URL('../public/app.css',import.meta.url),'utf8');
  for(const rule of ['.co-discovery-sidebar .co-scan-meta{margin-top:10px}', '.co-discovery-sidebar .co-source-caption{margin:10px 0 0}', '.co-journal-timeline{border-left:0}', '.co-journal-item:not(:last-child):after'])
   assert.ok(css.includes(rule),rule);
- for(const name of ['find_partners','this_week','outreach_draft','pipeline','manage_partners']){
+ for(const name of ['find_partners','this_week','outreach_draft','partner','manage_partners']){
   const html=readFileSync(new URL('../public/'+name+'.html',import.meta.url),'utf8');
   assert.ok(!html.includes('data-path="log-handover"'),name);
  }
@@ -548,7 +549,7 @@ test('AI suggested updates use a distinct, restrained colour palette',()=>{
 test('interaction outcomes are concrete and separate from relationship stage',async()=>{
  const {context,root}=await boot('/partner','?partner=p0');
  const form=runInNewContext('journalDialogContent(data.partners[0])',context);
- for(const label of ['Requested Information','Agreed to Meeting','Discussed Trial','Follow-Up Needed','Declined','No Reply'])
+ for(const label of ['Requested Information','Agreed to Meeting','Discussed Pilot','Follow-Up Needed','Declined','No Reply'])
   assert.ok(form.includes('>'+label+'</option>'),label);
  assert.ok(!form.includes('Interested / Positive'));
  assert.ok(!form.includes('value="positive"'));
@@ -613,7 +614,7 @@ test('partner page and Log Activity share a smaller, coherent font hierarchy',()
   '.co-partner-page .co-journal-overview-grid strong{font-size:13px}',
   '.co-partner-page .co-journal-item p{font-size:13px',
   '.co-partner-page .co-manage-panel .co-field>label{font-size:12px}',
-  '.co-dialog-partner:has(.co-journal-modal) .co-dialog-titlebar h2{font-size:18px',
+  '.co-dialog-partner:has(.co-journal-modal) .co-dialog-titlebar h2{font-size:20px',
   '.co-dialog-partner:has(.co-journal-modal) .co-field input,'
  ])assert.ok(css.includes(rule),rule);
 });
@@ -641,7 +642,7 @@ test('historical stage audit displays capitalised labels without changing saved 
  const formatted=runInNewContext("activityDisplayText('Stage: contacted to suggested','update')",context);
  assert.equal(formatted,'Stage: Contacted to Suggested');
  const html=runInNewContext("data.partnerActivity=[{id:'old',partnerId:'p0',type:'update',text:'Stage: trial to regular',at:'2026-10-19T08:00:00Z'}];journalTimeline(data.partners[0])",context);
- assert.ok(html.includes('Stage: Trial to Regular'));
+ assert.ok(html.includes('Stage: Pilot to Regular'));
  assert.equal(runInNewContext('data.partnerActivity[0].text',context),'Stage: trial to regular');
 });
 
@@ -835,4 +836,63 @@ test('handover form shows partner arrangement only when known and permits option
  assert.ok(editing.includes('Keep Recorded'));
  assert.ok(editing.includes('value="coffeebot-delivers" selected'));
  assert.ok(editing.includes('value="wet" selected'));
+});
+
+test('contact routes expose provenance and research actions independently of fit scoring',async()=>{
+ const {context,root}=await boot('/find-partners');
+ runInNewContext("data.partners[0].contactEvidence={source:'Directory',url:'https://example.org/source',method:'directory'};data.partners[1].contactPageUrl='https://example.org/contact';render()",context);
+ const html=root.innerHTML;
+ for(const expected of ['Contact Route','Email available','Contact page available','Not identified','research-contact','https://example.org/source','https://example.org/contact'])
+  assert.ok(html.includes(expected),expected);
+ assert.equal(runInNewContext("contactRouteBlock(data.partners[0]).label",context),'Email available');
+ assert.equal(runInNewContext("contactRouteBlock(data.partners[1]).label",context),'Contact page available');
+ assert.equal(runInNewContext("contactRouteBlock(data.partners[2]).label",context),'Not identified');
+ assert.equal(runInNewContext('data.ranked[0].match.score',context),90);
+});
+
+test('editing SFA and unknown sourced partner categories never silently resets their type',async()=>{
+ const {context}=await boot('/find-partners');
+ for(const category of ['crop farm','mixed crop/aquaculture farm','aquaponic research facility']){
+  const html=runInNewContext('partnerFormFields({name:"Existing Farm",category:'+JSON.stringify(category)+',status:"suggested"})',context);
+  assert.ok(html.includes('value="'+category+'" selected'),category);
+ }
+});
+
+test('Contactable First is independent of Best Fit, AI-Assessed Only and other filters',async()=>{
+ const {root,context}=await boot('/find-partners');
+ assert.ok(root.innerHTML.includes('id="contactable-first-filter"'));
+ assert.ok(root.innerHTML.indexOf('id="contactable-first-filter"')<root.innerHTML.indexOf('id="ai-assessed-filter"'));
+ runInNewContext("data.ranked[0].match.score=20; data.ranked[1].match.score=90; data.ranked[2].match.score=65; data.ranked[2].contactPageUrl='https://example.org/contact'; ui.contactableFirst=true; render()",context);
+ let ids=[...root.innerHTML.matchAll(/data-listing-id="([^"]+)"/g)].map(x=>x[1]);
+ assert.deepEqual(ids.slice(0,3),['p0','p2','p1'],'Email > contact page > no identified route');
+ assert.ok(root.innerHTML.includes('id="contactable-first-filter" checked'));
+ runInNewContext("ui.sort='nearest';render()",context);
+ ids=[...root.innerHTML.matchAll(/data-listing-id="([^"]+)"/g)].map(x=>x[1]);
+ assert.deepEqual(ids.slice(0,3),['p0','p2','p1'],'Nearest continues working within contact groups');
+ runInNewContext("ui.contactableFirst=false;ui.sort='fit';render()",context);
+ ids=[...root.innerHTML.matchAll(/data-listing-id="([^"]+)"/g)].map(x=>x[1]);
+ assert.equal(ids[0],'p1','Best Fit has not changed');
+ runInNewContext("ui.contactableFirst=true;ui.aiAssessedOnly=true;ui.page=2;render()",context);
+ ids=[...root.innerHTML.matchAll(/data-listing-id="([^"]+)"/g)].map(x=>x[1]);
+ assert.deepEqual(ids,['p0'],'AI checkbox remains a filter and resets pagination safely');
+ assert.equal(runInNewContext('ui.page',context),1);
+ assert.equal(runInNewContext('data.ranked[0].match.score',context),20);
+});
+
+test('compact source evidence is visible in Details and escapes untrusted source claims',async()=>{
+ const {root,context}=await boot('/find-partners');
+ runInNewContext("data.ranked[0].evidenceEntries=[{source:'NEA',url:'https://example.org/nea',claim:'Accepted materials: used coffee grounds <script>alert(1)</script>'}];render()",context);
+ assert.ok(root.innerHTML.includes('co-compact-source-evidence'));
+ assert.ok(root.innerHTML.includes('Source Evidence'));
+ assert.ok(root.innerHTML.includes('Accepted materials: used coffee grounds'));
+ assert.ok(root.innerHTML.includes('&lt;script&gt;'));
+ assert.ok(!root.innerHTML.includes('<script>alert(1)</script>'));
+ assert.ok(root.innerHTML.includes('class="co-candidate-details"'),'Evidence belongs inside existing Details');
+});
+
+test('Best Fit tie order stays independent of AI review status',async()=>{
+ const {root,context}=await boot('/find-partners');
+ runInNewContext("data.ranked.forEach((p,i)=>{p.match.score=20;p.match.aiLed=i===10;});ui.sort='fit';render()",context);
+ const ids=[...root.innerHTML.matchAll(/data-listing-id="([^"]+)"/g)].map(x=>x[1]);
+ assert.deepEqual(ids.slice(0,3),['p0','p1','p10']);
 });

@@ -1,14 +1,15 @@
+import {selectSourceBalanced} from './src/assessment-selection.js';
 import {createServer} from 'node:http';
 import {readFile, writeFile, rename, mkdir, stat} from 'node:fs/promises';
 import {existsSync} from 'node:fs';
 import {loadEnvFile} from 'node:process';
 import {join, resolve, extname} from 'node:path';
 import {randomUUID,createHash} from 'node:crypto';
-import {initialState, numbers, rankPartners, distanceKm, draftTemplate, OUTREACH_SUBJECT, suggestedReuse, outreachSalutation, proposedReuseContext, RESPONSE_STATUSES, ACTIVITY_OUTCOMES, LEGACY_ACTIVITY_OUTCOMES, STATUSES, AI_RUBRIC_VERSION, hasAIFit, validRatingWeights, enrichDemoProfiles, DEMO_ACTIVITY, LEGACY_DEMO_NOTES, LEGACY_SEEDED_PARTNER_NOTES} from './src/core.js';
+import {initialState, numbers, rankPartners, distanceKm, draftTemplate, OUTREACH_SUBJECT, suggestedReuse, outreachSalutation, proposedReuseContext, RESPONSE_STATUSES, ACTIVITY_OUTCOMES, LEGACY_ACTIVITY_OUTCOMES, STATUSES, AI_RUBRIC_VERSION, hasAIFit, validRatingWeights, migrateSponsorAssumptions, COFFEEBOT_MONTHLY_CUP_VOLUMES, SPONSOR_MONTHLY_CUPS, enrichDemoProfiles, DEMO_ACTIVITY, LEGACY_DEMO_NOTES, LEGACY_SEEDED_PARTNER_NOTES} from './src/core.js';
 import {generateJSON,validateDraft,validateAssessment,validateActivitySuggestion,ensureCoffeeBotSubject} from './src/ai.js';
 import {discoverAll} from './src/discovery.js';
 import {resolveLocations} from './src/geocode.js';
-import {researchPublicContact} from './src/contacts.js';
+import {researchPublicContact,publicWebUrl} from './src/contacts.js';
 import {parseCSV, enrichSchoolGardenLocations, SCHOOL_DIRECTORY_ID} from './src/moe.js';
 
 const ROOT=process.cwd();
@@ -18,7 +19,8 @@ if(existsSync(localConfig))loadEnvFile(localConfig);
 const DB_PATH=process.env.DATA_FILE || join(ROOT,'data','state.json');
 const PORT=Number(process.env.PORT || 4173);
 const FOLLOWUP_SUBJECT='CoffeeBot | Spent Coffee Grounds Reuse Follow-Up';
-const AI_PROVIDER=['codex','claude'].includes(process.env.AI_PROVIDER)?process.env.AI_PROVIDER:'template';
+const AI_PROVIDER=['codex','claude','qwen','llama'].includes(process.env.AI_PROVIDER)?process.env.AI_PROVIDER:'template';
+const AUTO_AI_REVIEW=/^(1|true)$/i.test(process.env.AUTO_AI_REVIEW||'false');
 let discoveryStatus={active:false,phase:'Idle',completed:0,total:4};
 let discoveryController=null;
 const stoppedError=()=>Object.assign(new Error('Discovery stopped; changes discarded'),{status:409,code:'DISCOVERY_STOPPED'});
@@ -62,7 +64,7 @@ export function cleanSeededPartnerNotes(partners){
  }
  return stats;
 }
-async function readState(){if(!existsSync(DB_PATH)){const seed=initialState();await store(seed);return seed;}const s=JSON.parse(await readFile(DB_PATH,'utf8'));const defaults=initialState().settings;if(!Number.isInteger(s.settings.automaticAIAssessments)||s.settings.automaticAIAssessments<0||s.settings.automaticAIAssessments>100)s.settings.automaticAIAssessments=defaults.automaticAIAssessments;if(!validRatingWeights(s.settings.ratingWeights))s.settings.ratingWeights={...defaults.ratingWeights};for(const field of ['referenceLat','referenceLon','referenceLabel'])s.settings[field]=defaults[field];delete s.settings.aiProvider;s.discoveryRuns??=[];s.aiActivity??=[];s.partnerActivity??=[];
+async function readState(){if(!existsSync(DB_PATH)){const seed=initialState();await store(seed);return seed;}const s=JSON.parse(await readFile(DB_PATH,'utf8'));const defaults=initialState().settings;migrateSponsorAssumptions(s);if(!Number.isInteger(s.settings.automaticAIAssessments)||s.settings.automaticAIAssessments<0||s.settings.automaticAIAssessments>100)s.settings.automaticAIAssessments=defaults.automaticAIAssessments;if(!validRatingWeights(s.settings.ratingWeights))s.settings.ratingWeights={...defaults.ratingWeights};delete s.settings.reportingCollectedKg;delete s.settings.reportingDiscardedKg;for(const field of ['referenceLat','referenceLon','referenceLabel'])s.settings[field]=defaults[field];delete s.settings.aiProvider;s.discoveryRuns??=[];s.aiActivity??=[];s.partnerActivity??=[];
  if(s.demoProfilesVersion!==2){
   enrichDemoProfiles(s.partners);
   const previouslyActive=new Set(s.partnerActivity.map(x=>x.partnerId));
@@ -79,6 +81,13 @@ async function readState(){if(!existsSync(DB_PATH)){const seed=initialState();aw
   enrichSchoolGardenLocations(s.partners,parseCSV(snapshot.body||''));
  }catch{}
  cleanSeededPartnerNotes(s.partners);
+ // Update only exact old fictional sample actions; never alter staff-written notes.
+ for(const p of s.partners){
+  if(p.source!=='Fictional Stitch scenario')continue;
+  if(p.id==='p4'&&p.nextAction==='Review trial outcome')p.nextAction='Review pilot arrangement';
+  if(p.id==='p6'&&p.nextAction==='Discuss school garden trial')p.nextAction='Discuss initial school garden collection';
+ }
+
   cleanGeneratedReuseClaims(s.partners);
   for(const p of s.partners){if(p.source==='Fictional Stitch scenario'&&(p.notes===LEGACY_DEMO_NOTES[p.id]||(p.id==='p4'&&p.notes==='Illustrative lead; no actual acceptance verified')))p.notes='';delete p.fee;if(p.source==='Fictional Stitch scenario'&&p.status==='suggested')p.status='interested';if(Number.isFinite(p.lat)&&Number.isFinite(p.lon))p.distanceKm=distanceKm(defaults.referenceLat,defaults.referenceLon,p.lat,p.lon);recoverLegacyAssessment(p);if(p.aiAssessment?.rubricVersion===AI_RUBRIC_VERSION&&p.aiAssessment.factsHash!==digest(sourceFacts(p))){archiveAssessment(p,'Source or staff information changed');delete p.aiAssessment;}}return s;}
 async function store(v){await mkdir(resolve(DB_PATH,'..'),{recursive:true});const temp=DB_PATH+'.'+randomUUID()+'.tmp';await writeFile(temp,JSON.stringify(v,null,2)+'\n','utf8');await rename(temp,DB_PATH);}
@@ -87,8 +96,9 @@ function response(res,status,value){const body=JSON.stringify(value);res.writeHe
 async function input(req){let txt='';for await (const chunk of req){txt+=chunk;if(txt.length>150000)throw Object.assign(new Error('Request too large'),{status:413});}try{return txt?JSON.parse(txt):{};}catch{throw Object.assign(new Error('Invalid JSON'),{status:400});}}
 function fail(msg){throw Object.assign(new Error(msg),{status:400});}
 const cleanString=(v,n=300)=>String(v ?? '').trim().slice(0,n);
+const contactSearchOutcome=r=>r.email?'email-found':r.contactPageUrl?'contact-page':r.pagesRead===0&&r.tried>0?'unavailable':'not-found';
 // Capitalise stage labels in staff-facing audit messages, not in stored stage keys.
-const stageLabel=status=>String(status||'').replace(/^[a-z]/,ch=>ch.toUpperCase());
+const stageLabel=status=>status==='trial'?'Pilot':String(status||'').replace(/^[a-z]/,ch=>ch.toUpperCase());
 const CLOSURE_REASONS=['declined','unresponsive','unsuitable','logistics','other'];
 const validNumber=(v,label,min,max)=>{if(v===null||v===''||!Number.isFinite(Number(v))||Number(v)<min||Number(v)>max)fail(`Invalid ${label}`);return Number(v);};
 function validatePartnerFields(payload,current={}){
@@ -99,6 +109,10 @@ function validatePartnerFields(payload,current={}){
   const value=cleanString(payload[key],35)||'unknown';
   if(!values.includes(value))fail('Invalid '+key);
   p[key]=value;
+ }
+ if(Object.hasOwn(payload,'contactEmail')&&p.contactEmail!==(current.contactEmail||'')){
+  if(p.contactEmail)p.contactEvidence={source:'Staff entered',url:'',checkedAt:new Date().toISOString(),method:'staff'};
+  else delete p.contactEvidence;
  }
  if(Object.hasOwn(payload,'status')){if(!STATUSES.includes(payload.status))fail('Invalid pipeline status');p.status=payload.status;}
   if(p.status==='closed'&&current.status!=='closed'){const reason=cleanString(payload.closeReason,30);if(!CLOSURE_REASONS.includes(reason))fail('Select a reason for closing this relationship');p.closeReason=reason;p.closeNotes=cleanString(payload.closeNotes,500);p.closedAt=new Date().toISOString();p.nextAction='';p.followUpDate='';}else if(current.status==='closed'&&p.status!=='closed'){delete p.closeReason;delete p.closeNotes;delete p.closedAt;}
@@ -130,7 +144,7 @@ function legacySourceFacts(p){
   sourceEvidence:(p.evidenceEntries||[{source:p.source,url:p.sourceUrl,claim:'Source lists '+p.name}])
    .map(e=>({source:e.source,url:e.url,claim:e.claim}))};
 }
-function sourceFacts(p){
+export function sourceFacts(p){
  return {...legacySourceFacts(p),
   staffSuppliedInformation:{
    location:p.location||null,possibleUse:p.use||null,notes:p.notes||null,
@@ -167,7 +181,7 @@ export function assessmentPrompt(facts){
  return [
   'Evaluate possible spent-coffee-grounds reuse partners from supplied records ONLY. Do not browse, use tools, or invent contacts, willingness, composting activity or agreements.',
   'Respond with one JSON object: {"assessments":[{"id":"matching id","reuseSuitability":integer,"sourceEvidence":integer,"operationalCompatibility":integer,"reason":"brief source-grounded rationale","check":"one most important unanswered question"}]}.',
-  'Score each lead independently using the same rubric: reuseSuitability 0-40 = plausible technical/organisational use of spent grounds; sourceEvidence 0-35 = strength and specificity of cited facts; operationalCompatibility 0-10 = evidence of recurring or trial quantity and handling capability.',
+  'Score each lead independently using the same rubric: reuseSuitability 0-40 = plausible technical/organisational use of spent grounds; sourceEvidence 0-35 = strength and specificity of cited facts; operationalCompatibility 0-10 = evidence of recurring or pilot quantity and handling capability.',
   'Strong scores require specific cited evidence. Schools, parks, nurseries and gardens are NOT proven to compost or accept grounds. Sustainability programmes are weak evidence. Unknown capacity or operations should score 0-2. Published coffee-ground acceptance supports a higher score, not a guaranteed agreement.',
   'Distinguish staff-supplied notes and claims from independently cited public source evidence. Unverified staff claims may guide checks but are not independently verified. Consider new staff information without inventing facts.',
   'Do NOT assess distance: the application calculates proximity separately. Use integer scores in the allowed ranges and give evidence-specific reasons and the main unresolved question. Assess every supplied id.',
@@ -186,11 +200,7 @@ export function saveAIResults(partners,batch,results,{provider,prompt,runId,manu
  }
  return saved;
 }
-export function chooseForAssessment(partners,limit=24){
- return partners.slice().sort((a,b)=>(b.match?.score??0)-(a.match?.score??0)
-  ||(a.distanceKm??Infinity)-(b.distanceKm??Infinity)
-  ||a.name.localeCompare(b.name)||a.id.localeCompare(b.id)).slice(0,limit);
-}
+export function chooseForAssessment(partners,limit=24){return selectSourceBalanced(partners,limit);}
 async function discover(s,{provider=AI_PROVIDER,assessmentGenerator=generateJSON,signal}={}){
   const check=()=>{if(signal?.aborted)throw stoppedError();};
  const runId=randomUUID(),startedAt=new Date().toISOString();
@@ -226,12 +236,13 @@ async function discover(s,{provider=AI_PROVIDER,assessmentGenerator=generateJSON
   for(const ranked of sites){
    const target=s.partners.find(p=>p.id===ranked.id);if(!target)continue;
    check();const found=await researchPublicContact(target,{signal});check();
-   target.contactSearch={checkedAt:found.checkedAt,result:found.email?'found':'unavailable',pagesChecked:found.tried||0};
+   target.contactSearch={checkedAt:found.checkedAt,result:contactSearchOutcome(found),pagesChecked:found.tried||0};
+    if(found.contactPageUrl){target.contactPageUrl=found.contactPageUrl;target.contactPageEvidence={url:found.contactPageUrl,source:'Organisation Website',checkedAt:found.checkedAt};}
    run.contactPagesChecked+=found.tried||0;
    if(found.email){target.contactEmail=found.email;target.contactEvidence={source:'Organisation Website',url:found.sourceUrl,checkedAt:found.checkedAt,method:'website'};run.contactsFound++;}
   }
-  discoveryStatus={active:true,phase:'Assessing and Ranking Partners',detail:'Ranking sourced leads',completed:2,total:4,runId};
-  if(AI_PROVIDER!=='template'){
+  discoveryStatus={active:true,phase:'Ranking Partners',detail:'Ranking sourced leads',completed:2,total:4,runId};
+  if(AUTO_AI_REVIEW && provider!=='template'){
    const candidates=rankPartners(s.partners,numbers(s.settings,s.partners,s.handovers).gapKg,s.settings.ratingWeights)
     .filter(p=>p.status==='suggested'&&p.source!=='Fictional Stitch scenario');
    const pending=chooseForAssessment(candidates.filter(p=>!hasAIFit(p)||p.aiAssessment.factsHash!==digest(sourceFacts(p))),s.settings.automaticAIAssessments);
@@ -265,13 +276,12 @@ async function discover(s,{provider=AI_PROVIDER,assessmentGenerator=generateJSON
  }catch(err){if(!signal?.aborted)discoveryStatus={active:false,phase:'Failed: '+err.message,completed:0,total:4,runId};throw err;}
 }
 
-async function aiDraft(p,kg,provider){
- const base=draftTemplate(p,kg);
+async function aiDraft(p,provider){
+ const base=draftTemplate(p);
  if(provider==='template')return base;
  const facts={organisation:p.name,category:p.category,salutation:outreachSalutation(p),reuseContext:proposedReuseContext(p),suggestedUse:suggestedReuse(p),possibleUse:p.use,source:p.source,sourceUrl:p.sourceUrl,sourceEvidence:p.evidenceEntries,location:p.location,verified:p.verified,weeklyCapacityKg:p.capacityKg,contact:p.contactName,notes:p.notes,
-   grounds:'CoffeeBot grounds are collected and sun-dried at HQ. Moisture content is not measured.',
-   trialMaxKg:Math.min(10,Math.max(1,kg||10))};
- const prompt='Write a warm, natural first-contact email from CoffeeBot to this organisation. Return strictly JSON with subject and body. Sound like a real person: start with the exact salutation supplied in the facts, then use short connected conversational paragraphs, a genuine specific reason for contacting the organisation, one practical but tentative reuse idea with source-backed context and preparation/handling questions in reuseContext, and a low-pressure invitation to talk about a small trial. Do not use any section headings or labels such as Introduction:, Partner Fit:, Proposed Reuse:, Call to Action:, Conclusion: or Closing:. No bullet points, markdown, generic marketing filler, or script-like scaffolding. Avoid repetitive possible/potential/exploring wording. Ground every claim in the facts; never assert suitability, acceptance, performance, safe use, capacity, approval or a named person not provided. Mention grounds are collected and sun-dried, with unmeasured moisture, and ask naturally about suitability, collection and who can approve a trial. Do not use tools or browse. Staff review before sending and the app overrides the subject. Facts: '+JSON.stringify(facts);
+   grounds:'CoffeeBot grounds are collected and sun-dried at HQ. Moisture content is not measured.'};
+ const prompt='Write a warm, natural first-contact email from CoffeeBot to this organisation. Return strictly JSON with subject and body. Sound like a real person: start with the exact salutation supplied in the facts, then use short connected conversational paragraphs, a genuine specific reason for contacting the organisation, one practical but tentative reuse idea with source-backed context and preparation/handling questions in reuseContext, and a low-pressure invitation to discuss a small initial collection if appropriate. Do not use any section headings or labels such as Introduction:, Partner Fit:, Proposed Reuse:, Call to Action:, Conclusion: or Closing:. No bullet points, markdown, generic marketing filler, or script-like scaffolding. Avoid repetitive possible/potential/exploring wording. Ground every claim in the facts; never assert suitability, acceptance, performance, safe use, capacity, approval or a named person not provided. Mention grounds are collected and sun-dried, with unmeasured moisture, and ask naturally about suitability, collection arrangements and who can approve an initial collection. Do not use tools or browse. Staff review before sending and the app overrides the subject. Facts: '+JSON.stringify(facts);
  const output=await generateJSON(provider,prompt,{withUsage:true});
   const draft=validateDraft(output.result);
   draft.body=draft.body.replace(/(^|\n)\s*(?:\*\*)?(?:introduction|greeting|partner fit|why this partner|proposed reuse|reuse idea|next steps|call to action|conclusion|closing|sign[- ]?off)(?:\*\*)?:\s*/gi,'$1').replace(/\n{3,}/g,'\n\n').trim();
@@ -304,14 +314,14 @@ async function aiFollowUpDraft(p,state,provider){
  return {subject:FOLLOWUP_SUBJECT,body:draft.body,mode:provider+' CLI-assisted follow-up — review before use',usage:output.usage};
 }
 
-export function createApp({aiProvider=AI_PROVIDER,assessmentGenerator=generateJSON}={}){const activityAnalysisRuns=new Map();return createServer(async(req,res)=>{
+export function createApp({aiProvider=AI_PROVIDER,assessmentGenerator=generateJSON,contactResearcher=researchPublicContact}={}){const activityAnalysisRuns=new Map();return createServer(async(req,res)=>{
  try{
   const url=new URL(req.url,'http://localhost');const path=url.pathname;
   if(path==='/api/health')return response(res,200,{ok:true,service:'CoffeeBot Circularity Copilot'});
-  if(path==='/api/state'&&req.method==='GET'){const s=await readState();return response(res,200,{...s,metrics:numbers(s.settings,s.partners,s.handovers),ranked:rankPartners(s.partners,numbers(s.settings,s.partners,s.handovers).gapKg,s.settings.ratingWeights)});}
+  if(path==='/api/state'&&req.method==='GET'){const s=await readState();return response(res,200,{...s,metrics:numbers(s.settings,s.partners,s.handovers),sponsorReference:{estimated:true,locations:COFFEEBOT_MONTHLY_CUP_VOLUMES,monthlyTotalCups:SPONSOR_MONTHLY_CUPS,coffeeSharePercent:60,gramsPerCoffee:15},ranked:rankPartners(s.partners,numbers(s.settings,s.partners,s.handovers).gapKg,s.settings.ratingWeights)});}
   if(path==='/api/settings'&&req.method==='PATCH'){
-   const v=await input(req);if(Object.hasOwn(v,'aiProvider'))fail('AI provider must be configured in the local repository environment');const changed=await mutation(s=>{for(const [key,min,max] of [['cupsPerWeek',0,10000000],['gramsPerCup',1,1000],['referenceLat',1.1,1.55],['referenceLon',103.5,104.1]])if(Object.hasOwn(v,key))s.settings[key]=validNumber(v[key],key,min,max);
-    for(const k of ['reportingCollectedKg','reportingDiscardedKg'])if(Object.hasOwn(v,k))s.settings[k]=v[k]===null||v[k]===''?null:validNumber(v[k],k,0,100000000);
+   const v=await input(req);if(Object.hasOwn(v,'aiProvider'))fail('AI provider must be configured in the local repository environment');const changed=await mutation(s=>{for(const [key,min,max] of [['cupsPerWeek',0,10000000],['coffeeSharePercent',0,100],['gramsPerCup',1,1000],['referenceLat',1.1,1.55],['referenceLon',103.5,104.1]])if(Object.hasOwn(v,key))s.settings[key]=validNumber(v[key],key,min,max);
+    if(['reportingCollectedKg','reportingDiscardedKg'].some(k=>Object.hasOwn(v,k)))fail('Reuse reporting inputs are no longer supported');
     if(Object.hasOwn(v,'referenceLabel'))s.settings.referenceLabel=cleanString(v.referenceLabel,150);
     if(Object.hasOwn(v,'ratingWeights')){if(!validRatingWeights(v.ratingWeights))fail('Rating weights must be whole percentages from 0 to 100 totalling exactly 100');s.settings.ratingWeights={...v.ratingWeights};}
     if(Object.hasOwn(v,'automaticAIAssessments')){if(!Number.isInteger(v.automaticAIAssessments)||v.automaticAIAssessments<0||v.automaticAIAssessments>100)fail('AI assessment limit must be a whole number from 0 to 100');s.settings.automaticAIAssessments=v.automaticAIAssessments;}
@@ -373,6 +383,31 @@ export function createApp({aiProvider=AI_PROVIDER,assessmentGenerator=generateJS
    if(outcome.error)return response(res,502,{error:'AI review failed: '+outcome.error});
    return response(res,200,{partnerId,assessment:outcome.reviewed});
   }
+  const contactRoute=path.match(/^\/api\/partners\/([a-zA-Z0-9_-]+)\/research-contact$/);
+  if(contactRoute&&req.method==='POST'){
+   if(discoveryStatus.active)return response(res,409,{error:'Finish discovery before researching a contact.'});
+   const v=await input(req),id=contactRoute[1],state=await readState();
+   const current=state.partners.find(p=>p.id===id);
+   if(!current)fail('Partner not found');
+   if(current.status!=='suggested')fail('Contact research is available for Suggested prospects');
+   const entered=cleanString(v.websiteUrl,500);
+   const selected=entered||current.websiteUrl||'';
+   const url=publicWebUrl(selected);
+   if(!url||url.protocol!=='https:')fail('Enter a public HTTPS organisation website');
+   const searched=await contactResearcher({websiteUrl:url.href});
+   const updated=await mutation(s=>{
+    const p=s.partners.find(x=>x.id===id);
+    if(!p||p.status!=='suggested')fail('Partner has changed; reload and review the contact');
+    if(!entered&&p.websiteUrl!==current.websiteUrl)fail('Website changed during research; retry');
+    if(entered&&url.href!==p.websiteUrl){p.websiteUrl=url.href;p.websiteOrigin='staff-entered';delete p.contactPageUrl;delete p.contactPageEvidence;}
+    p.contactSearch={checkedAt:searched.checkedAt||new Date().toISOString(),result:contactSearchOutcome(searched),pagesChecked:searched.tried||0};
+    if(searched.contactPageUrl){p.contactPageUrl=searched.contactPageUrl;p.contactPageEvidence={source:'Organisation Website',url:searched.contactPageUrl,checkedAt:p.contactSearch.checkedAt};}
+    if(searched.email&&!p.contactEmail){p.contactEmail=searched.email;p.contactEvidence={source:'Organisation Website',url:searched.sourceUrl,checkedAt:p.contactSearch.checkedAt,method:'website'};}
+    return {partnerId:id,email:p.contactEmail||'',contactPageUrl:p.contactPageUrl||'',result:p.contactSearch.result,checkedAt:p.contactSearch.checkedAt};
+   });
+   return response(res,200,updated);
+  }
+
   if(path==='/api/partners'&&req.method==='POST'){
    const payload=await input(req);const result=await mutation(s=>{const p=validatePartnerFields(payload,{id:randomUUID(),source:'Staff-entered lead',sourceUrl:'',verified:false,confirmed:false,capacityKg:null,status:'contacted',sourcedAt:new Date().toISOString(),willingness:'unknown'});s.partners.push(p);s.partnerActivity??=[];s.partnerActivity.unshift({id:randomUUID(),partnerId:p.id,type:'stage',text:'Added as '+stageLabel(p.status),at:new Date().toISOString()});return p;});return response(res,201,result);
   }
@@ -578,9 +613,9 @@ export function createApp({aiProvider=AI_PROVIDER,assessmentGenerator=generateJS
   }
   if(path==='/api/draft'&&req.method==='POST'){
    const {partnerId}=await input(req);const s=await readState();const p=s.partners.find(x=>x.id===partnerId);if(!p)fail('Select a partner');
-   const gap=numbers(s.settings,s.partners,s.handovers).gapKg,started=Date.now();
+   const started=Date.now();
    try{
-    const draft=await aiDraft(p,gap,AI_PROVIDER);
+    const draft=await aiDraft(p,AI_PROVIDER);
     if(AI_PROVIDER!=='template'){
      const log={id:randomUUID(),at:new Date().toISOString(),kind:'outreach-draft',provider:AI_PROVIDER,partnerId,success:true,durationMs:Date.now()-started,...(draft.usage||{inputTokens:null,outputTokens:null,cachedInputTokens:null})};
      await mutation(state=>{appendAILog(state,log);return null;});
@@ -633,7 +668,7 @@ export function createApp({aiProvider=AI_PROVIDER,assessmentGenerator=generateJS
  if(transportInput&&!['partner-collects','coffeebot-delivers','either'].includes(transportInput))fail('Invalid collection arrangement');
  if(conditionInput&&!['dry','wet','either'].includes(conditionInput))fail('Invalid grounds condition');
  const arrangement={transportArrangement:transportInput||partner.transportArrangement||'unknown',groundsCondition:conditionInput||partner.groundsAccepted||'unknown',transportException:!!transportInput&&transportInput!==partner.transportArrangement,groundsException:!!conditionInput&&conditionInput!==partner.groundsAccepted};
- const confirmation=v.confirmation??'unverified';if(!['unverified','partner-confirmed','reuse-confirmed'].includes(confirmation))fail('Invalid confirmation level');const intendedUse=cleanString(v.intendedUse,250);const h={id:randomUUID(),partnerId:v.partnerId,kg,date,...(time?{time}:{}),notes:cleanString(v.notes,1200),...arrangement,...(intendedUse?{intendedUse}:{}),confirmation,recordedAt:new Date().toISOString()};s.handovers.unshift(h);s.partnerActivity??=[];s.partnerActivity.unshift({id:randomUUID(),partnerId:v.partnerId,type:'handover',handoverId:h.id,text:kg+' kg transferred',at:h.recordedAt});return h;});return response(res,201,record);
+ if(Object.hasOwn(v,'confirmation')||Object.hasOwn(v,'intendedUse'))fail('Record only transfer details; reuse is maintained on the partner profile');const h={id:randomUUID(),partnerId:v.partnerId,kg,date,...(time?{time}:{}),notes:cleanString(v.notes,1200),...arrangement,recordedAt:new Date().toISOString()};s.handovers.unshift(h);s.partnerActivity??=[];s.partnerActivity.unshift({id:randomUUID(),partnerId:v.partnerId,type:'handover',handoverId:h.id,text:kg+' kg transferred',at:h.recordedAt});return h;});return response(res,201,record);
   }
   if(path==='/api/reset-suggestions'&&req.method==='POST'){
    if(discoveryStatus.active)return response(res,409,{error:'Discovery is running'});

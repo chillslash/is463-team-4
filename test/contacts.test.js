@@ -16,3 +16,11 @@ test('website lookup extracts only published email with page attribution',async(
  assert.equal(publicWebUrl('http://127.0.0.1/'),null);
  assert.equal(publicWebUrl('http://localhost/'),null);
 });
+
+test('unreachable websites report no pages read rather than claiming the site has no contact',async()=>{
+ const httpFetch=async()=>new Response('Down',{status:503});
+ const result=await researchPublicContact({websiteUrl:'https://example.org/'},{httpFetch});
+ assert.equal(result.pagesRead,0);
+ assert.equal(result.tried,1);
+ assert.equal(result.email,'');
+});

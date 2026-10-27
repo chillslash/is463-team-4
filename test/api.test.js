@@ -16,51 +16,68 @@ test('health and each HTML page loads',async()=>{
  const {data}=await call('/api/health');assert.equal(data.ok,true);
  for(const p of ['/dashboard','/this-week','/find-partners','/outreach','/pipeline','/manage-partners','/log-handover']){const r=await fetch(base+p);assert.equal(r.status,200);assert.match(await r.text(),/\/app.js/);}
 });
-test('settings, partner updates, handovers persist and reflect actual vs confirmed outcomes',async()=>{
- let state=(await call('/api/state')).data;assert.equal(state.metrics.gapKg,42);
+test('forecast settings, partner arrangements and handovers persist without certification',async()=>{
+ let state=(await call('/api/state')).data;assert.equal(state.metrics.gapKg,1.6);assert.equal(state.settings.coffeeSharePercent,60);assert.deepEqual(state.sponsorReference.monthlyTotalCups,{min:3600,max:4200});assert.equal(state.sponsorReference.locations.length,5);
+ assert.equal((await call('/api/settings','PATCH',{coffeeSharePercent:101})).status,400);
  let r=await call('/api/settings','PATCH',{cupsPerWeek:10000});assert.equal(r.status,200);
- state=(await call('/api/state')).data;assert.equal(state.metrics.gapKg,60);
+ state=(await call('/api/state')).data;assert.equal(state.metrics.gapKg,83.5);
  r=await call('/api/partners','POST',{name:'Example Park Lead',category:'park',fee:'unknown'});assert.equal(r.status,201);const id=r.data.id;
  r=await call('/api/partners/'+id,'PATCH',{status:'regular',capacityKg:20,confirmed:true,verified:false});assert.equal(r.status,400);
  r=await call('/api/partners/'+id,'PATCH',{status:'regular',capacityKg:20,confirmed:true,verified:true});assert.equal(r.status,200);
- state=(await call('/api/state')).data;assert.equal(state.metrics.gapKg,40);
- r=await call('/api/handovers','POST',{partnerId:id,kg:8,date:'2026-10-16',confirmation:'partner-confirmed',intendedUse:'Trial composting'});assert.equal(r.status,201);
- state=(await call('/api/state')).data;assert.equal(state.metrics.transferredKg,8);assert.equal(state.metrics.evidencedKg,0);
- r=await call('/api/handovers','POST',{partnerId:id,kg:5,date:'2026-10-16',confirmation:'reuse-confirmed',intendedUse:'Compost verified'});assert.equal(r.status,201);
- r=await call('/api/settings','PATCH',{reportingCollectedKg:100});assert.equal(r.status,200);
- state=(await call('/api/state')).data;assert.equal(state.metrics.evidencedKg,5);assert.equal(state.metrics.reuseRate,5);
+ state=(await call('/api/state')).data;assert.equal(state.metrics.gapKg,63.5);
+ r=await call('/api/handovers','POST',{partnerId:id,kg:8,date:'2026-10-16'});assert.equal(r.status,201);
+ state=(await call('/api/state')).data;assert.equal(state.metrics.transferredKg,8);assert.equal(Object.hasOwn(state.metrics,'evidencedKg'),false);
+ r=await call('/api/handovers','POST',{partnerId:id,kg:5,date:'2026-10-16'});assert.equal(r.status,201);
+ r=await call('/api/settings','PATCH',{reportingCollectedKg:100});assert.equal(r.status,400);
+ state=(await call('/api/state')).data;assert.equal(state.metrics.transferredKg,13);assert.equal(Object.hasOwn(state.metrics,'reuseRate'),false);
+ r=await call('/api/handovers','POST',{partnerId:id,kg:1,date:'2026-10-16',confirmation:'reuse-confirmed'});assert.equal(r.status,400);
  assert.equal(JSON.parse(await readFile(process.env.DATA_FILE,'utf8')).handovers.length,2);
 });
-test('handover time is optional and recording collection cannot imply verified reuse',async()=>{
- const baseline=(await call('/api/state')).data.metrics.evidencedKg;
+test('staff moving a Pilot partner to Regular updates demand without the hidden confirmed flag',async()=>{
+ const before=(await call('/api/state')).data;
+ const previous=before.partners.find(p=>p.id==='p4');
+ const baseDemand=before.metrics.confirmedKg;
+ const capacity=20;
+ const promote=await call('/api/partners/p4','PATCH',{status:'regular',capacityKg:capacity});
+ assert.equal(promote.status,200);
+ assert.equal(promote.data.confirmed,false);
+ const after=(await call('/api/state')).data;
+ assert.equal(after.metrics.confirmedKg,baseDemand+capacity);
+ assert.equal(after.metrics.gapKg,Math.max(0,after.metrics.forecastKg-baseDemand-capacity));
+ const restore=await call('/api/partners/p4','PATCH',{status:previous.status,capacityKg:previous.capacityKg});
+ assert.equal(restore.status,200);
+ assert.equal((await call('/api/state')).data.metrics.confirmedKg,baseDemand);
+});
+test('handover time is optional and no reuse confirmation is stored',async()=>{
+ const baseline=(await call('/api/state')).data.metrics.transferredKg;
  const created=await call('/api/partners','POST',{name:'Handover Test Partner',category:'urban farm'});
  assert.equal(created.status,201);
  const id=created.data.id;
  const first=await call('/api/handovers','POST',{partnerId:id,kg:8,date:'2026-10-18',time:'14:25',notes:'Collected by partner staff'});
  assert.equal(first.status,201);
  assert.equal(first.data.time,'14:25');
- assert.equal(first.data.confirmation,'unverified');
+ assert.equal(Object.hasOwn(first.data,'confirmation'),false);
  assert.equal(first.data.notes,'Collected by partner staff');
  assert.ok(!Object.hasOwn(first.data,'intendedUse'),'Do not store an invented batch-level reuse purpose');
  const second=await call('/api/handovers','POST',{partnerId:id,kg:3,date:'2026-10-18'});
  assert.equal(second.status,201);
  assert.ok(!Object.hasOwn(second.data,'time'),'No invented time for unrecorded transfers');
- const invalid=await call('/api/handovers','POST',{partnerId:id,kg:3,date:'2026-10-18',time:'27:92',intendedUse:'Trial'});
+ const invalid=await call('/api/handovers','POST',{partnerId:id,kg:3,date:'2026-10-18',time:'27:92'});
  assert.equal(invalid.status,400);
  const after=(await call('/api/state')).data;
- assert.equal(after.metrics.evidencedKg,baseline,'New handovers do not automatically count as verified reuse');
+ assert.equal(after.metrics.transferredKg,baseline+11,'Handovers track actual transferred mass only');
  assert.equal(after.handovers.filter(h=>h.partnerId===id).length,2);
 });
 
 test('draft fallback and explicit reset',async()=>{
  const id=(await call('/api/state')).data.partners[0].id;
  let r=await call('/api/draft','POST',{partnerId:id});assert.equal(r.status,200);assert.match(r.data.mode,/Template fallback/);
- r=await call('/api/reset-demo','POST');assert.equal(r.status,200);assert.equal((await call('/api/state')).data.metrics.forecastKg,182);
+ r=await call('/api/reset-demo','POST');assert.equal(r.status,200);assert.equal((await call('/api/state')).data.metrics.forecastKg,8.1);
 });
 
 test('rating weights persist and server recalculates scores without AI',async()=>{
  const before=(await call('/api/state')).data;
- assert.deepEqual(before.settings.ratingWeights,{suitability:40,evidence:35,proximity:10,operations:15});
+ assert.deepEqual(before.settings.ratingWeights,{suitability:30,evidence:30,proximity:5,operations:35});
  const original=before.ranked.find(p=>p.status==='trial');
  assert.equal((await call('/api/settings','PATCH',{ratingWeights:{suitability:40,evidence:35,proximity:10,operations:10}})).status,400);
  assert.equal((await call('/api/settings','PATCH',{ratingWeights:{suitability:40,evidence:35,proximity:10,operations:15,extra:0}})).status,400);
@@ -72,7 +89,7 @@ test('rating weights persist and server recalculates scores without AI',async()=
  assert.deepEqual(revised.match.weights,weights);
  assert.notEqual(revised.match.score,original.match.score);
  assert.equal(revised.match.score,Object.values(revised.match.parts).reduce((sum,v)=>sum+v,0));
- assert.equal((await call('/api/settings','PATCH',{ratingWeights:{suitability:40,evidence:35,proximity:10,operations:15}})).status,200);
+ assert.equal((await call('/api/settings','PATCH',{ratingWeights:{suitability:30,evidence:30,proximity:5,operations:35}})).status,200);
 });
 test('manual outreach and lifecycle keep durable activity records',async()=>{
  const id='p5';
@@ -115,7 +132,7 @@ test('closing a confirmed Regular partner clears capacity without erasing histor
  assert.equal(result.status,200);
  assert.equal(result.data.confirmed,false);
  const after=(await call('/api/state')).data;
- assert.equal(after.metrics.confirmedKg,prior-70);
+ assert.equal(after.metrics.confirmedKg,prior-3);
  assert.ok(after.partnerActivity.some(x=>x.partnerId==='p1'&&x.text.includes('Closed')));
 });
 
