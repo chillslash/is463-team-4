@@ -52,6 +52,9 @@ Institutional sites (e.g. parks and schools) require an authorised contact; a na
 The scripts do **not** change `data/state.json` and refuse to overwrite existing output files. They operate on the local, Git-ignored snapshot; do not commit filled reviews containing potentially sensitive contact data.
 
 ```powershell
+# Diagnose score clustering and missing operational evidence before re-tuning rules.
+node scripts/sponsor-ranking-evaluation.mjs diagnose --state=data/state.json --out=data/ranking-pool-diagnostic.json
+
 # Create model-blinded, source-balanced sponsor review. Fill review fields offline.
 node scripts/sponsor-ranking-evaluation.mjs prepare --state=data/state.json --limit=24 --out=data/sponsor-review.json
 
