@@ -122,7 +122,7 @@ function contactRouteBlock(p){
 function findView(){
  const all=data.ranked.filter(p=>p.status==='suggested'&&p.source!=='Fictional Stitch scenario');
  const categories=[...new Set(all.map(p=>p.category))].sort();
- let matches=all.filter(p=>(!ui.aiAssessedOnly||p.match?.method==='AI-assisted')&&(ui.category==='all'||p.category===ui.category)&&(p.name+' '+p.category+' '+p.use).toLowerCase().includes(ui.search.toLowerCase()));
+ let matches=all.filter(p=>(!ui.aiAssessedOnly||p.match?.aiLed===true)&&(ui.category==='all'||p.category===ui.category)&&(p.name+' '+p.category+' '+p.use).toLowerCase().includes(ui.search.toLowerCase()));
  if(ui.sort==='fit')matches.sort((a,b)=>b.match.score-a.match.score||a.name.localeCompare(b.name));
  if(ui.sort==='nearest')matches.sort((a,b)=>(a.distanceKm??Infinity)-(b.distanceKm??Infinity)||b.match.score-a.match.score);
  if(ui.sort==='recent')matches.sort((a,b)=>(Date.parse(b.sourcedAt||'')||0)-(Date.parse(a.sourcedAt||'')||0)||b.match.score-a.match.score);
@@ -142,7 +142,7 @@ function findView(){
   const aiScored=p.match.method==='AI-assisted'&&p.aiEvidenceReview;
   const recommendation=aiScored?`<p class="co-why"><strong>AI Evidence Assessment:</strong> ${esc(p.aiEvidenceReview.reason)}</p>`:
    p.match.aiLed&&p.aiAssessment?`<p class="co-why"><strong>Previous AI Notes (advisory):</strong> ${esc(p.aiAssessment.reason)}</p>`:
-   `<p class="co-why">Preliminary screening based on available sources.</p>`;
+   `<p class="co-why">Preliminary screening based on source category and available evidence.</p>`;
   const citedEvidence=aiScored?(p.aiEvidenceReview.evidenceIds||[]).map(i=>(p.evidenceEntries||[])[i]).filter(Boolean).slice(0,2)
    .map(e=>`<a href="${esc(e.url)}" target="_blank" rel="noopener noreferrer">${esc(e.claim)}</a>`).join(' · '):'';
 
@@ -191,7 +191,7 @@ function findView(){
      </select>
     </label>
     <label class="co-discovery-ai-checkbox"><input type="checkbox" id="contactable-first-filter" ${ui.contactableFirst?'checked':''}>Contactable First</label>
-    <label class="co-discovery-ai-checkbox"><input type="checkbox" id="ai-assessed-filter" ${ui.aiAssessedOnly?'checked':''}>AI-Ranked Only</label>
+    <label class="co-discovery-ai-checkbox"><input type="checkbox" id="ai-assessed-filter" ${ui.aiAssessedOnly?'checked':''}>AI-Assessed Only</label>
     <div class="co-discovery-result-count">Showing ${matches.length?pageStart+1:0}–${Math.min(pageStart+15,matches.length)} of ${matches.length}</div>
    </div>
    <div class="co-discovery-sidebar-status">
