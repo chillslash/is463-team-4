@@ -1,3 +1,4 @@
+import {activeEvidenceReview,evidenceQuality,evidencePrompt,validateEvidenceAssessments} from './src/evidence-review.js';
 import {selectSourceBalanced} from './src/assessment-selection.js';
 import {createServer} from 'node:http';
 import {readFile, writeFile, rename, mkdir, stat} from 'node:fs/promises';
@@ -20,7 +21,7 @@ const DB_PATH=process.env.DATA_FILE || join(ROOT,'data','state.json');
 const PORT=Number(process.env.PORT || 4173);
 const FOLLOWUP_SUBJECT='CoffeeBot | Spent Coffee Grounds Reuse Follow-Up';
 const AI_PROVIDER=['codex','claude','qwen','llama'].includes(process.env.AI_PROVIDER)?process.env.AI_PROVIDER:'template';
-const AUTO_AI_REVIEW=/^(1|true)$/i.test(process.env.AUTO_AI_REVIEW||'false');
+const AUTO_AI_REVIEW=process.env.AUTO_AI_REVIEW===undefined?AI_PROVIDER!=='template':/^(1|true)$/i.test(process.env.AUTO_AI_REVIEW);
 let discoveryStatus={active:false,phase:'Idle',completed:0,total:4};
 let discoveryController=null;
 const stoppedError=()=>Object.assign(new Error('Discovery stopped; changes discarded'),{status:409,code:'DISCOVERY_STOPPED'});
@@ -201,6 +202,20 @@ export function saveAIResults(partners,batch,results,{provider,prompt,runId,manu
  return saved;
 }
 export function chooseForAssessment(partners,limit=24){return selectSourceBalanced(partners,limit);}
+
+export function saveEvidenceResults(partners,results,{provider,runId}){
+ let count=0;
+ for(const assessed of results){
+  const p=partners.find(x=>x.id===assessed.id);
+  if(!p)continue;
+  // Re-check the citation/fingerprint against the current record before saving.
+  if(!validateEvidenceAssessments({assessments:[assessed]},[p]).length)continue;
+  p.aiEvidenceReview={...assessed,provider,runId,assessedAt:new Date().toISOString()};
+  count++;
+ }
+ return count;
+}
+
 async function discover(s,{provider=AI_PROVIDER,assessmentGenerator=generateJSON,signal}={}){
   const check=()=>{if(signal?.aborted)throw stoppedError();};
  const runId=randomUUID(),startedAt=new Date().toISOString();
@@ -245,27 +260,33 @@ async function discover(s,{provider=AI_PROVIDER,assessmentGenerator=generateJSON
   if(AUTO_AI_REVIEW && provider!=='template'){
    const candidates=rankPartners(s.partners,numbers(s.settings,s.partners,s.handovers).gapKg,s.settings.ratingWeights)
     .filter(p=>p.status==='suggested'&&p.source!=='Fictional Stitch scenario');
-   const pending=chooseForAssessment(candidates.filter(p=>!hasAIFit(p)||p.aiAssessment.factsHash!==digest(sourceFacts(p))),s.settings.automaticAIAssessments);
-   const batches=[];for(let i=0;i<pending.length;i+=12)batches.push(pending.slice(i,i+12));
-   discoveryStatus={active:true,phase:'Assessing and Ranking Partners',detail:batches.length?'AI batch 1 of '+batches.length+' in progress':'No new AI assessments needed',completed:2,total:4,batchCompleted:0,batchTotal:batches.length,runId};
+   const specific=candidates.filter(p=>!activeEvidenceReview(p)&&
+    (p.evidenceEntries||[]).some(e=>evidenceQuality(e)));
+   const pending=chooseForAssessment(specific,s.settings.automaticAIAssessments);
+   const batches=[];for(let i=0;i<pending.length;i+=6)batches.push(pending.slice(i,i+6));
+   discoveryStatus={active:true,phase:'Assessing and Ranking Partners',
+    detail:batches.length?'Evidence assessment batch 1 of '+batches.length:'No new evidence-rich leads to assess',
+    completed:2,total:4,batchCompleted:0,batchTotal:batches.length,runId};
    for(let i=0;i<batches.length;i++){
-    const batch=batches[i],facts=batch.map(sourceFacts);
-    const prompt=assessmentPrompt(facts);
-    const started=Date.now();let usage=null,success=false,error=null;
+    const batch=batches[i],prompt=evidencePrompt(batch),started=Date.now();
+    let usage=null,success=false,error=null;
     try{
      run.aiCalls++;
      const generated=await assessmentGenerator(provider,prompt,{withUsage:true,signal});
-      check();
-     usage=generated.usage;
-     const response=validateAssessment(generated.result,batch.map(p=>p.id));
-     run.reviewed+=saveAIResults(s.partners,batch,response,{provider,prompt,runId});
+     check();usage=generated.usage;
+     const assessed=validateEvidenceAssessments(generated.result,batch);
+     run.reviewed+=saveEvidenceResults(s.partners,assessed,{provider,runId});
      success=true;
     }catch(err){check();error=err.message;run.warnings.push('AI batch '+(i+1)+': '+error);}
     finally{
-     const log={id:randomUUID(),at:new Date().toISOString(),kind:'partner-assessment',provider:AI_PROVIDER,runId,batch:i+1,candidates:batch.length,success,error,durationMs:Date.now()-started,...(usage||{inputTokens:null,outputTokens:null,cachedInputTokens:null})};
+     const log={id:randomUUID(),at:new Date().toISOString(),kind:'evidence-assessment',
+      provider,runId,batch:i+1,candidates:batch.length,success,error,
+      durationMs:Date.now()-started,...(usage||{inputTokens:null,outputTokens:null,cachedInputTokens:null})};
      run.aiUsage.push(log);appendAILog(s,log);
     }
-    discoveryStatus={active:true,phase:'Assessing and Ranking Partners',detail:'AI batch '+(i+1)+' of '+batches.length+' complete',completed:2,total:4,batchCompleted:i+1,batchTotal:batches.length,runId};
+    discoveryStatus={active:true,phase:'Assessing and Ranking Partners',
+     detail:'Evidence batch '+(i+1)+' of '+batches.length+' complete',
+     completed:2,total:4,batchCompleted:i+1,batchTotal:batches.length,runId};
    }
   }
   discoveryStatus={active:true,phase:'Finalising Results',detail:'Saving discovery results',completed:3,total:4,runId};
@@ -353,6 +374,36 @@ export function createApp({aiProvider=AI_PROVIDER,assessmentGenerator=generateJS
     discoveryStatus={active:false,phase:'Failed: '+err.message,completed:0,total:4};
     throw err;
    }finally{if(discoveryController===controller)discoveryController=null;}
+  }
+  const evidenceReviewRoute=path.match(/^\/api\/partners\/([a-zA-Z0-9_-]+)\/evidence-review$/);
+  if(evidenceReviewRoute&&req.method==='POST'){
+   if(discoveryStatus.active)return response(res,409,{error:'Discovery is running'});
+   if(aiProvider==='template')return response(res,503,{error:'Configure an AI provider before requesting evidence assessment'});
+   const id=evidenceReviewRoute[1];
+   const result=await mutation(async state=>{
+    const p=state.partners.find(x=>x.id===id);
+    if(!p)fail('Partner not found');
+    if(p.status==='closed')fail('Closed partners cannot be reviewed');
+    if(!(p.evidenceEntries||[]).some(e=>evidenceQuality(e)))
+     fail('A specific cited source is needed before AI can assess this partner. Add verifiable source evidence first.');
+    const runId=randomUUID(),prompt=evidencePrompt([p]),started=Date.now();
+    let usage=null,error=null,review=null;
+    try{
+     const generated=await assessmentGenerator(aiProvider,prompt,{withUsage:true});
+     usage=generated.usage;
+     const assessments=validateEvidenceAssessments(generated.result,[p]);
+     if(assessments.length!==1)throw Error('Insufficient grounded evidence returned by AI');
+     saveEvidenceResults(state.partners,assessments,{provider:aiProvider,runId});
+     review=p.aiEvidenceReview;
+    }catch(err){error=err.message;}
+    appendAILog(state,{id:randomUUID(),at:new Date().toISOString(),
+     kind:'manual-evidence-review',provider:aiProvider,partnerId:id,
+     success:!error,error,runId,durationMs:Date.now()-started,
+     ...(usage||{inputTokens:null,outputTokens:null,cachedInputTokens:null})});
+    return {review,error,partnerId:id};
+   });
+   if(result.error)return response(res,502,{error:'Evidence review failed: '+result.error});
+   return response(res,200,{partnerId:id,assessment:result.review});
   }
   if(path.match(/^\/api\/partners\/[a-zA-Z0-9_-]+\/ai-review$/)&&req.method==='POST'){
    if(discoveryStatus.active)return response(res,409,{error:'Discovery is running. Try reviewing after it completes.'});
