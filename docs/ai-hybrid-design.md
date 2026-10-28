@@ -32,6 +32,8 @@ The app already records provider, token metadata when available, number of calls
 
 **No measured energy, power or carbon values are available.** Token counts, wall time and inference-call counts are proxies for resource use, not carbon footprints. The sustainability hypothesis is that a selective hybrid might provide useful individual differentiation at less inference cost than sending all discovered candidates to a large model; it has **not yet been demonstrated on independently verified operational outcomes**.
 
+**Completed 28 October benchmark:** [Full Codex, full Qwen, rules-only and selective-hybrid results](benchmark-2026-10-28-results.md). The experiment ran on all 24 frozen proxy cases; rules-only had the highest agreement with internal labels, but operational partner acceptance remains unvalidated.
+
 ## Reproducible evaluation
 
 Existing assessments and frozen desk judgements are in `scripts/proxy-review-judgements.json`, with the labelled local review at `data/proxy-review-labelled.json` (ignored). Never allow prediction code to read reference labels until scoring is complete.
