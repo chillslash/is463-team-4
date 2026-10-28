@@ -1,3 +1,4 @@
+import {activeEvidenceReview} from './evidence-review.js';
 export const STATUSES = ['suggested', 'contacted', 'interested', 'trial', 'regular', 'closed'];
 export const OUTREACH_SUBJECT = 'CoffeeBot | Spent Coffee Grounds Reuse Partnership';
 export const RESPONSE_STATUSES = ['none', 'awaiting-reply', 'positive', 'declined', 'no-response', 'other'];
@@ -173,9 +174,15 @@ function screen(p){
 }
 export function scorePartner(p,gap,ratingWeights=DEFAULT_RATING_WEIGHTS){
  const weights=validRatingWeights(ratingWeights)?ratingWeights:DEFAULT_RATING_WEIGHTS;
- const aiLed=hasAIFit(p),a=p.aiAssessment||{};
- // Independent source-evidence screening controls numeric scores, even after AI review.
- const q=screen(p);
+ const review=activeEvidenceReview(p);
+ const aiLed=!!review||hasAIFit(p),a=p.aiAssessment||{};
+ // Rules-only is the complete, inexpensive fallback. V2 AI contributes only
+ // when the cited organisation-specific evidence still matches saved facts.
+ const base=screen(p);
+ const q=review?{
+  reuse:(base.reuse+review.reuseSuitability)/2,
+  evidence:(base.evidence+review.sourceEvidence)/2
+ }:base;
  const km=Number(p.distanceKm);
  // Straight-line distance is a weak convenience proxy, never a delivery-route promise.
  const proximity=p.distanceKm==null||!Number.isFinite(km)?0:Math.round(Math.max(0,10-0.35*Math.max(0,km)));
@@ -196,13 +203,14 @@ export function scorePartner(p,gap,ratingWeights=DEFAULT_RATING_WEIGHTS){
  const maxima={suitability:40,evidence:35,proximity:10,operations:40};
  const parts=Object.fromEntries(Object.keys(maxima).map(key=>[key,Math.round(Math.max(0,Math.min(1,rawParts[key]/maxima[key]))*weights[key])]));
  const score=Object.values(parts).reduce((sum,v)=>sum+v,0);
- const reasons=[aiLed?a.reason:(p.directCoffeeEvidence?'Source explicitly mentions used coffee grounds':'Preliminary screening based on source category and available evidence')];
+ const reasons=[review?review.reason:(aiLed?a.reason:(p.directCoffeeEvidence?'Source explicitly mentions used coffee grounds':'Preliminary screening based on source category and available evidence'))];
  if(p.distanceKm!=null)reasons.push('Approximately '+p.distanceKm+' km straight-line from HQ');
  if(knownCapacity)reasons.push(capacity+' kg/week intake '+(p.verified?'verified by staff':'reported, not yet verified'));
  if(!knownCapacity)reasons.push('Intake capacity unknown; confirm with partner');
  if(transport)reasons.push('Collection preference: '+(p.transportArrangement==='partner-collects'?'partner collects':'either arrangement'));
- return {score,aiLed,provisional:!aiLed,parts,weights:{...weights},
-  reasons,checks:[aiLed?a.check:'Confirm actual grounds reuse and acceptance arrangements']};
+ return {score,aiLed,provisional:!review,method:review?'AI-assisted':'Rule-ranked',
+  evidenceReferences:review?review.evidenceIds:[],parts,weights:{...weights},
+  reasons,checks:[review?review.check:(aiLed?a.check:'Confirm actual grounds reuse and acceptance arrangements')]};
 }
 export function rankPartners(partners,gap,ratingWeights=DEFAULT_RATING_WEIGHTS){
  return partners.filter(p=>p.status!=='closed'&&p.status!=='regular')
