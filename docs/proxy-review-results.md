@@ -31,10 +31,12 @@ Computed by `scripts/sponsor-ranking-evaluation.mjs` against the saved local sta
 - **A1 Environment:** NEA describes real spent-grounds recovery into materials and compost ([NEA](https://www.nea.gov.sg/media/news/news/index/closing-the-food-resource-loop-and-driving-sustainability-at-the-inaugural-food-resource-valorisation-awards)). Fees and additional uptake remain to be checked.
 - **Ento Industries:** SMU describes food-waste conversion using black soldier flies and an often paid intake model ([SMU](https://news.smu.edu.sg/news/2025/08/27/trash-treasure-how-ento-industries-developed-growing-sustainable-food-waste)). It is a plausible technical recipient but neither free collection nor grounds acceptance is established.
 
+**Completed 28 October benchmark:** [Full Codex, full Qwen, rules-only and selective-hybrid results](benchmark-2026-10-28-results.md). The experiment ran on all 24 frozen proxy cases; rules-only had the highest agreement with internal labels, but operational partner acceptance remains unvalidated.
+
 ## Interpretation / next comparison
 
 The proxy experiment does **not** overturn the earlier 36-case source-tier results, nor establish that rules beat LLMs operationally. The most useful diagnosis is that some same-source records deserve different attention, and an LLM should be tested for its ability to use *specific, cited* evidence rather than just source category.
 
-Any next Codex/Qwen comparison must (1) use the same 24 frozen IDs; (2) show both methods the same evidence snapshot; (3) keep proxy grades out of prompts; (4) record inference latency, tokens, errors and coverage; and (5) evaluate using common complete records. Where local providers are unavailable, report that explicitly; never replace missing predictions with invented scores or claim an LLM lost without running it.
+The now-completed Codex/Qwen comparison (linked above) followed this procedure; future replications must (1) use the same 24 frozen IDs; (2) show both methods the same evidence snapshot; (3) keep proxy grades out of prompts; (4) record inference latency, tokens, errors and coverage; and (5) evaluate using common complete records. Where local providers are unavailable, report that explicitly; never replace missing predictions with invented scores or claim an LLM lost without running it.
 
 No production ranking, partner state or discovery reset is justified by this exploratory result alone.
