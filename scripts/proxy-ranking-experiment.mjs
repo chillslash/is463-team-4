@@ -64,6 +64,6 @@ for(const provider of models){
  runMetrics[provider+'-selective-hybrid']={selected:selected.length,upgraded:upgraded.size,coverage:all.length,elapsedMs:Date.now()-begin,calls:hybridCalls};
 }
 const evaluation=evaluateSponsorReview(state,review,predictions);
-const output={description:'Exploratory proxy comparison, not CoffeeBot ground truth; unassessed hybrid uses deterministic fallback',caseCount:all.length,hybridLimit:limit,resumedFrom:opts.resume||null,runMetrics,predictions,evaluation};
+const output={description:'LEGACY DIAGNOSTIC ONLY: full AI and hybrid use different prompts, validators and score formulas; not a controlled strategy comparison',validity:'diagnostic-only',methodologyAudit:'docs/benchmark-methodology-audit-2026-10-28.md',caseCount:all.length,hybridLimit:limit,resumedFrom:opts.resume||null,runMetrics,predictions,evaluation};
 await writeFile(opts.out,JSON.stringify(output,null,2)+'\n',{flag:'wx'});
 console.log(JSON.stringify({status:evaluation.status,labelled:evaluation.labelledCandidates,results:Object.fromEntries(Object.entries(evaluation.results).map(([k,v])=>[k,{coverage:v.coverage,ndcg:v.comparable?.ndcgAt10,pairwise:v.comparable?.pairwiseAccuracy}])),runs:runMetrics},null,2));
