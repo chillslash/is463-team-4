@@ -69,6 +69,8 @@ The sources run independently with source caching and run history. Candidate rec
 
 The ranking considers intake only where recorded; it cannot infer quantities from organisation size or category, optimise delivery routes, or claim partner willingness. The **AI Review** button uses public cited material-specific evidence; if the source is generic but an organisation website is recorded, the app tries a bounded evidence extraction first. A published excerpt is not verified intake or acceptance. AI scoring blends source screening with reviewed evidence and never assigns operational capacity. Approximate HQ proximity has a small role because an existing delivery route can be more convenient than a closer new stop. CoffeeBot has no immediate reuse-method restrictions; staff must still check intended reuse, capacity, frequency and practical transport.
 
+**Experimental benchmark (28 October 2026):** The frozen 24-case rules-only, full Codex, full Qwen and selective-hybrid comparison has been completed in the feature branch. Results are [documented here](docs/benchmark-2026-10-28-results.md); they are agreement with internally labelled outreach priorities, **not** confirmed uptake or measured carbon reductions.
+
 ## Auditability, limitations and project structure
 
 - Source results, latest scan history (up to 40 runs), AI source and prompt hashes and provider usage metadata are stored locally in `data/state.json`; source caches live in `data/source-cache/`. Both are ignored by Git. Stopping before commit discards partner/assessment changes from that run, but not already consumed AI usage or downloaded caches.
