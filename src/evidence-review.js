@@ -17,6 +17,8 @@ const TECHNICAL=/\b(?:used coffee grounds|spent coffee grounds|coffee grounds|co
 export function evidenceQuality(entry){
  const claim=String(entry?.claim||'').trim();
  if(!entry?.url?.startsWith('https://')||claim.length<35||GENERIC.test(claim))return false;
+ // Source-directory disclaimers may mention grounds only to say their use is unknown.
+ if(/\b(?:does not establish|does not demonstrate|does not prove|no evidence of|not evidence of|acceptance (?:is|remains) unknown)\b/i.test(claim))return false;
  // A generic business-directory membership or farm licence is not
  // organisation-specific proof of compatible reuse.
  if(/\b(?:lists .* (?:corporate member|under vegetable farming)|licence [A-Z0-9]+)\b/i.test(claim)&&!(/coffee grounds|substrate|compost/i.test(claim)))return false;
