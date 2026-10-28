@@ -122,7 +122,7 @@ function contactRouteBlock(p){
 function findView(){
  const all=data.ranked.filter(p=>p.status==='suggested'&&p.source!=='Fictional Stitch scenario');
  const categories=[...new Set(all.map(p=>p.category))].sort();
- let matches=all.filter(p=>(!ui.aiAssessedOnly||p.match?.aiLed===true)&&(ui.category==='all'||p.category===ui.category)&&(p.name+' '+p.category+' '+p.use).toLowerCase().includes(ui.search.toLowerCase()));
+ let matches=all.filter(p=>(!ui.aiAssessedOnly||p.match?.method==='AI-assisted')&&(ui.category==='all'||p.category===ui.category)&&(p.name+' '+p.category+' '+p.use).toLowerCase().includes(ui.search.toLowerCase()));
  if(ui.sort==='fit')matches.sort((a,b)=>b.match.score-a.match.score||a.name.localeCompare(b.name));
  if(ui.sort==='nearest')matches.sort((a,b)=>(a.distanceKm??Infinity)-(b.distanceKm??Infinity)||b.match.score-a.match.score);
  if(ui.sort==='recent')matches.sort((a,b)=>(Date.parse(b.sourcedAt||'')||0)-(Date.parse(a.sourcedAt||'')||0)||b.match.score-a.match.score);
@@ -139,9 +139,15 @@ function findView(){
   const contact=contactRouteBlock(p);
   const sourceHref=[...(p.evidenceEntries||[]).map(e=>e.url),p.sourceUrl].find(url=>typeof url==='string'&&url.startsWith('https://'));
   const sourceLink=sourceHref?`<a class="co-listing-source" href="${esc(sourceHref)}" target="_blank" rel="noopener noreferrer">View source ↗</a>`:'';
-  const recommendation=p.match.aiLed&&p.aiAssessment?`<p class="co-why"><strong>AI Review Notes:</strong> ${esc(p.aiAssessment.reason)}</p>`:`<p class="co-why">Preliminary screening based on source category and available evidence.</p>`;
+  const aiScored=p.match.method==='AI-assisted'&&p.aiEvidenceReview;
+  const recommendation=aiScored?`<p class="co-why"><strong>AI Evidence Assessment:</strong> ${esc(p.aiEvidenceReview.reason)}</p>`:
+   p.match.aiLed&&p.aiAssessment?`<p class="co-why"><strong>Previous AI Notes (advisory):</strong> ${esc(p.aiAssessment.reason)}</p>`:
+   `<p class="co-why">Preliminary screening based on available sources.</p>`;
+  const citedEvidence=aiScored?(p.aiEvidenceReview.evidenceIds||[]).map(i=>(p.evidenceEntries||[])[i]).filter(Boolean).slice(0,2)
+   .map(e=>`<a href="${esc(e.url)}" target="_blank" rel="noopener noreferrer">${esc(e.claim)}</a>`).join(' · '):'';
+
    const claim=(p.evidenceEntries||[]).find(e=>typeof e.claim==='string'&&e.claim.trim())?.claim?.trim()||p.materialEvidence||'';
-   const evidenceSummary=claim?'<div class="co-compact-source-evidence"><strong>Source Evidence</strong><span>'+esc(claim.length>220?claim.slice(0,217)+'…':claim)+'</span></div>':'';
+   const evidenceSummary=claim?'<div class="co-compact-source-evidence"><strong>Source Evidence</strong><span>'+esc(claim.length>220?claim.slice(0,217)+'…':claim)+'</span>'+ (citedEvidence?'<span>AI cited: '+citedEvidence+'</span>':'')+'</div>':'';
   const dimensions=[
    {label:'Reuse Suitability',value:p.match.parts?.suitability??0,max:p.match.weights?.suitability??40,colour:'suitability'},
    {label:'Source Evidence',value:p.match.parts?.evidence??0,max:p.match.weights?.evidence??35,colour:'evidence'},
@@ -150,7 +156,7 @@ function findView(){
   ];
   const filled=dimensions.reduce((total,item)=>total+Math.min(item.max,Math.max(0,item.value)),0);
   const composition=`<div class="co-fit-composition"><div class="co-fit-composition-head"><strong>Fit Score</strong><span>${p.match.score}/100</span></div><div class="co-fit-segments" role="img" aria-label="Fit Score composition: ${dimensions.map(x=>x.label+' '+x.value+' of '+x.max).join(', ')}">${dimensions.map(x=>`<span class="co-fit-segment co-fit-${x.colour}" style="width:${Math.min(x.max,Math.max(0,x.value))}%"></span>`).join('')}<span class="co-fit-segment co-fit-unearned" style="width:${Math.max(0,100-filled)}%"></span></div><div class="co-fit-legend">${dimensions.map(x=>`<div><i class="co-fit-dot co-fit-${x.colour}"></i><span>${x.label}</span><strong>${x.value}/${x.max}</strong></div>`).join('')}</div></div>`;
-  return `<article class="co-discovery-card" data-listing-id="${esc(p.id)}" tabindex="0" aria-label="Toggle details for ${esc(p.name)}" aria-controls="listing-details-${esc(p.id)}" aria-expanded="false"><div><div class="co-listing-head"><h3>${esc(p.name)}</h3>${sourceLink}${pBadge(p)}</div><div class="co-listing-meta"><span><b><span class="material-symbols-outlined" aria-hidden="true">category</span>Category</b>${esc(titleCase(p.category))}</span><span><b><span class="material-symbols-outlined" aria-hidden="true">near_me</span>Distance From HQ</b>${p.distanceKm==null?'Unknown':m(p.distanceKm)+' km'}</span><span><b><span class="material-symbols-outlined" aria-hidden="true">alternate_email</span>Contact Route</b>${esc(contact.label)}</span></div>${recommendation}<details class="co-candidate-details" id="listing-details-${esc(p.id)}"><summary>Details</summary><div class="co-details-sourced"><span class="material-symbols-outlined" aria-hidden="true">calendar_today</span><span>Date Sourced</span><strong>${timeLabel(p.sourcedAt)}</strong></div>${composition}${evidenceSummary}${contact.html}</details></div><div class="co-card-actions"><div class="co-fit-meter co-fit-${p.match.score>=75?'good':p.match.score>=50?'moderate':'low'}" role="img" aria-label="Fit score ${p.match.score} out of 100"><div class="co-fit-meter-score">${p.match.score}/100</div><div class="co-fit-meter-method">Source Screening</div><div class="co-fit-meter-track"><span class="co-fit-meter-fill" style="width:${Math.max(0,Math.min(100,p.match.score))}%"></span></div></div><button class="co-button small" data-href="/outreach?partner=${encodeURIComponent(p.id)}">Draft Outreach</button><button class="co-button alt small" data-action="edit" data-id="${esc(p.id)}">Edit Partner</button><button class="co-button alt small" data-action="ai-review" data-id="${esc(p.id)}" ${ui.reviewingId?'disabled':''}>${ui.reviewingId===p.id?'Reviewing…':'AI Review'}</button></div></article>`;
+  return `<article class="co-discovery-card" data-listing-id="${esc(p.id)}" tabindex="0" aria-label="Toggle details for ${esc(p.name)}" aria-controls="listing-details-${esc(p.id)}" aria-expanded="false"><div><div class="co-listing-head"><h3>${esc(p.name)}</h3>${sourceLink}${pBadge(p)}</div><div class="co-listing-meta"><span><b><span class="material-symbols-outlined" aria-hidden="true">category</span>Category</b>${esc(titleCase(p.category))}</span><span><b><span class="material-symbols-outlined" aria-hidden="true">near_me</span>Distance From HQ</b>${p.distanceKm==null?'Unknown':m(p.distanceKm)+' km'}</span><span><b><span class="material-symbols-outlined" aria-hidden="true">alternate_email</span>Contact Route</b>${esc(contact.label)}</span></div>${recommendation}<details class="co-candidate-details" id="listing-details-${esc(p.id)}"><summary>Details</summary><div class="co-details-sourced"><span class="material-symbols-outlined" aria-hidden="true">calendar_today</span><span>Date Sourced</span><strong>${timeLabel(p.sourcedAt)}</strong></div>${composition}${evidenceSummary}${contact.html}</details></div><div class="co-card-actions"><div class="co-fit-meter co-fit-${p.match.score>=75?'good':p.match.score>=50?'moderate':'low'}" role="img" aria-label="Fit score ${p.match.score} out of 100"><div class="co-fit-meter-score">${p.match.score}/100</div><div class="co-fit-meter-method">${esc(p.match.method||'Rule-ranked')}</div><div class="co-fit-meter-track"><span class="co-fit-meter-fill" style="width:${Math.max(0,Math.min(100,p.match.score))}%"></span></div></div><button class="co-button small" data-href="/outreach?partner=${encodeURIComponent(p.id)}">Draft Outreach</button><button class="co-button alt small" data-action="edit" data-id="${esc(p.id)}">Edit Partner</button><button class="co-button alt small" data-action="ai-review" data-id="${esc(p.id)}" ${ui.reviewingId?'disabled':''}>${ui.reviewingId===p.id?'Reviewing…':'AI Review'}</button></div></article>`;
  }).join('');
  const pageNumbers=[...new Set([1,ui.page-1,ui.page,ui.page+1,totalPages].filter(n=>n>=1&&n<=totalPages))].sort((a,b)=>a-b);
  const pageButton=n=>'<button class="co-page-button" data-action="page" data-page="'+n+'" '+(ui.page===n?'aria-current="page"':'')+'>'+n+'</button>';
@@ -161,7 +167,7 @@ function findView(){
   data.discoveryRuns.slice(0,5).map(run=>'<div class="co-audit-row"><strong>'+timeLabel(run.startedAt)+'</strong><span>'+esc((run.sources||[]).map(x=>x.name+(x.cached?' (cached)':'')+' · '+x.found).join(', '))+'</span><span>'+run.newLeads+' added · '+run.reviewed+' AI assessed · '+run.aiCalls+' AI calls'+'</span></div>').join('')+
   '</details>':'';
  const last=(data.discoveryRuns||[])[0];
-  const idle=`<div class="co-last-scan"><div class="co-scan-primary"><strong>Last Scanned</strong><span>${timeLabel(last?.finishedAt||last?.startedAt)}</span></div><div class="co-scan-meta">${last?(()=>{return last.sources.length+' Sources Successful · '+last.sources.reduce((sum,x)=>sum+x.found,0)+' Entries · '+all.filter(p=>p.match.aiLed).length+' AI-Assessed Now';})():'Select Discover Partners to begin'}</div></div>`;
+  const idle=`<div class="co-last-scan"><div class="co-scan-primary"><strong>Last Scanned</strong><span>${timeLabel(last?.finishedAt||last?.startedAt)}</span></div><div class="co-scan-meta">${last?(()=>{return last.sources.length+' Sources Successful · '+last.sources.reduce((sum,x)=>sum+x.found,0)+' Entries · '+all.filter(p=>p.match.method==='AI-assisted').length+' AI-Ranked Now';})():'Select Discover Partners to begin'}</div></div>`;
  const status=ui.discoveryStatus;
  const progressState=discoveryViewProgress(status);
  const progress=`<section class="co-progress-panel" id="discovery-progress" ${ui.discoveryRunning?'':'hidden'} role="status" aria-live="polite"><strong id="discovery-phase">${esc(progressState.phase)}</strong><div class="co-progress-track"><div class="co-progress-fill" id="discovery-bar" style="width:${progressState.percentage}%"></div></div><div class="co-progress-meta"><span class="co-note" id="discovery-count">${progressState.label}</span><span class="co-note" id="discovery-detail">${esc(progressState.detail)}</span></div></section>`;
@@ -185,7 +191,7 @@ function findView(){
      </select>
     </label>
     <label class="co-discovery-ai-checkbox"><input type="checkbox" id="contactable-first-filter" ${ui.contactableFirst?'checked':''}>Contactable First</label>
-    <label class="co-discovery-ai-checkbox"><input type="checkbox" id="ai-assessed-filter" ${ui.aiAssessedOnly?'checked':''}>AI-Assessed Only</label>
+    <label class="co-discovery-ai-checkbox"><input type="checkbox" id="ai-assessed-filter" ${ui.aiAssessedOnly?'checked':''}>AI-Ranked Only</label>
     <div class="co-discovery-result-count">Showing ${matches.length?pageStart+1:0}–${Math.min(pageStart+15,matches.length)} of ${matches.length}</div>
    </div>
    <div class="co-discovery-sidebar-status">
@@ -800,12 +806,12 @@ async function handleAction(el){const action=el.dataset.action;
   if(action==='ai-review'){
   const id=el.dataset.id,p=partner(id);
   if(!p||ui.reviewingId)return;
-  if(p.aiAssessment&&!confirm('Re-review '+p.name+' with AI? This will use another AI call and replace its existing AI assessment.'))return;
+  if(p.aiEvidenceReview&&!confirm('Reassess '+p.name+' using AI? This uses another inference call.'))return;
   ui.reviewingId=id;render();
   try{
-   await request('/api/partners/'+encodeURIComponent(id)+'/ai-review',{method:'POST',body:'{}'});
+   await request('/api/partners/'+encodeURIComponent(id)+'/evidence-review',{method:'POST',body:'{}'});
    await refresh();
-   notice('AI review complete.');
+   notice('AI evidence assessment complete. Fit score updated where source evidence is sufficient.');
   }catch(err){notice(err.message,'error');}
   finally{ui.reviewingId=null;render();}
   return;
