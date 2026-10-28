@@ -81,7 +81,7 @@ export async function generateJSON(provider, prompt, {runner=spawn, timeoutMs=90
     child.stderr.on('data', chunk => {stderr += chunk.toString(); if (stderr.length > LIMIT) child.kill();});
     child.on('close', code => {
       if (stdout.length > LIMIT || stderr.length > LIMIT) return complete(new Error('AI output was too long'));
-      if (code !== 0) return complete(new Error(provider + ' CLI failed. Confirm it is installed and signed in (run ' + provider + ' in your terminal).'));
+      if (code !== 0) return complete(new Error(/\b429\b|Too Many Requests/i.test(stderr+' '+stdout)?provider+' rate-limited (HTTP 429); try again when the provider allows requests':provider + ' CLI failed. Confirm it is installed and signed in (run ' + provider + ' in your terminal).'));
       try {const parsed=parseAIOutput(stdout,provider); complete(null,withUsage?parsed:parsed.result);}
       catch {complete(new Error(provider + ' returned an invalid JSON response. Try again.'));}
     });
