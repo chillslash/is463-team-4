@@ -2,7 +2,7 @@
 
 **Status:** Baseline model comparison completed 23 October 2026; CoffeeBot feedback incorporated 27 October 2026. Results measure source-evidence ordering, not real acceptance.
 
-**New experimental hybrid implementation:** See [AI hybrid design](ai-hybrid-design.md), [sponsor-priority methodology](sponsor-ranking-evaluation.md) and [24-case proxy review](proxy-review-results.md). The historical figures below assess agreement with our internal public-source relevance tiers, **not** CoffeeBot's operational judgement or realised acceptance. The old deterministic-only implementation decision below is **superseded on the feature branch** by citation-checked, selective AI evidence blending. The 28 October proxy comparison is **completed**, but does not establish a real-world winner. [See results](benchmark-2026-10-28-results.md).
+**New experimental hybrid implementation:** See [AI hybrid design](ai-hybrid-design.md), [sponsor-priority methodology](sponsor-ranking-evaluation.md) and [24-case proxy review](proxy-review-results.md). The historical figures below assess agreement with our internal public-source relevance tiers, **not** CoffeeBot's operational judgement or realised acceptance. The old deterministic-only implementation decision below is **superseded on the feature branch** by citation-checked, selective AI evidence blending. The 28 October proxy comparison was executed but is **not a valid controlled model-selection experiment**. [Audit](benchmark-methodology-audit-2026-10-28.md) · [Original diagnostic figures](benchmark-2026-10-28-results.md).
 
 ## Operational purpose
 
