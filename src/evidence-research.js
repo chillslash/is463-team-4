@@ -7,7 +7,8 @@ function plain(html){
   .replace(/\s+/g,' ').trim();
 }
 export function extractMaterialEvidence(html){
- const text=plain(html).slice(0,160000);
+ const structured=String(html||'').replace(/<\\/(?:p|li|h[1-6]|section|article|div)>/gi,'. ');
+ const text=plain(structured).slice(0,160000);
  const sentences=text.split(/(?<=[.!?])\s+|\s{2,}/);
  const selected=[];
  for(const piece of sentences){
