@@ -69,3 +69,10 @@ test('prompt requires cited evidence indices, source-limited reasoning and no in
  assert.match(prompt,/sourceEvidence/i);
  assert.ok(prompt.includes(explicit));
 });
+
+test('SFA licence disclaimer mentioning coffee grounds is not positive reuse evidence',()=>{
+ const p=source('sfa','Vegetable Farm','SFA lists Vegetable Farm under Vegetable Farming (licence 7521I051). This does not establish growing method, acceptance of coffee grounds, contact authority, capacity or logistics.');
+ assert.equal(evidenceQuality(p.evidenceEntries[0]),false);
+ assert.deepEqual(validateEvidenceAssessments(answer(p,40,35),[p]),[]);
+ assert.equal(scorePartner(p,0).method,'Rule-ranked');
+});
