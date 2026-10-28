@@ -13,25 +13,29 @@ if(models.some(x=>!['codex','claude','qwen','llama'].includes(x)))throw Error('U
 const limit=opts.limit?Number(opts.limit):12;
 if(!Number.isInteger(limit)||limit<1||limit>24)throw Error('Hybrid limit must be 1–24');
 const state=JSON.parse(await readFile(opts.state,'utf8'));migrateSponsorAssumptions(state);
-const review=JSON.parse(await readFile(opts.review,'utf8'));
+const reference=JSON.parse(await readFile(opts.review,'utf8'));
+const maxCases=opts['max-cases']?Number(opts['max-cases']):reference.cases.length;
+if(!Number.isInteger(maxCases)||maxCases<1||maxCases>reference.cases.length)throw Error('Invalid max-cases');
+const review={...reference,cases:reference.cases.slice(0,maxCases)};
 const index=new Map(state.partners.map(p=>[p.id,p]));
 const all=review.cases.map(x=>{const p=index.get(x.id);if(!p)throw Error('Missing '+x.id);return {...p,use:'',notes:'',aiAssessment:null,aiEvidenceReview:null};});
 const w=state.settings.ratingWeights;
 const runMetrics={};const predictions={models:{}};
 for(const provider of models){
  // Full AI baseline uses the legacy model rubric without grounding requirements.
- const full={},fullCalls=[];let begin=Date.now();
+ const full={},fullCalls=[];let begin=Date.now(),unavailable=false;
  for(let i=0;i<all.length;i+=4){
   const batch=all.slice(i,i+4),start=Date.now();
   try{
-   const result=await generateJSON(provider,assessmentPrompt(batch.map(sourceFacts)),{withUsage:true,timeoutMs:300000});
+   const result=await generateJSON(provider,assessmentPrompt(batch.map(sourceFacts)),{withUsage:true,timeoutMs:90000});
    const values=validateAssessment(result.result,batch.map(p=>p.id));
    for(const a of values){
     const p=batch.find(x=>x.id===a.id),fixed=scorePartner(p,0,w).parts;
     full[p.id]=Math.round(a.reuseSuitability/40*w.suitability)+Math.round(a.sourceEvidence/35*w.evidence)+fixed.proximity+fixed.operations;
    }
    fullCalls.push({count:batch.length,valid:values.length,ms:Date.now()-start,usage:result.usage});
-  }catch(err){fullCalls.push({count:batch.length,valid:0,ms:Date.now()-start,error:String(err.message).slice(0,160)});}
+  }catch(err){fullCalls.push({count:batch.length,valid:0,ms:Date.now()-start,error:String(err.message).slice(0,160)});
+   if(/could not launch|CLI failed|timed out|ECONNREFUSED|fetch failed/i.test(String(err.message))){unavailable=true;break;}}
  }
  predictions.models[provider+'-full']=full;
  runMetrics[provider+'-full']={coverage:Object.keys(full).length,elapsedMs:Date.now()-begin,calls:fullCalls};
@@ -39,7 +43,7 @@ for(const provider of models){
  const eligible=rankPartners(all,0,w).filter(p=>(p.evidenceEntries||[]).some(e=>evidenceQuality(e)));
  const selected=selectSourceBalanced(eligible,limit);
  const scores={};const hybridCalls=[];const upgraded=new Map();begin=Date.now();
- for(let i=0;i<selected.length;i+=4){
+ for(let i=0;!unavailable && i<selected.length;i+=4){
   const batch=selected.slice(i,i+4),start=Date.now();
   try{
    const result=await generateJSON(provider,evidencePrompt(batch),{withUsage:true,timeoutMs:300000});
