@@ -2,7 +2,7 @@
 
 **Status:** Baseline model comparison completed 23 October 2026; CoffeeBot feedback incorporated 27 October 2026. Results measure source-evidence ordering, not real acceptance.
 
-**New independent sponsor-priority evaluation:** See [sponsor-ranking-evaluation.md](sponsor-ranking-evaluation.md). The existing figures below assess agreement with our internal public-source relevance tiers, **not** CoffeeBot's operational judgement or realised acceptance. The separate blinded review and diagnostics are on this feature branch; a new model winner is not yet established.
+**New experimental hybrid implementation:** See [AI hybrid design](ai-hybrid-design.md), [sponsor-priority methodology](sponsor-ranking-evaluation.md) and [24-case proxy review](proxy-review-results.md). The historical figures below assess agreement with our internal public-source relevance tiers, **not** CoffeeBot's operational judgement or realised acceptance. The old deterministic-only implementation decision below is **superseded on the feature branch** by citation-checked, selective AI evidence blending. A new model winner is **not** established.
 
 ## Operational purpose
 
