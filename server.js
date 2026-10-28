@@ -1,3 +1,4 @@
+import {researchOrganisationEvidence} from './src/evidence-research.js';
 import {activeEvidenceReview,evidenceQuality,evidencePrompt,validateEvidenceAssessments} from './src/evidence-review.js';
 import {selectSourceBalanced} from './src/assessment-selection.js';
 import {createServer} from 'node:http';
@@ -203,6 +204,20 @@ export function saveAIResults(partners,batch,results,{provider,prompt,runId,manu
 }
 export function chooseForAssessment(partners,limit=24){return selectSourceBalanced(partners,limit);}
 
+async function enrichWebsiteEvidence(p,{signal}={}){
+ if(!p.websiteUrl)return 0;
+ const checked=Date.parse(p.evidenceResearch?.checkedAt||'');
+ if(Number.isFinite(checked)&&Date.now()-checked<7*86400000)return 0;
+ const researched=await researchOrganisationEvidence(p,{signal});
+ p.evidenceResearch={checkedAt:researched.checkedAt,result:researched.reason};
+ const entries=p.evidenceEntries||[];
+ for(const e of researched.entries){
+  if(!entries.some(x=>x.url===e.url&&x.claim===e.claim))entries.push(e);
+ }
+ p.evidenceEntries=entries.slice(0,30);
+ return researched.entries.length;
+}
+
 export function saveEvidenceResults(partners,results,{provider,runId}){
  let count=0;
  for(const assessed of results){
@@ -258,6 +273,11 @@ async function discover(s,{provider=AI_PROVIDER,assessmentGenerator=generateJSON
   }
   discoveryStatus={active:true,phase:'Ranking Partners',detail:'Ranking sourced leads',completed:2,total:4,runId};
   if(AUTO_AI_REVIEW && provider!=='template'){
+   // A bounded evidence-gathering stage runs only for sources with an
+   // organisation website. Failures do not block other organisations.
+   const researchTargets=rankPartners(s.partners,0,s.settings.ratingWeights)
+    .filter(p=>p.status==='suggested'&&p.websiteUrl).slice(0,6);
+   for(const p of researchTargets){check();await enrichWebsiteEvidence(s.partners.find(x=>x.id===p.id),{signal});}
    const candidates=rankPartners(s.partners,numbers(s.settings,s.partners,s.handovers).gapKg,s.settings.ratingWeights)
     .filter(p=>p.status==='suggested'&&p.source!=='Fictional Stitch scenario');
    const specific=candidates.filter(p=>!activeEvidenceReview(p)&&
@@ -384,8 +404,9 @@ export function createApp({aiProvider=AI_PROVIDER,assessmentGenerator=generateJS
     const p=state.partners.find(x=>x.id===id);
     if(!p)fail('Partner not found');
     if(p.status==='closed')fail('Closed partners cannot be reviewed');
+    if(!(p.evidenceEntries||[]).some(e=>evidenceQuality(e)))await enrichWebsiteEvidence(p);
     if(!(p.evidenceEntries||[]).some(e=>evidenceQuality(e)))
-     fail('A specific cited source is needed before AI can assess this partner. Add verifiable source evidence first.');
+     fail('Insufficient specific public evidence. Use Research Contact to save the organisation website, or add a verifiable source before AI assessment.');
     const runId=randomUUID(),prompt=evidencePrompt([p]),started=Date.now();
     let usage=null,error=null,review=null;
     try{
