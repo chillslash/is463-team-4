@@ -1,5 +1,7 @@
 # Partner ranking benchmark, 28 October 2026
 
+**METHODOLOGY AUDIT (28 October): This is a historical diagnostic run, NOT a valid head-to-head model-selection experiment.** The audit finds source-category dependence, label-information asymmetry and different full-AI/hybrid prompts, validators and score formulas. **Withdraw the earlier interpretation that rules-only was established as the best partner-ranking method.** The recorded figures below are genuine outputs but do not isolate the AI contribution. [Read the audit](benchmark-methodology-audit-2026-10-28.md).
+
 **Status:** Completed exploratory comparison on the existing 24-case, assistant-labelled proxy cohort. All five approaches generated a score for all 24 partners. The work and results are in `feature/evidence-calibrated-ranking-benchmark`; nothing was merged into `main`.
 
 ## Evaluation question
@@ -33,7 +35,7 @@ The reference labels are **not independent CoffeeBot or observed acceptance judg
 | Full Qwen3.5 4B | 24/24 | 0.7522 | 61.29% | 6 | 0.8840 |
 | Selective Qwen hybrid | 24/24 | 1.0000 | 91.29% | 10 | 0.9948 |
 
-**Interpretation:** Against these frozen proxy grades, rules-only was strongest. Selective hybrids preserved most of its ranking quality. The Qwen hybrid had the exact same ordering metrics because its one valid assessment did not change the relevant ordering. It would be false to interpret this as AI improving ranking quality. Similarly, an nDCG@10 of 1.0 is close alignment with **our limited proxy reference**, not proof of optimal real-world partners.
+**Historical diagnostic interpretation (not a valid model winner claim):** Against these frozen proxy grades, rules-only had the highest aggregate agreement. Selective hybrids preserved most of its ranking quality. The Qwen hybrid had the exact same ordering metrics because its one valid assessment did not change the relevant ordering. It would be false to interpret this as AI improving ranking quality. Similarly, an nDCG@10 of 1.0 is close alignment with **our limited proxy reference**, not proof of optimal real-world partners.
 
 ### Where rankings disagreed
 
