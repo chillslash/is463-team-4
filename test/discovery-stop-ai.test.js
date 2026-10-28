@@ -22,6 +22,7 @@ const cib='d_f91a8b057cfb2bebf2e531ad8061e1c1',parks='d_0542d48f0991541706b58059
 globalThis.fetch=async(url,opts)=>{
  const u=String(url);
  if(u.startsWith(base))return native(url,opts);
+ if(u.includes('nea.gov.sg/our-services/'))return new Response('<h3>Local food waste recycling facilities</h3><table><tbody><tr><td>A1 Environment Pte Ltd</td><td>Contact</td><td>Used coffee grounds</td></tr></tbody></table>',{status:200});
  if(u.includes('poll-download'))return new Response(JSON.stringify({code:0,data:{url:'https://s3.ap-southeast-1.amazonaws.com/'+u.match(/d_[a-f0-9]+/)?.[0]+'.json'}}),{status:200});
  if(u.includes('amazonaws.com')){
   const id=u.match(/d_[a-f0-9]+/)?.[0];
