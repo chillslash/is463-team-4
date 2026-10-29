@@ -10,8 +10,10 @@ process.env.SOURCE_CACHE_DIR=join(dir,'sources');
 process.env.AI_PROVIDER='codex';
 process.env.AUTO_AI_REVIEW='true';
 const {createApp}=await import('../server.js');
-const assessmentGenerator=async(_,__,{signal})=>{
- throw new Error('Generic directory claims must not reach the AI assessment provider');
+let attempted=0;
+const assessmentGenerator=async()=>{
+ attempted++;
+ throw new Error('Simulated provider outage after valid selection of directory candidates');
 };
 const srv=createApp({aiProvider:'codex',assessmentGenerator});srv.listen(0,'127.0.0.1');await once(srv,'listening');
 const base='http://127.0.0.1:'+srv.address().port,native=globalThis.fetch;
@@ -30,16 +32,19 @@ globalThis.fetch=async(url,opts)=>{
 };
 const api=async(path,method='GET')=>{const r=await native(base+path,{method});return {status:r.status,body:await r.json()};};
 test.after(async()=>{globalThis.fetch=native;srv.close();await once(srv,'close');await rm(dir,{recursive:true,force:true})});
-test('generic discovered directory leads are skipped and never sent for unsupported AI assessment',async()=>{
+test('generic discovered directory leads enter evaluation but provider failure leaves only rules',async()=>{
  const before=(await api('/api/state')).body;
  const disk=await readFile(process.env.DATA_FILE,'utf8');
  const completed=await api('/api/discover','POST');
  assert.equal(completed.status,200);
  assert.equal(completed.body.assessed,0);
- assert.equal(completed.body.aiCalls,0);
+ assert.ok(completed.body.aiCalls>0);
+ assert.ok(attempted>0);
+ assert.ok(completed.body.assessmentFailed>0);
  const after=(await api('/api/state')).body;
  assert.ok(after.partners.length>=before.partners.length);
  assert.equal(after.discoveryRuns.length,before.discoveryRuns.length+1);
- assert.deepEqual(after.aiActivity,before.aiActivity);
+ assert.ok(after.aiActivity.length>before.aiActivity.length);
+ assert.ok(after.ranked.filter(p=>p.match.method==='AI-assisted').length===0);
  assert.notEqual(await readFile(process.env.DATA_FILE,'utf8'),disk);
 });
