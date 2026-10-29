@@ -134,9 +134,9 @@ test('discovery progress tracks AI batches and displays its actual completion pe
  const halfway=status(2,'Assessing and Ranking Partners',',batchTotal:2,batchCompleted:1');
  const done=status(2,'Assessing and Ranking Partners',',batchTotal:2,batchCompleted:2');
  assert.equal(start.percentage,25);
- assert.equal(start.detail,'Evaluating Batch 1 Of 2');
+ assert.equal(start.detail,'Evaluating Batch 1 of 2');
  assert.equal(halfway.percentage,58);
- assert.equal(halfway.detail,'Evaluating Batch 2 Of 2');
+ assert.equal(halfway.detail,'Evaluating Batch 2 of 2');
  assert.equal(done.percentage,90);
  assert.equal(done.detail,'Evaluated All 2 Batches');
  assert.equal(status(3,'Finalising Results').percentage,95);
