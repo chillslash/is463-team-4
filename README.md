@@ -1,5 +1,8 @@
 # CoffeeBot Circularity Copilot
 
+**29 October simplified assessment workflow (feature branch):** CoffeeBot uses deterministic screening only to select a configurable, source-balanced top-N cohort (0–24 per run). Every selected candidate is eligible for the same structured AI evaluation prompt—even if its only evidence is a directory entry. Codex is the current prototype model; Qwen and Llama use the same prompt for comparisons with the deterministic baseline. Cite whatever public records are actually available, score source-evidence strength conservatively, state uncertainties, and never invent uptake, capacity, willingness or downstream reuse. AI changes only suitability and evidence points; location and documented operations stay deterministic. A bounded website check may supplement some selected candidates but never determines assessment eligibility. Previously saved evidence-v2 and advisory results remain as history, not active v3 numerical scores. The benchmark comparisons remain exploratory, not sponsor outcomes.
+
+
 Functional, single-user IS463 prototype for CoffeeBot (Team Second Shot). It helps staff identify *potential* spent coffee grounds (SCG) recipients, prepare reviewed outreach, manage recurring partnerships, and log physical transfers. This repository is the source of truth for the implemented application; see [`docs/problem-statement.md`](docs/problem-statement.md) for the sponsor problem and [`docs/prototype.md`](docs/prototype.md) for the current functional scope and open decisions.
 
 ## Run locally
