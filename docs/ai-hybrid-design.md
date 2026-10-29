@@ -34,6 +34,8 @@ The app already records provider, token metadata when available, number of calls
 
 **Completed 28 October benchmark:** [Full Codex, full Qwen, rules-only and selective-hybrid results](benchmark-2026-10-28-results.md). The legacy comparison ran on all 24 frozen proxy cases, but a [methodological audit](benchmark-methodology-audit-2026-10-28.md) found label and scoring confounds. Its figures are diagnostic only; no ranking approach has been validated for actual CoffeeBot acceptance.
 
+**Controlled evidence-aware rerun completed 29 October:** [Methodology](controlled-rerun-methodology-2026-10-29.md) · [Results](controlled-rerun-results-2026-10-29.md). The older proxy model-winner claim was withdrawn; the new comparison uses the same evidence, AI answers and fusion for full versus selective, but internal reference labels remain limited.
+
 ## Reproducible evaluation
 
 Existing assessments and frozen desk judgements are in `scripts/proxy-review-judgements.json`, with the labelled local review at `data/proxy-review-labelled.json` (ignored). Never allow prediction code to read reference labels until scoring is complete.
