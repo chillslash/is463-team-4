@@ -87,6 +87,7 @@ test('invalid citations do not overwrite a previous grounded review',async()=>{
  assert.equal(after.partners.find(p=>p.id==='material-farm').aiEvidenceReview.evidenceIds[0],0);
 });
 test('dated source evidence does not create a pre-assessment block',async()=>{
+ invalid=false;
  const previous=calls;
  const response=await call('/api/partners/stale-material-farm/evidence-review','POST');
  assert.equal(response.status,200);assert.equal(calls,previous+1);
