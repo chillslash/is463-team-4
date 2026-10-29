@@ -36,3 +36,12 @@ test('community garden school location uses official directory without inventing
  assert.ok(school.evidenceEntries.some(x=>x.url===SCHOOL_DIRECTORY_URL));
  assert.equal(manual.location,'Custom staff-provided address');
 });
+
+test('MOE directory websites are retained only when explicitly published and HTTPS',()=>{
+ const row={school_name:'Green School',alp_domain:'Environment',alp_title:'Green Gardening Programme',llp_title:''};
+ const make=url=>moeSchoolCandidates([row],[{school_name:'Green School',address:'10 Sample Street',postal_code:'123456',url_address:url}],initialState().settings)[0];
+ assert.equal(make('https://greenschool.edu.sg').websiteUrl,'https://greenschool.edu.sg/');
+ assert.equal(make('http://greenschool.edu.sg').websiteUrl,'');
+ assert.equal(make('https://localhost/private').websiteUrl,'');
+ assert.equal(make('').websiteUrl,'');
+});
