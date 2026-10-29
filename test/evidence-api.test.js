@@ -36,7 +36,7 @@ let invalid=false,providerFailure=false,calls=0;
 const assessmentGenerator=async(_provider,prompt)=>{
  calls++;
  if(providerFailure)throw new Error('Codex provider unavailable');
- const [input]=JSON.parse(prompt.split('\\n').at(-1));
+ const [input]=JSON.parse(prompt.split('\n').at(-1));
  const generic=input.id==='generic-farm';
  return {result:{assessments:[{id:input.id,reuseSuitability:invalid?40:generic?12:36,
   sourceEvidence:generic?4:30,evidenceIds:[invalid?99:0],
