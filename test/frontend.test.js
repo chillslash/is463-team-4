@@ -123,16 +123,25 @@ test('all navigation pages use the updated two-line brand and centred staff labe
  }
 });
 
-test('discovery progress remains on a fixed four-stage scale through AI batches',async()=>{
+test('discovery progress tracks AI batches and displays its actual completion percentage',async()=>{
  const {root,context}=await boot('/find-partners');
  const status=(completed,phase,extra='')=>runInNewContext('discoveryViewProgress({completed:'+completed+',phase:'+JSON.stringify(phase)+',total:4'+extra+'})',context);
- assert.equal(status(0,'Discovering Partners').percentage,0);
- assert.equal(status(1,'Researching Contacts').percentage,25);
- assert.equal(status(2,'Assessing and Ranking Partners',',batchTotal:2,batchCompleted:0').percentage,50);
- assert.equal(status(2,'Assessing and Ranking Partners',',batchTotal:2,batchCompleted:1').percentage,63);
- assert.equal(status(2,'Assessing and Ranking Partners',',batchTotal:2,batchCompleted:2').percentage,75);
- assert.equal(status(3,'Finalising Results').percentage,75);
+ const first=status(0,'Discovering Partners');
+ assert.equal(first.percentage,5);
+ assert.equal(first.label,'5% Complete');
+ assert.equal(status(1,'Researching Contacts').percentage,15);
+ const start=status(2,'Assessing and Ranking Partners',',batchTotal:2,batchCompleted:0');
+ const halfway=status(2,'Assessing and Ranking Partners',',batchTotal:2,batchCompleted:1');
+ const done=status(2,'Assessing and Ranking Partners',',batchTotal:2,batchCompleted:2');
+ assert.equal(start.percentage,25);
+ assert.equal(start.detail,'Evaluating Batch 1 Of 2');
+ assert.equal(halfway.percentage,58);
+ assert.equal(halfway.detail,'Evaluating Batch 2 Of 2');
+ assert.equal(done.percentage,90);
+ assert.equal(done.detail,'Evaluated All 2 Batches');
+ assert.equal(status(3,'Finalising Results').percentage,95);
  assert.equal(status(4,'Completed').percentage,100);
+ for(const progress of [first,start,halfway,done])assert.equal(progress.label,progress.percentage+'% Complete');
  assert.ok(!root.innerHTML.includes('discovery-progress"  role'));
  assert.ok(root.innerHTML.includes('5 Sources')===false);
 });
