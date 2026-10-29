@@ -175,7 +175,7 @@ function screen(p){
 export function scorePartner(p,gap,ratingWeights=DEFAULT_RATING_WEIGHTS){
  const weights=validRatingWeights(ratingWeights)?ratingWeights:DEFAULT_RATING_WEIGHTS;
  const review=activeEvidenceReview(p);
- const aiLed=!!review||hasAIFit(p),a=p.aiAssessment||{};
+ const aiLed=!!review; // AI-Assessed Only means an active model-influenced score, not historical advisory text.
  // Rules-only is the complete, inexpensive fallback. V2 AI contributes only
  // when the cited organisation-specific evidence still matches saved facts.
  const base=screen(p);
@@ -203,7 +203,7 @@ export function scorePartner(p,gap,ratingWeights=DEFAULT_RATING_WEIGHTS){
  const maxima={suitability:40,evidence:35,proximity:10,operations:40};
  const parts=Object.fromEntries(Object.keys(maxima).map(key=>[key,Math.round(Math.max(0,Math.min(1,rawParts[key]/maxima[key]))*weights[key])]));
  const score=Object.values(parts).reduce((sum,v)=>sum+v,0);
- const reasons=[review?review.reason:(aiLed?a.reason:(p.directCoffeeEvidence?'Source explicitly mentions used coffee grounds':'Preliminary screening based on source category and available evidence'))];
+ const reasons=[review?review.reason:(p.directCoffeeEvidence?'Source explicitly mentions used coffee grounds':'Preliminary screening based on source category and available evidence')];
  if(p.distanceKm!=null)reasons.push('Approximately '+p.distanceKm+' km straight-line from HQ');
  if(knownCapacity)reasons.push(capacity+' kg/week intake '+(p.verified?'verified by staff':'reported, not yet verified'));
  if(!knownCapacity)reasons.push('Intake capacity unknown; confirm with partner');
