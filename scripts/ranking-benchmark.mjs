@@ -2,9 +2,10 @@ import {readFile,mkdir,writeFile} from 'node:fs/promises';
 import {join,dirname,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createHash} from 'node:crypto';
-import {scorePartner,DEFAULT_RATING_WEIGHTS,AI_RUBRIC_VERSION} from '../src/core.js';
-import {generateJSON,validateAssessment} from '../src/ai.js';
-import {sourceFacts,assessmentPrompt} from '../server.js';
+import {scorePartner,DEFAULT_RATING_WEIGHTS} from '../src/core.js';
+import {evidencePrompt,validateEvidenceAssessments} from '../src/evidence-review.js';
+import {generateJSON} from '../src/ai.js';
+
 import {rankingMetrics} from './ranking-metrics.mjs';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const option=(n,d)=>process.argv.find(x=>x.startsWith('--'+n+'='))?.slice(n.length+3)||d;
@@ -20,14 +21,13 @@ const cases=fixture.cases.filter(x=>split==='all'||x.split===split).slice(0,limi
  const p=index.get(x.id);if(!p)throw new Error('Missing saved prospect '+x.id+'; benchmark requires the reviewed discovery snapshot');
  return {...x,p:{...p,aiAssessment:null}};
 });
-const fingerprint=createHash('sha256').update(JSON.stringify(cases.map(x=>sourceFacts(x.p)))).digest('hex');
+const fingerprint=createHash('sha256').update(JSON.stringify(cases.map(x=>x.p))).digest('hex');
 const folder=join(root,'data','benchmark-results');await mkdir(folder,{recursive:true});
 // Report a candidate model's rubric score for comparison even when production
 // intentionally uses deterministic scores instead of model scores.
 function diagnosticModelScore(p,a){
- const baseline=scorePartner({...p,aiAssessment:null},0,DEFAULT_RATING_WEIGHTS);
- const verifiedReadiness=p.verified&&p.confirmed&&Number(p.capacityKg)>0?5:0;
- return a.reuseSuitability+a.sourceEvidence+baseline.parts.proximity+Math.min(15,a.operationalCompatibility+verifiedReadiness);
+ // Exactly the same scorer and assessment format as the actual application.
+ return scorePartner({...p,aiEvidenceReview:{...a,assessedAt:new Date().toISOString()}},0,DEFAULT_RATING_WEIGHTS).score;
 }
 const all=[];
 for(const model of models){
@@ -40,12 +40,12 @@ for(const model of models){
   for(const x of cases)scores.set(x.id,{score:scorePartner(x.p,0,DEFAULT_RATING_WEIGHTS).score,reason:'Source-only screening'});
  }else for(let i=0;i<cases.length;i+=batchSize){
   const group=cases.slice(i,i+batchSize).filter(x=>!scores.has(x.id));if(!group.length)continue;
-  const prompt=assessmentPrompt(group.map(x=>sourceFacts(x.p)));
+  const prompt=evidencePrompt(group.map(x=>x.p));
   const t=Date.now();
   console.log(model+' batch '+(Math.floor(i/batchSize)+1)+'/'+Math.ceil(cases.length/batchSize)+' ('+group.length+' records)');
   try{
    const raw=await generateJSON(model,prompt,{withUsage:true,timeoutMs:300000});
-   const assessments=validateAssessment(raw.result,group.map(x=>x.id));
+   const assessments=validateEvidenceAssessments(raw.result,group.map(x=>x.p));
    for(const a of assessments){
     const x=group.find(x=>x.id===a.id);
     scores.set(a.id,{score:diagnosticModelScore(x.p,a),reason:a.reason,check:a.check});
