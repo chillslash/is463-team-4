@@ -1,4 +1,6 @@
 import {readFile,mkdir,writeFile} from 'node:fs/promises';
+import {existsSync} from 'node:fs';
+import {loadEnvFile} from 'node:process';
 import {join,dirname,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createHash} from 'node:crypto';
@@ -8,6 +10,9 @@ import {generateJSON} from '../src/ai.js';
 
 import {rankingMetrics} from './ranking-metrics.mjs';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
+// Match the server's local provider settings, without committing or printing credentials.
+const envPath=join(root,'.env');
+if(existsSync(envPath))loadEnvFile(envPath);
 const option=(n,d)=>process.argv.find(x=>x.startsWith('--'+n+'='))?.slice(n.length+3)||d;
 const models=option('models','rules,codex,qwen,llama').split(',');
 const split=option('split','all');
