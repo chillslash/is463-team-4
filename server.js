@@ -8,7 +8,7 @@ import {loadEnvFile} from 'node:process';
 import {join, resolve, extname} from 'node:path';
 import {randomUUID,createHash} from 'node:crypto';
 import {initialState, numbers, rankPartners, distanceKm, draftTemplate, OUTREACH_SUBJECT, suggestedReuse, outreachSalutation, proposedReuseContext, RESPONSE_STATUSES, ACTIVITY_OUTCOMES, LEGACY_ACTIVITY_OUTCOMES, STATUSES, AI_RUBRIC_VERSION, hasAIFit, validRatingWeights, migrateSponsorAssumptions, COFFEEBOT_MONTHLY_CUP_VOLUMES, SPONSOR_MONTHLY_CUPS, enrichDemoProfiles, DEMO_ACTIVITY, LEGACY_DEMO_NOTES, LEGACY_SEEDED_PARTNER_NOTES} from './src/core.js';
-import {generateJSON,validateDraft,validateAssessment,validateActivitySuggestion,ensureCoffeeBotSubject} from './src/ai.js';
+import {generateJSON,validateDraft,validateActivitySuggestion,ensureCoffeeBotSubject} from './src/ai.js';
 import {discoverAll} from './src/discovery.js';
 import {resolveLocations} from './src/geocode.js';
 import {researchPublicContact,publicWebUrl} from './src/contacts.js';
@@ -179,17 +179,8 @@ function archiveAssessment(p,reason){
  p.aiAssessmentHistory.unshift({...p.aiAssessment,archivedReason:reason});
  p.aiAssessmentHistory=p.aiAssessmentHistory.slice(0,10);
 }
-export function assessmentPrompt(facts){
- return [
-  'Evaluate possible spent-coffee-grounds reuse partners from supplied records ONLY. Do not browse, use tools, or invent contacts, willingness, composting activity or agreements.',
-  'Respond with one JSON object: {"assessments":[{"id":"matching id","reuseSuitability":integer,"sourceEvidence":integer,"operationalCompatibility":integer,"reason":"brief source-grounded rationale","check":"one most important unanswered question"}]}.',
-  'Score each lead independently using the same rubric: reuseSuitability 0-40 = plausible technical/organisational use of spent grounds; sourceEvidence 0-35 = strength and specificity of cited facts; operationalCompatibility 0-10 = evidence of recurring or pilot quantity and handling capability.',
-  'Strong scores require specific cited evidence. Schools, parks, nurseries and gardens are NOT proven to compost or accept grounds. Sustainability programmes are weak evidence. Unknown capacity or operations should score 0-2. Published coffee-ground acceptance supports a higher score, not a guaranteed agreement.',
-  'Distinguish staff-supplied notes and claims from independently cited public source evidence. Unverified staff claims may guide checks but are not independently verified. Consider new staff information without inventing facts.',
-  'Do NOT assess distance: the application calculates proximity separately. Use integer scores in the allowed ranges and give evidence-specific reasons and the main unresolved question. Assess every supplied id.',
-  'Source facts: '+JSON.stringify(facts)
- ].join('\n');
-}
+// Kept as an API alias; there is exactly one partner-assessment prompt.
+export function assessmentPrompt(partners){return evidencePrompt(partners);}
 export function saveAIResults(partners,batch,results,{provider,prompt,runId,manual=false}){
  const byId=new Map(results.map(a=>[a.id,a]));let saved=0;
  for(const ranked of batch){
@@ -416,7 +407,7 @@ export function createApp({aiProvider=AI_PROVIDER,assessmentGenerator=generateJS
     throw err;
    }finally{if(discoveryController===controller)discoveryController=null;}
   }
-  const evidenceReviewRoute=path.match(/^\/api\/partners\/([a-zA-Z0-9_-]+)\/evidence-review$/);
+  const evidenceReviewRoute=path.match(/^\/api\/partners\/([a-zA-Z0-9_-]+)\/(?:evidence-review|ai-review)$/);
   if(evidenceReviewRoute&&req.method==='POST'){
    if(discoveryStatus.active)return response(res,409,{error:'Discovery is running'});
    if(aiProvider==='template')return response(res,503,{error:'Configure an AI provider before requesting evidence assessment'});
@@ -444,35 +435,6 @@ export function createApp({aiProvider=AI_PROVIDER,assessmentGenerator=generateJS
    });
    if(result.error)return response(res,502,{error:'Evidence review failed: '+result.error});
    return response(res,200,{partnerId:id,assessment:result.review});
-  }
-  if(path.match(/^\/api\/partners\/[a-zA-Z0-9_-]+\/ai-review$/)&&req.method==='POST'){
-   if(discoveryStatus.active)return response(res,409,{error:'Discovery is running. Try reviewing after it completes.'});
-   if(aiProvider==='template')return response(res,503,{error:'AI review requires Codex or Claude configured in the server environment.'});
-   const partnerId=path.split('/')[3];
-   const outcome=await mutation(async state=>{
-    const p=state.partners.find(x=>x.id===partnerId);
-    if(!p)fail('Partner not found');
-    if(p.status==='closed')fail('Closed partners cannot be AI-reviewed');
-    const runId=randomUUID(),facts=[sourceFacts(p)],prompt=assessmentPrompt(facts),started=Date.now();
-    let usage=null,error=null,reviewed=null;
-    try{
-     const generated=await assessmentGenerator(aiProvider,prompt,{withUsage:true});
-     usage=generated.usage;
-     const response=validateAssessment(generated.result,[p.id]);
-     const count=saveAIResults(state.partners,[p],response,{provider:aiProvider,prompt,runId,manual:true});
-     if(count!==1)throw Error('No valid assessment returned for this partner');
-     reviewed=p.aiAssessment;
-    }catch(err){error=err.message;}
-    appendAILog(state,{
-     id:randomUUID(),at:new Date().toISOString(),kind:'manual-partner-review',
-     provider:aiProvider,partnerId,runId,success:!error,error,
-     durationMs:Date.now()-started,
-     ...(usage||{inputTokens:null,outputTokens:null,cachedInputTokens:null})
-    });
-    return {reviewed,error,partnerId};
-   });
-   if(outcome.error)return response(res,502,{error:'AI review failed: '+outcome.error});
-   return response(res,200,{partnerId,assessment:outcome.reviewed});
   }
   const contactRoute=path.match(/^\/api\/partners\/([a-zA-Z0-9_-]+)\/research-contact$/);
   if(contactRoute&&req.method==='POST'){
