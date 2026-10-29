@@ -24,9 +24,9 @@ test('progress label matches progress-bar percentage',()=>{
 test('batch progress moves during AI evaluation with capitalised status',()=>{
  const at=n=>progress({phase:'Assessing and Ranking Partners',completed:2,batchCompleted:n,batchTotal:4});
  assert.equal(at(0).percentage,25);
- assert.equal(at(0).detail,'Evaluating Batch 1 Of 4');
+ assert.equal(at(0).detail,'Evaluating Batch 1 of 4');
  assert.equal(at(2).percentage,58);
- assert.equal(at(2).detail,'Evaluating Batch 3 Of 4');
+ assert.equal(at(2).detail,'Evaluating Batch 3 of 4');
  assert.equal(at(4).percentage,90);
 });
 test('score badges use consistent capitalisation without changing internal method keys',()=>{
