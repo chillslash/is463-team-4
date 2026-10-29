@@ -110,9 +110,9 @@ function discoveryViewProgress(status){
   done>=3?95:done===2?25:done===1?15:5;
  const detail=assessing&&totalBatches>0?
   (completedBatches>=totalBatches?'Evaluated All '+totalBatches+' Batches':
-   'Evaluating Batch '+(completedBatches+1)+' Of '+totalBatches):
+   'Evaluating Batch '+(completedBatches+1)+' of '+totalBatches):
   status?.detail||'';
- return {percentage,phase,detail,label:percentage+'% Complete'};
+ return {percentage,phase:assessing?'Assessing And Ranking Partners':phase,detail,label:percentage+'% Complete'};
 }
 function contactRouteBlock(p){
  const email=String(p.contactEmail||'').trim();
