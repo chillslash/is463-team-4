@@ -65,6 +65,8 @@ Sponsor priorities include intake quantity, dependable frequency, convenient han
 
 A top-10 ranking of likely gardening/waste-processing categories therefore cannot establish which organisations would be useful partners, even if the top-10 nDCG is perfect.
 
+**Update, 29 October:** The [controlled rerun](controlled-rerun-results-2026-10-29.md) corrected fixed-evidence and full-versus-selective prompt/fusion confounds. It remains diagnostic because the same internal labels were retained. The following recommendations still apply to independent validation.
+
 ## Required replacement experiment (do not tune on this frozen proxy set)
 
 1. **Separately assess candidate discovery and partner ranking.** Source coverage, duplicates and finding relevant organisations are discovery metrics. Partner ordering is a distinct inference task.
