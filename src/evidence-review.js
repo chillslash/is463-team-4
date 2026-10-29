@@ -96,5 +96,5 @@ export function evidencePrompt(partners){
   'Unknown willingness, quantity, fees, permission, frequency, logistics, collection arrangements or repeatability are NOT reasons to deduct technical suitability or factual evidence twice. They are recorded separately, not supplied by AI. Ask the key unanswered question; do not score distance or logistics.',
   'Use scores across their natural ranges when the evidence actually distinguishes candidates. Never fabricate score variation or claim unknown intake is zero capacity.',
   JSON.stringify(input)
- ].join('\\n');
+ ].join('\n');
 }
