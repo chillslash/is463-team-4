@@ -30,28 +30,29 @@ test('v2 AI can distinguish differently evidenced partners from the same categor
  assert.equal(a.capacityKg,null);assert.equal(b.capacityKg,null);
  assert.deepEqual(rankPartners([a,b],0).map(p=>p.id),['a','b']);
 });
-test('generic directory citation cannot promote even a confident hallucinated review',()=>{
+test('generic directory leads can be reviewed without an eligibility gate',()=>{
  const p=source('generic','Generic Farm','Official or mapped source lists Generic Farm');
  assert.equal(evidenceQuality(p.evidenceEntries[0]),false);
- assert.deepEqual(validateEvidenceAssessments(answer(p,40,35),[p]),[]);
- p.aiEvidenceReview={...answer(p,40,35).assessments[0],rubricVersion:'evidence-v2',factsHash:evidenceFingerprint(p)};
- assert.equal(activeEvidenceReview(p),null);
- assert.equal(scorePartner(p,0).method,'Rule-ranked');
+ const result=validateEvidenceAssessments(answer(p,16,5),[p]);
+ assert.equal(result.length,1);
+ p.aiEvidenceReview={...result[0],assessedAt:new Date().toISOString()};
+ assert.equal(scorePartner(p,0).method,'AI-assisted');
+ assert.equal(p.aiEvidenceReview.sourceEvidence,5);
 });
 test('stale sources and falsified evidence IDs cannot affect the score',()=>{
  const p=source('a','A',explicit);
  const reviewed=validateEvidenceAssessments(answer(p,36,30),[p])[0];
- p.aiEvidenceReview=reviewed;
+ p.aiEvidenceReview={...reviewed,assessedAt:new Date().toISOString()};
  assert.equal(scorePartner(p,0).method,'AI-assisted');
  p.evidenceEntries[0].claim='Organisation is no longer cultivating fungal substrates';
  assert.equal(scorePartner(p,0).method,'Rule-ranked');
  assert.equal(activeEvidenceReview(p),null);
  assert.equal(validateEvidenceAssessments({...answer(p,36,30),assessments:[{...answer(p,36,30).assessments[0],evidenceIds:[999]}]},[p]).length,0);
 });
-test('evidence citations older than 30 days cannot keep an AI score active',()=>{
+test('AI assessments expire after 30 days and return to rule-ranked fallback',()=>{
  const p=source('old','Old Evidence',explicit);
- p.aiEvidenceReview=validateEvidenceAssessments(answer(p,38,32),[p])[0];
- p.evidenceEntries[0].checkedAt=new Date(Date.now()-31*86400000).toISOString();
+ p.aiEvidenceReview={...validateEvidenceAssessments(answer(p,38,32),[p])[0],assessedAt:new Date().toISOString()};
+ p.aiEvidenceReview.assessedAt=new Date(Date.now()-31*86400000).toISOString();
  assert.equal(scorePartner(p,0).method,'Rule-ranked');
 });
 test('AI may not award operational points or infer permission, recurring intake, or logistics',()=>{
@@ -59,7 +60,7 @@ test('AI may not award operational points or infer permission, recurring intake,
  const x=answer(p,40,35);
  x.assessments[0].operationalCompatibility=10;
  x.assessments[0].capacityKg=100;
- p.aiEvidenceReview=validateEvidenceAssessments(x,[p])[0];
+ p.aiEvidenceReview={...validateEvidenceAssessments(x,[p])[0],assessedAt:new Date().toISOString()};
  const result=scorePartner(p,0);
  assert.equal(result.parts.operations,0);
  assert.match(result.reasons.join(' '),/capacity unknown/);
@@ -79,9 +80,11 @@ test('prompt requires cited evidence indices, source-limited reasoning and no in
  assert.ok(prompt.includes(explicit));
 });
 
-test('SFA licence disclaimer mentioning coffee grounds is not positive reuse evidence',()=>{
+test('SFA licence disclaimer remains weak evidence but does not bar an AI review',()=>{
  const p=source('sfa','Vegetable Farm','SFA lists Vegetable Farm under Vegetable Farming (licence 7521I051). This does not establish growing method, acceptance of coffee grounds, contact authority, capacity or logistics.');
  assert.equal(evidenceQuality(p.evidenceEntries[0]),false);
- assert.deepEqual(validateEvidenceAssessments(answer(p,40,35),[p]),[]);
- assert.equal(scorePartner(p,0).method,'Rule-ranked');
+ const results=validateEvidenceAssessments(answer(p,12,4),[p]);
+ assert.equal(results.length,1);
+ assert.equal(results[0].sourceEvidence,4);
+ assert.equal(scorePartner(p,0).method,'Rule-ranked','No model score is active until saved');
 });
