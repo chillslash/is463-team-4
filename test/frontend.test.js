@@ -150,7 +150,7 @@ test('Best Fit sorts numerically and AI-Assessed Only filters with pagination re
  assert.ok(root.innerHTML.includes('id="ai-assessed-filter"'));
  assert.ok(root.innerHTML.includes('AI-Assessed Only'));
  assert.ok(root.innerHTML.includes('co-fit-meter-method'));
- assert.ok(root.innerHTML.includes('Rule-ranked'));
+ assert.ok(root.innerHTML.includes('Rule-Ranked'));
  runInNewContext('data.ranked.forEach((p,i)=>{p.match.score=i===1?82:i===0?17:10;});render()',context);
  assert.equal(root.innerHTML.match(/data-listing-id="([^"]+)"/)[1],'p1');
  runInNewContext('ui.page=3;ui.aiAssessedOnly=true;render()',context);
