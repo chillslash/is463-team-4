@@ -1,7 +1,7 @@
 import {publicWebUrl} from './contacts.js';
 
 const SIGNALS=/\b(?:coffee grounds?|spent grounds?|compost(?:ing)?|mushroom|mycelium|fungi|fungal|hydroponics?|aeroponics?|substrate|fertilis(?:er|ation)|horticultur\w*|nursery|planting|soil amendments?|organic by-products?|food waste|rubber flooring|grow(?:ing|th) media|black soldier fly)\b/i;
-const BLOCK=/<(?:script|style|nav|footer|header|aside|svg|noscript)\b[^>]*>[\s\S]*?<\/\s*(?:script|style|nav|footer|header|aside|svg|noscript)>/gi;
+const BLOCK=/<(?:script|style|nav|footer|header|aside|svg|noscript|a)\b[^>]*>[\s\S]*?<\/\s*(?:script|style|nav|footer|header|aside|svg|noscript|a)>/gi;
 function plain(html){
  return String(html||'').replace(BLOCK,' ').replace(/<[^>]*>/g,' ').replace(/&(?:nbsp|amp|quot|lt|gt);/gi,' ').replace(/&#\d+;/g,' ')
   .replace(/\s+/g,' ').trim();
