@@ -2,6 +2,7 @@ import {generateLocalJSON} from './ollama.js';
 import {spawn} from 'node:child_process';
 import {isAbsolute as isWinAbsolute} from 'node:path/win32';
 import {isAbsolute as isPosixAbsolute} from 'node:path/posix';
+import {join} from 'node:path';
 
 export const AI_PROVIDERS = ['template', 'codex', 'claude', 'qwen', 'llama'];
 const LIMIT = 120000;
@@ -20,6 +21,13 @@ export function cliInvocation(provider, platform = process.platform, env = proce
   return platform === 'win32'
     ? {command: env.ComSpec || 'cmd.exe', args: ['/d', '/s', '/c', provider, ...args]}
     : {command: provider, args};
+}
+function cliEnvironment(provider){
+  const env={...process.env};
+  // Some managed Windows shells omit HOME. Keep Codex pointed at the signed-in
+  // user's existing profile without changing global environment or config.
+  if(provider==='codex'&&!env.CODEX_HOME&&env.USERPROFILE)env.CODEX_HOME=join(env.USERPROFILE,'.codex');
+  return env;
 }
 export function parseAIJSON(text, provider) {
   let output = text.trim();
@@ -74,14 +82,14 @@ export async function generateJSON(provider, prompt, {runner=spawn, timeoutMs=90
     const timer = setTimeout(() => {child?.kill(); complete(new Error(provider + ' timed out; check your CLI login or try again'));}, timeoutMs);
     signal?.addEventListener('abort',onAbort,{once:true});
     if(signal?.aborted){onAbort();return;}
-    try {child = runner(command, args, {cwd:process.cwd(), env:process.env, windowsHide:true, stdio:['pipe','pipe','pipe']});}
+    try {child = runner(command, args, {cwd:process.cwd(), env:cliEnvironment(provider), windowsHide:true, stdio:['pipe','pipe','pipe']});}
     catch {complete(new Error('Could not launch ' + provider + '; install and sign in to its CLI on this computer')); return;}
     child.on('error', () => complete(new Error('Could not launch ' + provider + '; install and sign in to its CLI on this computer')));
     child.stdout.on('data', chunk => {stdout += chunk.toString(); if (stdout.length > LIMIT) child.kill();});
     child.stderr.on('data', chunk => {stderr += chunk.toString(); if (stderr.length > LIMIT) child.kill();});
     child.on('close', code => {
       if (stdout.length > LIMIT || stderr.length > LIMIT) return complete(new Error('AI output was too long'));
-      if (code !== 0) return complete(new Error(provider + ' CLI failed. Confirm it is installed and signed in (run ' + provider + ' in your terminal).'));
+      if (code !== 0) return complete(new Error(/\b429\b|Too Many Requests/i.test(stderr+' '+stdout)?provider+' rate-limited (HTTP 429); try again when the provider allows requests':provider + ' CLI failed. Confirm it is installed and signed in (run ' + provider + ' in your terminal).'));
       try {const parsed=parseAIOutput(stdout,provider); complete(null,withUsage?parsed:parsed.result);}
       catch {complete(new Error(provider + ' returned an invalid JSON response. Try again.'));}
     });

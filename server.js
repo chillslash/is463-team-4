@@ -1,3 +1,5 @@
+import {researchOrganisationEvidence} from './src/evidence-research.js';
+import {activeEvidenceReview,hasCurrentSpecificEvidence,evidencePrompt,validateEvidenceAssessments} from './src/evidence-review.js';
 import {selectSourceBalanced} from './src/assessment-selection.js';
 import {createServer} from 'node:http';
 import {readFile, writeFile, rename, mkdir, stat} from 'node:fs/promises';
@@ -20,7 +22,7 @@ const DB_PATH=process.env.DATA_FILE || join(ROOT,'data','state.json');
 const PORT=Number(process.env.PORT || 4173);
 const FOLLOWUP_SUBJECT='CoffeeBot | Spent Coffee Grounds Reuse Follow-Up';
 const AI_PROVIDER=['codex','claude','qwen','llama'].includes(process.env.AI_PROVIDER)?process.env.AI_PROVIDER:'template';
-const AUTO_AI_REVIEW=/^(1|true)$/i.test(process.env.AUTO_AI_REVIEW||'false');
+const AUTO_AI_REVIEW=process.env.AUTO_AI_REVIEW===undefined?AI_PROVIDER!=='template':/^(1|true)$/i.test(process.env.AUTO_AI_REVIEW);
 let discoveryStatus={active:false,phase:'Idle',completed:0,total:4};
 let discoveryController=null;
 const stoppedError=()=>Object.assign(new Error('Discovery stopped; changes discarded'),{status:409,code:'DISCOVERY_STOPPED'});
@@ -64,7 +66,7 @@ export function cleanSeededPartnerNotes(partners){
  }
  return stats;
 }
-async function readState(){if(!existsSync(DB_PATH)){const seed=initialState();await store(seed);return seed;}const s=JSON.parse(await readFile(DB_PATH,'utf8'));const defaults=initialState().settings;migrateSponsorAssumptions(s);if(!Number.isInteger(s.settings.automaticAIAssessments)||s.settings.automaticAIAssessments<0||s.settings.automaticAIAssessments>100)s.settings.automaticAIAssessments=defaults.automaticAIAssessments;if(!validRatingWeights(s.settings.ratingWeights))s.settings.ratingWeights={...defaults.ratingWeights};delete s.settings.reportingCollectedKg;delete s.settings.reportingDiscardedKg;for(const field of ['referenceLat','referenceLon','referenceLabel'])s.settings[field]=defaults[field];delete s.settings.aiProvider;s.discoveryRuns??=[];s.aiActivity??=[];s.partnerActivity??=[];
+async function readState(){if(!existsSync(DB_PATH)){const seed=initialState();await store(seed);return seed;}const s=JSON.parse(await readFile(DB_PATH,'utf8'));const defaults=initialState().settings;migrateSponsorAssumptions(s);if(!Number.isInteger(s.settings.automaticAIAssessments)||s.settings.automaticAIAssessments<0||s.settings.automaticAIAssessments>24)s.settings.automaticAIAssessments=defaults.automaticAIAssessments;if(!validRatingWeights(s.settings.ratingWeights))s.settings.ratingWeights={...defaults.ratingWeights};delete s.settings.reportingCollectedKg;delete s.settings.reportingDiscardedKg;for(const field of ['referenceLat','referenceLon','referenceLabel'])s.settings[field]=defaults[field];delete s.settings.aiProvider;s.discoveryRuns??=[];s.aiActivity??=[];s.partnerActivity??=[];
  if(s.demoProfilesVersion!==2){
   enrichDemoProfiles(s.partners);
   const previouslyActive=new Set(s.partnerActivity.map(x=>x.partnerId));
@@ -201,13 +203,41 @@ export function saveAIResults(partners,batch,results,{provider,prompt,runId,manu
  return saved;
 }
 export function chooseForAssessment(partners,limit=24){return selectSourceBalanced(partners,limit);}
-async function discover(s,{provider=AI_PROVIDER,assessmentGenerator=generateJSON,signal}={}){
+
+async function enrichWebsiteEvidence(p,{signal}={}){
+ if(!p.websiteUrl)return 0;
+ const checked=Date.parse(p.evidenceResearch?.checkedAt||'');
+ if(Number.isFinite(checked)&&Date.now()-checked<7*86400000)return 0;
+ const researched=await researchOrganisationEvidence(p,{signal});
+ p.evidenceResearch={checkedAt:researched.checkedAt,result:researched.reason};
+ const entries=p.evidenceEntries||[];
+ for(const e of researched.entries){
+  if(!entries.some(x=>x.url===e.url&&x.claim===e.claim))entries.push(e);
+ }
+ p.evidenceEntries=entries.slice(0,30);
+ return researched.entries.length;
+}
+
+export function saveEvidenceResults(partners,results,{provider,runId}){
+ let count=0;
+ for(const assessed of results){
+  const p=partners.find(x=>x.id===assessed.id);
+  if(!p)continue;
+  // Re-check the citation/fingerprint against the current record before saving.
+  if(!validateEvidenceAssessments({assessments:[assessed]},[p]).length)continue;
+  p.aiEvidenceReview={...assessed,provider,runId,assessedAt:new Date().toISOString()};
+  count++;
+ }
+ return count;
+}
+
+async function discover(s,{provider=AI_PROVIDER,assessmentGenerator=generateJSON,discoveryProvider=discoverAll,signal}={}){
   const check=()=>{if(signal?.aborted)throw stoppedError();};
  const runId=randomUUID(),startedAt=new Date().toISOString();
  discoveryStatus={active:true,phase:'Discovering Partners',detail:'Retrieving sources and matching locations',completed:0,total:4,runId};
- const run={id:runId,startedAt,provider,sources:[],warnings:[],newLeads:0,reviewed:0,aiCalls:0,aiUsage:[],contactsFound:0,contactPagesChecked:0};
+ const run={id:runId,startedAt,provider,sources:[],warnings:[],newLeads:0,existingRefreshed:0,reviewed:0,assessmentFailed:0,assessmentSkipped:0,aiCalls:0,aiUsage:[],contactsFound:0,contactPagesChecked:0,evidencePagesChecked:0};
  try{
-  const result=await discoverAll(s.settings,{signal});
+  const result=await discoveryProvider(s.settings,{signal});
    check();
   run.geocoding=await resolveLocations(result.candidates,s.settings,{signal});
    check();
@@ -217,10 +247,11 @@ async function discover(s,{provider=AI_PROVIDER,assessmentGenerator=generateJSON
    const key=x=>x.name.trim().toLowerCase().replace(/[^a-z0-9]+/g,'');
    const existing=s.partners.find(o=>o.id===p.id||(o.source!=='Fictional Stitch scenario'&&key(o)===key(p)&&(!Number.isFinite(o.lat)||!Number.isFinite(p.lat)||(Math.abs(o.lat-p.lat)<0.008&&Math.abs(o.lon-p.lon)<0.008))));
    if(existing){
+    run.existingRefreshed++;
     existing.lastSeenAt=p.lastSeenAt;
     // Earlier imports have no reliable first-seen timestamp; do not fabricate one.
     const prev=existing.evidenceEntries||[{source:existing.source,url:existing.sourceUrl,claim:'Previous source record'}];
-    existing.evidenceEntries=[...prev,...p.evidenceEntries].filter((x,i,arr)=>arr.findIndex(y=>y.source===x.source&&y.url===x.url)===i);
+    existing.evidenceEntries=[...p.evidenceEntries,...prev].filter((x,i,arr)=>arr.findIndex(y=>y.source===x.source&&y.url===x.url)===i);
     if(!Number.isFinite(existing.lat)&&Number.isFinite(p.lat)){existing.lat=p.lat;existing.lon=p.lon;existing.distanceKm=p.distanceKm;}
     if(!existing.websiteUrl&&p.websiteUrl)existing.websiteUrl=p.websiteUrl;
     if(!existing.directCoffeeEvidence&&p.directCoffeeEvidence){existing.directCoffeeEvidence=true;existing.materialEvidence=p.materialEvidence;existing.use=p.use;}
@@ -243,36 +274,61 @@ async function discover(s,{provider=AI_PROVIDER,assessmentGenerator=generateJSON
   }
   discoveryStatus={active:true,phase:'Ranking Partners',detail:'Ranking sourced leads',completed:2,total:4,runId};
   if(AUTO_AI_REVIEW && provider!=='template'){
+   // A bounded evidence-gathering stage runs only for sources with an
+   // organisation website. Failures do not block other organisations.
+   const researchCandidates=rankPartners(s.partners,0,s.settings.ratingWeights)
+    .filter(p=>p.status==='suggested'&&p.websiteUrl&&
+     (!Date.parse(p.evidenceResearch?.checkedAt)||Date.now()-Date.parse(p.evidenceResearch.checkedAt)>=7*86400000));
+   const researchTargets=chooseForAssessment(researchCandidates,Math.min(s.settings.automaticAIAssessments,24));
+   for(const ranked of researchTargets){
+    check();
+    const target=s.partners.find(x=>x.id===ranked.id);
+    if(target){run.evidencePagesChecked+=await enrichWebsiteEvidence(target,{signal});}
+   }
    const candidates=rankPartners(s.partners,numbers(s.settings,s.partners,s.handovers).gapKg,s.settings.ratingWeights)
     .filter(p=>p.status==='suggested'&&p.source!=='Fictional Stitch scenario');
-   const pending=chooseForAssessment(candidates.filter(p=>!hasAIFit(p)||p.aiAssessment.factsHash!==digest(sourceFacts(p))),s.settings.automaticAIAssessments);
-   const batches=[];for(let i=0;i<pending.length;i+=12)batches.push(pending.slice(i,i+12));
-   discoveryStatus={active:true,phase:'Assessing and Ranking Partners',detail:batches.length?'AI batch 1 of '+batches.length+' in progress':'No new AI assessments needed',completed:2,total:4,batchCompleted:0,batchTotal:batches.length,runId};
+   const specific=candidates.filter(p=>!activeEvidenceReview(p)&&
+    hasCurrentSpecificEvidence(p));
+   const pending=chooseForAssessment(specific,s.settings.automaticAIAssessments);
+   run.assessmentSkipped=Math.max(0,candidates.length-pending.length);
+   const batches=[];for(let i=0;i<pending.length;i+=6)batches.push(pending.slice(i,i+6));
+   discoveryStatus={active:true,phase:'Assessing and Ranking Partners',
+    detail:batches.length?'Evidence assessment batch 1 of '+batches.length:'No new evidence-rich leads to assess',
+    completed:2,total:4,batchCompleted:0,batchTotal:batches.length,runId};
    for(let i=0;i<batches.length;i++){
-    const batch=batches[i],facts=batch.map(sourceFacts);
-    const prompt=assessmentPrompt(facts);
-    const started=Date.now();let usage=null,success=false,error=null;
+    const batch=batches[i],prompt=evidencePrompt(batch),started=Date.now();
+    let usage=null,success=false,error=null;
     try{
      run.aiCalls++;
      const generated=await assessmentGenerator(provider,prompt,{withUsage:true,signal});
-      check();
-     usage=generated.usage;
-     const response=validateAssessment(generated.result,batch.map(p=>p.id));
-     run.reviewed+=saveAIResults(s.partners,batch,response,{provider,prompt,runId});
-     success=true;
-    }catch(err){check();error=err.message;run.warnings.push('AI batch '+(i+1)+': '+error);}
+     check();usage=generated.usage;
+     const assessed=validateEvidenceAssessments(generated.result,batch);
+     const saved=saveEvidenceResults(s.partners,assessed,{provider,runId});
+     run.reviewed+=saved;
+     const invalid=batch.length-saved;
+     if(invalid){run.assessmentFailed+=invalid;error=invalid+' assessment(s) returned no evidence-valid result';run.warnings.push('AI batch '+(i+1)+': '+error);}
+     success=invalid===0;
+    }catch(err){check();error=err.message;run.assessmentFailed+=batch.length;run.warnings.push('AI batch '+(i+1)+': '+error);}
     finally{
-     const log={id:randomUUID(),at:new Date().toISOString(),kind:'partner-assessment',provider:AI_PROVIDER,runId,batch:i+1,candidates:batch.length,success,error,durationMs:Date.now()-started,...(usage||{inputTokens:null,outputTokens:null,cachedInputTokens:null})};
+     const log={id:randomUUID(),at:new Date().toISOString(),kind:'evidence-assessment',
+      provider,runId,batch:i+1,candidates:batch.length,success,error,
+      durationMs:Date.now()-started,...(usage||{inputTokens:null,outputTokens:null,cachedInputTokens:null})};
      run.aiUsage.push(log);appendAILog(s,log);
     }
-    discoveryStatus={active:true,phase:'Assessing and Ranking Partners',detail:'AI batch '+(i+1)+' of '+batches.length+' complete',completed:2,total:4,batchCompleted:i+1,batchTotal:batches.length,runId};
+    discoveryStatus={active:true,phase:'Assessing and Ranking Partners',
+     detail:'Evidence batch '+(i+1)+' of '+batches.length+' complete',
+     completed:2,total:4,batchCompleted:i+1,batchTotal:batches.length,runId};
    }
   }
   discoveryStatus={active:true,phase:'Finalising Results',detail:'Saving discovery results',completed:3,total:4,runId};
   run.finishedAt=new Date().toISOString();
   s.discoveryRuns.unshift(run);s.discoveryRuns=s.discoveryRuns.slice(0,40);
   // Completion is published by the HTTP handler only after mutation() has persisted the run.
-  return {runId,found:result.candidates.length,added:run.newLeads,assessed:run.reviewed,aiCalls:run.aiCalls,provider,sources:run.sources,warnings:run.warnings,contactsFound:run.contactsFound};
+  run.sourceFreshness=run.sources.some(x=>!x.cached)?(run.sources.some(x=>x.cached)?'mixed':'fresh'):'cached';
+  return {runId,found:result.candidates.length,added:run.newLeads,existingRefreshed:run.existingRefreshed,
+   assessed:run.reviewed,assessmentFailed:run.assessmentFailed,assessmentSkipped:run.assessmentSkipped,
+   evidencePagesChecked:run.evidencePagesChecked,aiCalls:run.aiCalls,provider,sources:run.sources,
+   sourceFreshness:run.sourceFreshness,warnings:run.warnings,contactsFound:run.contactsFound};
  }catch(err){if(!signal?.aborted)discoveryStatus={active:false,phase:'Failed: '+err.message,completed:0,total:4,runId};throw err;}
 }
 
@@ -314,7 +370,7 @@ async function aiFollowUpDraft(p,state,provider){
  return {subject:FOLLOWUP_SUBJECT,body:draft.body,mode:provider+' CLI-assisted follow-up — review before use',usage:output.usage};
 }
 
-export function createApp({aiProvider=AI_PROVIDER,assessmentGenerator=generateJSON,contactResearcher=researchPublicContact}={}){const activityAnalysisRuns=new Map();return createServer(async(req,res)=>{
+export function createApp({aiProvider=AI_PROVIDER,assessmentGenerator=generateJSON,contactResearcher=researchPublicContact,discoveryProvider=discoverAll}={}){const activityAnalysisRuns=new Map();return createServer(async(req,res)=>{
  try{
   const url=new URL(req.url,'http://localhost');const path=url.pathname;
   if(path==='/api/health')return response(res,200,{ok:true,service:'CoffeeBot Circularity Copilot'});
@@ -324,7 +380,7 @@ export function createApp({aiProvider=AI_PROVIDER,assessmentGenerator=generateJS
     if(['reportingCollectedKg','reportingDiscardedKg'].some(k=>Object.hasOwn(v,k)))fail('Reuse reporting inputs are no longer supported');
     if(Object.hasOwn(v,'referenceLabel'))s.settings.referenceLabel=cleanString(v.referenceLabel,150);
     if(Object.hasOwn(v,'ratingWeights')){if(!validRatingWeights(v.ratingWeights))fail('Rating weights must be whole percentages from 0 to 100 totalling exactly 100');s.settings.ratingWeights={...v.ratingWeights};}
-    if(Object.hasOwn(v,'automaticAIAssessments')){if(!Number.isInteger(v.automaticAIAssessments)||v.automaticAIAssessments<0||v.automaticAIAssessments>100)fail('AI assessment limit must be a whole number from 0 to 100');s.settings.automaticAIAssessments=v.automaticAIAssessments;}
+    if(Object.hasOwn(v,'automaticAIAssessments')){if(!Number.isInteger(v.automaticAIAssessments)||v.automaticAIAssessments<0||v.automaticAIAssessments>24)fail('AI assessment limit must be a whole number from 0 to 24');s.settings.automaticAIAssessments=v.automaticAIAssessments;}
     return s.settings;});return response(res,200,changed);
   }
   if(path==='/api/discovery-status'&&req.method==='GET')return response(res,200,discoveryStatus);
@@ -342,7 +398,7 @@ export function createApp({aiProvider=AI_PROVIDER,assessmentGenerator=generateJS
    discoveryController=controller;
    discoveryStatus={active:true,phase:'Discovering Partners',detail:'Retrieving sources and matching locations',completed:0,total:4};
    try{
-    const result=await mutation(s=>discover(s,{provider:aiProvider,assessmentGenerator,signal:controller.signal}),{signal:controller.signal,guard:controller});
+    const result=await mutation(s=>discover(s,{provider:aiProvider,assessmentGenerator,discoveryProvider,signal:controller.signal}),{signal:controller.signal,guard:controller});
     discoveryStatus={active:false,phase:result.warnings.some(w=>w.startsWith('AI batch'))?'Completed with partial AI results':'Completed',completed:4,total:4,runId:result.runId};
     return response(res,200,result);
    }catch(err){
@@ -353,6 +409,37 @@ export function createApp({aiProvider=AI_PROVIDER,assessmentGenerator=generateJS
     discoveryStatus={active:false,phase:'Failed: '+err.message,completed:0,total:4};
     throw err;
    }finally{if(discoveryController===controller)discoveryController=null;}
+  }
+  const evidenceReviewRoute=path.match(/^\/api\/partners\/([a-zA-Z0-9_-]+)\/evidence-review$/);
+  if(evidenceReviewRoute&&req.method==='POST'){
+   if(discoveryStatus.active)return response(res,409,{error:'Discovery is running'});
+   if(aiProvider==='template')return response(res,503,{error:'Configure an AI provider before requesting evidence assessment'});
+   const id=evidenceReviewRoute[1];
+   const result=await mutation(async state=>{
+    const p=state.partners.find(x=>x.id===id);
+    if(!p)fail('Partner not found');
+    if(p.status==='closed')fail('Closed partners cannot be reviewed');
+    if(!hasCurrentSpecificEvidence(p))await enrichWebsiteEvidence(p);
+    if(!hasCurrentSpecificEvidence(p))
+     fail('Insufficient specific public evidence. Use Research Contact to save the organisation website, or add a verifiable source before AI assessment.');
+    const runId=randomUUID(),prompt=evidencePrompt([p]),started=Date.now();
+    let usage=null,error=null,review=null;
+    try{
+     const generated=await assessmentGenerator(aiProvider,prompt,{withUsage:true});
+     usage=generated.usage;
+     const assessments=validateEvidenceAssessments(generated.result,[p]);
+     if(assessments.length!==1)throw Error('Insufficient grounded evidence returned by AI');
+     saveEvidenceResults(state.partners,assessments,{provider:aiProvider,runId});
+     review=p.aiEvidenceReview;
+    }catch(err){error=err.message;}
+    appendAILog(state,{id:randomUUID(),at:new Date().toISOString(),
+     kind:'manual-evidence-review',provider:aiProvider,partnerId:id,
+     success:!error,error,runId,durationMs:Date.now()-started,
+     ...(usage||{inputTokens:null,outputTokens:null,cachedInputTokens:null})});
+    return {review,error,partnerId:id};
+   });
+   if(result.error)return response(res,502,{error:'Evidence review failed: '+result.error});
+   return response(res,200,{partnerId:id,assessment:result.review});
   }
   if(path.match(/^\/api\/partners\/[a-zA-Z0-9_-]+\/ai-review$/)&&req.method==='POST'){
    if(discoveryStatus.active)return response(res,409,{error:'Discovery is running. Try reviewing after it completes.'});

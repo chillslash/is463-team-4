@@ -1,6 +1,34 @@
 # Evidence-based ranking and borrowed-model review
 
-**Status:** Baseline model comparison completed 23 October 2026; CoffeeBot feedback incorporated 27 October 2026. Results measure source-evidence ordering, not real acceptance.
+**Status:** The 23 October comparison below is historical and its rules-only implementation decision has been superseded. The 29 October controlled rerun is diagnostic only; it does not externally validate CoffeeBot rankings or partner acceptance.
+
+## Current prototype decision (29 October 2026)
+
+Codex is the configured model. A source-grounded assessment can affect only the suitability and public-evidence dimensions when its evidence IDs cite specific, current public evidence retained on that organisation. It blends equally with the deterministic values for those dimensions. Operational points and proximity remain rule-based on recorded facts. Legacy advisory assessments are not eligible. Candidates without a valid current assessment use Rule-ranked scoring.
+
+Discover Partners performs a bounded, source-balanced assessment pass over the saved Suggested pool, including existing records when no new partner is discovered. Organisation website research and AI review share a configurable 0–24 prospect run budget. Cited evidence older than 30 days is stale; unchanged current reviews are skipped. Failures are logged, later batches continue, and cached source snapshots are disclosed. Generic directories, licences, sustainability statements and disclaimer text do not qualify as positive organisation-specific reuse evidence. See [29 October results](controlled-rerun-results-2026-10-29.md) and [methodology](controlled-rerun-methodology-2026-10-29.md).
+
+### Local integration score snapshot (29 October 2026)
+
+Measured the 354 saved Suggested records on the integration branch against the original `main` scorer. The updated distribution includes one successful, real Codex assessment in a hash-verified isolated database copy; the other 353 records remain Rule-ranked. It is a deployment smoke-check, not a representative production-wide AI sample.
+
+| Snapshot | Distinct scores | Minimum | Maximum | Median | AI-assisted | Rule-ranked |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Main baseline | 13 | 10 | 57 | 18 | 0 | 354 |
+| Integration after one live assessment | 13 | 10 | 42 | 18 | 1 | 353 |
+
+Baseline score frequencies: **10:1, 11:1, 12:19, 13:32, 14:41, 15:13, 16:3, 17:14, 18:118, 19:36, 20:61, 21:14, 57:1**. Updated frequencies are identical except the single A1 Environment score moved from **57 to 42**. Codex assessed that candidate at suitability **12/40** and evidence **20/35**, citing the NEA entry that lists used coffee grounds and explicitly retaining unanswered CoffeeBot-specific preparation, capacity, repeatability, fee and downstream-use questions. Its proximity and operational components stayed at zero. The lower score is this model's evidence interpretation, not evidence that the real organisation is unsuitable or that CoffeeBot has been accepted.
+
+Per-source before → after distinct-score count, range and median (counts unchanged):
+
+| Discovery source | n | Distinct | Score range | Median |
+| --- | ---: | ---: | ---: | ---: |
+| NParks Community in Bloom | 70 | 4 → 4 | 18–21 → 18–21 | 20 |
+| NParks parks | 35 | 4 → 4 | 11–14 → 11–14 | 13 |
+| MOE programmes | 65 | 4 → 4 | 12–15 → 12–15 | 14 |
+| NEA recycling facilities | 10 | 3 → 3 | 15–57 → 15–42 | 21 |
+| LIAS directory | 85 | 8 → 8 | 10–20 → 10–20 | 18 |
+| SFA crop farms | 89 | 1 → 1 | 18–18 → 18–18 | 18 |
 
 ## Operational purpose
 

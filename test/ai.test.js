@@ -18,15 +18,21 @@ test('both CLI formats parse equivalent structured drafts',()=>{
  assert.deepEqual(validateDraft({subject:'Hello',body:'Short enquiry'}),{subject:'Hello',body:'Short enquiry',guide:''});
 });
 test('mock signed-in local CLI receives prompts over stdin',async()=>{
- let actualPrompt='';
- const runner=()=>{
+ let actualPrompt='',codexHome='';
+ const priorHome=process.env.CODEX_HOME,priorProfile=process.env.USERPROFILE;
+ delete process.env.CODEX_HOME;process.env.USERPROFILE='C:\\Users\\CoffeeBotTest';
+ const runner=(_command,_args,options)=>{
+  codexHome=options.env.CODEX_HOME;
   const proc=new EventEmitter();proc.stdout=new PassThrough();proc.stderr=new PassThrough();proc.stdin=new PassThrough();
   proc.stdin.on('data',chunk=>actualPrompt+=chunk.toString());
   proc.stdin.on('end',()=>{proc.stdout.end(JSON.stringify({subject:'Subject',body:'Safe text',guide:'Review'}));proc.emit('close',0);});
   proc.kill=()=>{};return proc;
  };
- const response=await generateJSON('codex','Assess candidate A', {runner,timeoutMs:2000});
- assert.equal(actualPrompt,'Assess candidate A');assert.equal(response.subject,'Subject');
+ try{
+  const response=await generateJSON('codex','Assess candidate A', {runner,timeoutMs:2000});
+  assert.equal(actualPrompt,'Assess candidate A');assert.equal(response.subject,'Subject');
+  assert.equal(codexHome,'C:\\Users\\CoffeeBotTest\\.codex');
+ }finally{if(priorHome===undefined)delete process.env.CODEX_HOME;else process.env.CODEX_HOME=priorHome;if(priorProfile===undefined)delete process.env.USERPROFILE;else process.env.USERPROFILE=priorProfile;}
 });
 test('AI-led assessment validator rejects old labels and unbounded scores',()=>{
  const result=validateAssessment({assessments:[

@@ -36,6 +36,7 @@ const api=async(path,method='GET',body)=>{const r=await fetch(base+path,{method,
 test('discovery retains source citations and caching when SFA is unavailable',async()=>{
  const first=await api('/api/discover','POST',{});
  assert.equal(first.status,200);assert.equal(first.body.added,5);assert.equal(first.body.assessed,0);
+ assert.equal(first.body.sourceFreshness,'fresh');
  assert.equal(first.body.sources.length,5);
  const done=(await api('/api/discovery-status')).body;assert.equal(done.completed,4);assert.equal(done.total,4);assert.equal(done.phase,'Completed');
  assert.equal(first.body.warnings.length,1);
@@ -50,6 +51,7 @@ test('discovery retains source citations and caching when SFA is unavailable',as
  const calls=officialCalls;
  const second=await api('/api/discover','POST',{});
  assert.equal(second.status,200);assert.equal(second.body.added,0);
+ assert.equal(second.body.sourceFreshness,'cached');assert.equal(second.body.existingRefreshed,5);
  assert.equal(officialCalls,calls);assert.ok(second.body.sources.every(x=>x.cached));
  s=(await api('/api/state')).body;
  assert.equal(s.partners.find(p=>p.id===school.id).sourcedAt,when);
@@ -58,6 +60,12 @@ test('discovery retains source citations and caching when SFA is unavailable',as
 test('AI provider cannot be changed through frontend settings API',async()=>{
  const r=await api('/api/settings','PATCH',{aiProvider:'claude'});
  assert.equal(r.status,400);
+});
+
+test('AI evidence budget is configurable and capped at 24 prospects per discovery run',async()=>{
+ assert.equal((await api('/api/settings','PATCH',{automaticAIAssessments:12})).status,200);
+ assert.equal((await api('/api/state')).body.settings.automaticAIAssessments,12);
+ assert.equal((await api('/api/settings','PATCH',{automaticAIAssessments:25})).status,400);
 });
 
 test('reset suggestions preserves existing pipeline entries and removes discovery history',async()=>{
