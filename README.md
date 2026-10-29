@@ -71,6 +71,8 @@ The ranking considers intake only where recorded; it cannot infer quantities fro
 
 **Experimental benchmark (28 October 2026):** The frozen 24-case rules-only, full Codex, full Qwen and selective-hybrid experiment was run, but a [methodological audit](docs/benchmark-methodology-audit-2026-10-28.md) found confounded source labels, asymmetrical evidence and different model rubrics. Its [recorded results](docs/benchmark-2026-10-28-results.md) are **diagnostic only**, not proof of a winning ranking approach or carbon reductions.
 
+**Controlled rerun (29 October 2026):** [Methodology](docs/controlled-rerun-methodology-2026-10-29.md) and [results](docs/controlled-rerun-results-2026-10-29.md). Codex improved within-source distinction against limited internal proxy grades under matched evidence, while a selective half-budget retained most of that differentiation. This is **not** independent CoffeeBot acceptance validation.
+
 ## Auditability, limitations and project structure
 
 - Source results, latest scan history (up to 40 runs), AI source and prompt hashes and provider usage metadata are stored locally in `data/state.json`; source caches live in `data/source-cache/`. Both are ignored by Git. Stopping before commit discards partner/assessment changes from that run, but not already consumed AI usage or downloaded caches.
