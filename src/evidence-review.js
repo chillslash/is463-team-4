@@ -2,6 +2,7 @@ import {createHash} from 'node:crypto';
 
 export const EVIDENCE_RUBRIC_VERSION='evidence-v2';
 export const EVIDENCE_MAX_AGE_MS=30*86400000;
+export const EVIDENCE_FAILURE_COOLDOWN_MS=24*60*60*1000;
 export function evidenceFacts(p){
  return {name:p.name,category:p.category,source:p.source,sourceUrl:p.sourceUrl||'',
   directCoffeeEvidence:!!p.directCoffeeEvidence,materialEvidence:p.materialEvidence||'',
@@ -32,6 +33,11 @@ export function evidenceQuality(entry,partner=null){
 }
 export function hasCurrentSpecificEvidence(partner){
  return (partner.evidenceEntries||[]).some(entry=>evidenceQuality(entry,partner));
+}
+export function hasRecentEvidenceFailure(partner,now=Date.now()){
+ const failedAt=Date.parse(partner.aiEvidenceFailureAt||'');
+ return partner.aiEvidenceFailureHash===evidenceFingerprint(partner)&&Number.isFinite(failedAt)&&
+  now>=failedAt&&now-failedAt<EVIDENCE_FAILURE_COOLDOWN_MS;
 }
 export function activeEvidenceReview(p){
  const r=p.aiEvidenceReview;

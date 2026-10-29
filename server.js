@@ -1,5 +1,5 @@
 import {researchOrganisationEvidence} from './src/evidence-research.js';
-import {activeEvidenceReview,hasCurrentSpecificEvidence,evidencePrompt,validateEvidenceAssessments} from './src/evidence-review.js';
+import {activeEvidenceReview,hasCurrentSpecificEvidence,hasRecentEvidenceFailure,evidenceFingerprint,evidencePrompt,validateEvidenceAssessments} from './src/evidence-review.js';
 import {selectSourceBalanced} from './src/assessment-selection.js';
 import {createServer} from 'node:http';
 import {readFile, writeFile, rename, mkdir, stat} from 'node:fs/promises';
@@ -226,6 +226,7 @@ export function saveEvidenceResults(partners,results,{provider,runId}){
   // Re-check the citation/fingerprint against the current record before saving.
   if(!validateEvidenceAssessments({assessments:[assessed]},[p]).length)continue;
   p.aiEvidenceReview={...assessed,provider,runId,assessedAt:new Date().toISOString()};
+  delete p.aiEvidenceFailureAt;delete p.aiEvidenceFailureHash;
   count++;
  }
  return count;
@@ -287,7 +288,7 @@ async function discover(s,{provider=AI_PROVIDER,assessmentGenerator=generateJSON
    }
    const candidates=rankPartners(s.partners,numbers(s.settings,s.partners,s.handovers).gapKg,s.settings.ratingWeights)
     .filter(p=>p.status==='suggested'&&p.source!=='Fictional Stitch scenario');
-   const specific=candidates.filter(p=>!activeEvidenceReview(p)&&
+   const specific=candidates.filter(p=>!activeEvidenceReview(p)&&!hasRecentEvidenceFailure(p)&&
     hasCurrentSpecificEvidence(p));
    const pending=chooseForAssessment(specific,s.settings.automaticAIAssessments);
    run.assessmentSkipped=Math.max(0,candidates.length-pending.length);
@@ -306,9 +307,16 @@ async function discover(s,{provider=AI_PROVIDER,assessmentGenerator=generateJSON
      const saved=saveEvidenceResults(s.partners,assessed,{provider,runId});
      run.reviewed+=saved;
      const invalid=batch.length-saved;
-     if(invalid){run.assessmentFailed+=invalid;error=invalid+' assessment(s) returned no evidence-valid result';run.warnings.push('AI batch '+(i+1)+': '+error);}
+     if(invalid){
+      const accepted=new Set(assessed.map(x=>x.id));
+      for(const candidate of batch){if(accepted.has(candidate.id))continue;const target=s.partners.find(x=>x.id===candidate.id);if(target){target.aiEvidenceFailureAt=new Date().toISOString();target.aiEvidenceFailureHash=evidenceFingerprint(target);}}
+      run.assessmentFailed+=invalid;error=invalid+' assessment(s) returned no evidence-valid result';run.warnings.push('AI batch '+(i+1)+': '+error);
+     }
      success=invalid===0;
-    }catch(err){check();error=err.message;run.assessmentFailed+=batch.length;run.warnings.push('AI batch '+(i+1)+': '+error);}
+    }catch(err){
+     check();error=err.message;run.assessmentFailed+=batch.length;run.warnings.push('AI batch '+(i+1)+': '+error);
+     for(const candidate of batch){const target=s.partners.find(x=>x.id===candidate.id);if(target){target.aiEvidenceFailureAt=new Date().toISOString();target.aiEvidenceFailureHash=evidenceFingerprint(target);}}
+    }
     finally{
      const log={id:randomUUID(),at:new Date().toISOString(),kind:'evidence-assessment',
       provider,runId,batch:i+1,candidates:batch.length,success,error,
