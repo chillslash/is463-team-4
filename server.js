@@ -275,22 +275,20 @@ async function discover(s,{provider=AI_PROVIDER,assessmentGenerator=generateJSON
   }
   discoveryStatus={active:true,phase:'Ranking Partners',detail:'Ranking sourced leads',completed:2,total:4,runId};
   if(AUTO_AI_REVIEW && provider!=='template'){
-   // A bounded evidence-gathering stage runs only for sources with an
-   // organisation website. Failures do not block other organisations.
-   const researchCandidates=rankPartners(s.partners,0,s.settings.ratingWeights)
-    .filter(p=>p.status==='suggested'&&p.websiteUrl&&
-     (!Date.parse(p.evidenceResearch?.checkedAt)||Date.now()-Date.parse(p.evidenceResearch.checkedAt)>=7*86400000));
-   const researchTargets=chooseForAssessment(researchCandidates,Math.min(s.settings.automaticAIAssessments,24));
-   for(const ranked of researchTargets){
-    check();
-    const target=s.partners.find(x=>x.id===ranked.id);
-    if(target){run.evidencePagesChecked+=await enrichWebsiteEvidence(target,{signal});}
-   }
+   // Assess the configured top-N across sources. Lack of a detailed website
+   // is a confidence issue for the AI, not a prerequisite for evaluation.
    const candidates=rankPartners(s.partners,numbers(s.settings,s.partners,s.handovers).gapKg,s.settings.ratingWeights)
     .filter(p=>p.status==='suggested'&&p.source!=='Fictional Stitch scenario');
-   const specific=candidates.filter(p=>!activeEvidenceReview(p)&&!hasRecentEvidenceFailure(p)&&
-    hasCurrentSpecificEvidence(p));
-   const pending=chooseForAssessment(specific,s.settings.automaticAIAssessments);
+   const eligible=candidates.filter(p=>!activeEvidenceReview(p)&&!hasRecentEvidenceFailure(p));
+   const selected=chooseForAssessment(eligible,s.settings.automaticAIAssessments);
+   // Optional lightweight research on already-selected organisation websites.
+   // It never controls who may be assessed. Reuse cached results where possible.
+   for(const ranked of selected.filter(p=>p.websiteUrl).slice(0,6)){
+    check();
+    const target=s.partners.find(x=>x.id===ranked.id);
+    if(target)run.evidencePagesChecked+=await enrichWebsiteEvidence(target,{signal});
+   }
+   const pending=selected.map(p=>s.partners.find(x=>x.id===p.id)).filter(Boolean);
    run.assessmentSkipped=Math.max(0,candidates.length-pending.length);
    const batches=[];for(let i=0;i<pending.length;i+=6)batches.push(pending.slice(i,i+6));
    discoveryStatus={active:true,phase:'Assessing and Ranking Partners',
@@ -427,9 +425,7 @@ export function createApp({aiProvider=AI_PROVIDER,assessmentGenerator=generateJS
     const p=state.partners.find(x=>x.id===id);
     if(!p)fail('Partner not found');
     if(p.status==='closed')fail('Closed partners cannot be reviewed');
-    if(!hasCurrentSpecificEvidence(p))await enrichWebsiteEvidence(p);
-    if(!hasCurrentSpecificEvidence(p))
-     fail('Insufficient specific public evidence. Use Research Contact to save the organisation website, or add a verifiable source before AI assessment.');
+    if(p.websiteUrl)await enrichWebsiteEvidence(p); // Helpful when available; never blocks AI.
     const runId=randomUUID(),prompt=evidencePrompt([p]),started=Date.now();
     let usage=null,error=null,review=null;
     try{
