@@ -6,16 +6,16 @@
 
 Codex is the configured model. A source-grounded assessment can affect only the suitability and public-evidence dimensions when its evidence IDs cite specific, current public evidence retained on that organisation. It blends equally with the deterministic values for those dimensions. Operational points and proximity remain rule-based on recorded facts. Legacy advisory assessments are not eligible. Candidates without a valid current assessment use Rule-ranked scoring.
 
-Discover Partners performs a bounded, source-balanced assessment pass over the saved Suggested pool, including existing records when no new partner is discovered. Organisation website research and AI review share a configurable 0–24 prospect run budget. Cited evidence older than 30 days is stale; unchanged current reviews are skipped. Failed records with unchanged evidence cool down for 24 hours, while later batches and other eligible records continue; changed evidence becomes eligible immediately. Cached source snapshots are disclosed. Generic directories, licences, sustainability statements and disclaimer text do not qualify as positive organisation-specific reuse evidence. See [29 October results](controlled-rerun-results-2026-10-29.md) and [methodology](controlled-rerun-methodology-2026-10-29.md).
+Discover Partners performs a bounded, source-balanced assessment pass over the saved Suggested pool, including existing records when no new partner is discovered. Website research and AI assessment each have a configurable 0–24 prospect cap; they are separate passes, so a run can touch more distinct prospects than the setting. Cited evidence older than 30 days is stale; unchanged current reviews are skipped. Failed records with unchanged evidence cool down for 24 hours, while later batches and other eligible records continue; changed evidence becomes eligible immediately. Cached source snapshots are disclosed. Generic directories, licences, sustainability statements and disclaimer text do not qualify as positive organisation-specific reuse evidence. See [29 October results](controlled-rerun-results-2026-10-29.md) and [methodology](controlled-rerun-methodology-2026-10-29.md).
 
-### Local integration score snapshot (29 October 2026)
+### Live app score and evidence spot-check (29 October 2026)
 
-Measured the 354 saved Suggested records on the integration branch against the original `main` scorer. The updated distribution includes one successful, real Codex assessment in a hash-verified isolated database copy; the other 353 records remain Rule-ranked. It is a deployment smoke-check, not a representative production-wide AI sample.
+Measured the active app's 354 saved Suggested records. A staff-facing Playwright review made one real Codex inference for A1 Environment; its saved evidence-v2 assessment changed that record's Fit Score from 57 to 42. The remaining 353 Suggested records are Rule-ranked. This is a deployment smoke-check, not a representative production-wide AI sample.
 
 | Snapshot | Distinct scores | Minimum | Maximum | Median | AI-assisted | Rule-ranked |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Main baseline | 13 | 10 | 57 | 18 | 0 | 354 |
-| Integration after one live assessment | 13 | 10 | 42 | 18 | 1 | 353 |
+| Before live assessment | 13 | 10 | 57 | 18 | 0 | 354 |
+| Active app after live assessment | 13 | 10 | 42 | 18 | 1 | 353 |
 
 Baseline score frequencies: **10:1, 11:1, 12:19, 13:32, 14:41, 15:13, 16:3, 17:14, 18:118, 19:36, 20:61, 21:14, 57:1**. Updated frequencies are identical except the single A1 Environment score moved from **57 to 42**. Codex assessed that candidate at suitability **12/40** and evidence **20/35**, citing the NEA entry that lists used coffee grounds and explicitly retaining unanswered CoffeeBot-specific preparation, capacity, repeatability, fee and downstream-use questions. Its proximity and operational components stayed at zero. The lower score is this model's evidence interpretation, not evidence that the real organisation is unsuitable or that CoffeeBot has been accepted.
 
@@ -29,6 +29,10 @@ Per-source before → after distinct-score count, range and median (counts uncha
 | NEA recycling facilities | 10 | 3 → 3 | 15–57 → 15–42 | 21 |
 | LIAS directory | 85 | 8 → 8 | 10–20 → 10–20 | 18 |
 | SFA crop farms | 89 | 1 → 1 | 18–18 → 18–18 | 18 |
+
+The assessment gate currently has a much narrower reach than the saved pool: **8 of 362 total partners** pass the specific, current-evidence check, and all eight are NEA recycling facilities. Only A1 has an active evidence-v2 score. The saved garden, park, school, LIAS and SFA records mostly identify a site, programme, member or licence; they do not contain a specific material pathway. Most MOE, NParks and SFA records also have no organisation website URL for the bounded website researcher to inspect. LIAS URLs are available for many records, but the current website extractor has not produced qualifying evidence for those cases. Source balancing runs only after this evidence gate, so it cannot create non-NEA assessments from otherwise generic records. The nine evidence supplements in the controlled rerun are experiment inputs, not automatically imported into production records.
+
+The evidence prompt now explicitly separates reuse/evidence scores from operational readiness: unknown acceptance, capacity, frequency, fees, permissions and logistics belong in the verification question and the separate operations component. This guards against subtracting for the same missing fact twice. A material pathway can still receive a low suitability assessment when the documented process itself is a poor fit; absence of operational facts alone is not that reason.
 
 ## Operational purpose
 

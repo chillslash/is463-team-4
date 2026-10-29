@@ -74,6 +74,8 @@ test('prompt requires cited evidence indices, source-limited reasoning and no in
  assert.match(prompt,/do not score distance or logistics/i);
  assert.match(prompt,/sourceEvidence/i);
  assert.match(prompt,/explicitly names used or spent coffee grounds.*direct evidence/i);
+ assert.match(prompt,/do not lower reuseSuitability or sourceEvidence merely because capacity, repeatability, willingness, fees, preparation requirements, permission or logistics are unknown/i);
+ assert.match(prompt,/Only recorded partner facts contribute to the separate operational score/i);
  assert.ok(prompt.includes(explicit));
 });
 
