@@ -33,14 +33,17 @@ state.partners.push({id:'generic-farm',name:'Generic Farm',status:'suggested',
 await writeFile(process.env.DATA_FILE,JSON.stringify(state));
 const {createApp}=await import('../server.js');
 let invalid=false,providerFailure=false,calls=0;
-const assessmentGenerator=async()=>{
+const assessmentGenerator=async(_provider,prompt)=>{
  calls++;
  if(providerFailure)throw new Error('Codex provider unavailable');
- return {result:{assessments:[{id:'material-farm',reuseSuitability:invalid?40:36,
-  sourceEvidence:30,evidenceIds:[invalid?99:0],
-  reason:'The company documents organic-by-product fungal substrate production, not verified grounds acceptance.',
-  check:'Can prepared coffee grounds be used in the substrate?',
-  pathway:'Fungal cultivation trial'}]},usage:{inputTokens:250,outputTokens:70}};
+ const [input]=JSON.parse(prompt.split('\\n').at(-1));
+ const generic=input.id==='generic-farm';
+ return {result:{assessments:[{id:input.id,reuseSuitability:invalid?40:generic?12:36,
+  sourceEvidence:generic?4:30,evidenceIds:[invalid?99:0],
+  reason:generic?'Only an organisation directory listing is known; material compatibility is unverified.':
+    'The company documents organic-by-product fungal substrate production, not verified grounds acceptance.',
+  check:'Can prepared coffee grounds be used in a documented process?',
+  pathway:generic?'Unknown; verify organisation-specific use':'Fungal cultivation trial'}]},usage:{inputTokens:250,outputTokens:70}};
 };
 const srv=createApp({aiProvider:'codex',assessmentGenerator});
 srv.listen(0,'127.0.0.1');await once(srv,'listening');
@@ -66,11 +69,14 @@ test('AI evidence review increases relative suitability and has an auditable exp
  assert.equal(p.aiEvidenceReview.provider,'codex');
  assert.ok(after.aiActivity.some(x=>x.kind==='manual-evidence-review'&&x.success));
 });
-test('generic directory evidence cannot trigger costly AI inference',async()=>{
+test('generic directory partner is assessed with low confidence instead of being blocked',async()=>{
  const previous=calls;
  const response=await call('/api/partners/generic-farm/evidence-review','POST');
- assert.equal(response.status,400);
- assert.equal(calls,previous);
+ assert.equal(response.status,200);
+ assert.equal(calls,previous+1);
+ const state=(await call('/api/state')).data;
+ assert.equal(state.ranked.find(p=>p.id==='generic-farm').match.method,'AI-assisted');
+ assert.equal(state.partners.find(p=>p.id==='generic-farm').aiEvidenceReview.sourceEvidence,4);
 });
 test('invalid citations do not overwrite a previous grounded review',async()=>{
  invalid=true;
@@ -80,10 +86,10 @@ test('invalid citations do not overwrite a previous grounded review',async()=>{
  assert.equal(after.ranked.find(p=>p.id==='material-farm').match.method,'AI-assisted');
  assert.equal(after.partners.find(p=>p.id==='material-farm').aiEvidenceReview.evidenceIds[0],0);
 });
-test('stale source evidence is skipped instead of triggering inference',async()=>{
+test('dated source evidence does not create a pre-assessment block',async()=>{
  const previous=calls;
  const response=await call('/api/partners/stale-material-farm/evidence-review','POST');
- assert.equal(response.status,400);assert.equal(calls,previous);
+ assert.equal(response.status,200);assert.equal(calls,previous+1);
 });
 test('failed live provider calls leave deterministic scores and record the failure',async()=>{
  providerFailure=true;
