@@ -2,6 +2,8 @@
 
 **Completed:** Both Codex and Qwen3.5 4B assessed all 24 frozen prospects using the same candidate evidence packets and the same assessment rubric. No source labels, priority grades or reviewer rationales were supplied during inference. Full and selective strategies for each model use exactly the same saved responses and scoring formula; selective uses predictions for the first 12 source-balanced candidates and rules for the remaining 12. All work stays on `feature/evidence-calibrated-ranking-benchmark`, not `main`.
 
+**Integration note:** The evidence packet builder, public-evidence supplements, and their tests were later copied into the local integration branch. The labelled proxy review and generated model-response files remain untracked experiment data in the experimental worktree; they were not copied into CoffeeBot's production data folder or committed.
+
 **Validity label: DIAGNOSTIC, NOT INDEPENDENT VALIDATION.** The reference labels are still the assistant's own provisional outreach-priority judgements, with only 14 differently graded within-source candidate pairs. Some source categories are uniformly graded. The fresh facts were frozen before this rerun but are neither prospect acceptance data nor an independently blinded reference.
 
 ## Protocol and parity improvements
@@ -62,6 +64,6 @@ The next meaningful test is not more weight tweaking against the same grades. It
 
 - **Method:** [Controlled rerun methodology](controlled-rerun-methodology-2026-10-29.md).
 - **Code:** `scripts/controlled-ranking-experiment.mjs` and `scripts/controlled-evidence-supplements.json`. `test/controlled-ranking-experiment.test.js` checks label-free packets, exact full/selective output reuse and rejection of inflated generic-listing scores.
-- **Saved (Git-ignored) machine-readable inputs/results:** `data/controlled-packets-20261029.json`, `data/controlled-codex-20261029.json`, `data/controlled-qwen-20261029.json`, `data/controlled-codex-analysis-20261029.json`, `data/controlled-qwen-analysis-20261029.json`. Each model prediction file records evidence hash, provider, all 24 scored IDs, per-batch latency, token usage, citation indices and rationale.
-- **Historical result:** [28 October benchmark](benchmark-2026-10-28-results.md) is withdrawn as a controlled strategy comparison; do not use its ranking numbers as the final model result.
-- **Change isolation:** All files, tests and benchmark scripts remain in the feature branch. No edits to `main`, production `data/state.json` or staff relationship records.
+- **Experiment-local, Git-ignored inputs/results:** `data/controlled-packets-20261029.json`, `data/controlled-codex-20261029.json`, `data/controlled-qwen-20261029.json`, `data/controlled-codex-analysis-20261029.json`, and `data/controlled-qwen-analysis-20261029.json` were saved in the experimental worktree. They are not included in the main application repository. Each model prediction file records evidence hash, provider, all 24 scored IDs, per-batch latency, token usage, citation indices and rationale.
+- **Historical result:** The 28 October benchmark is withdrawn as a controlled strategy comparison; its ranking numbers are not copied into this repository or used as the final model result.
+- **Change isolation:** The controlled experiment itself did not edit the real partner database. Its reusable packet-builder code and tests were integrated separately; its proxy labels and generated outputs remain experiment-local. The prototype adoption decision does not treat the proxy labels as CoffeeBot ground truth.

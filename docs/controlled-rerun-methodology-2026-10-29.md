@@ -31,7 +31,7 @@ No new sponsor labels, field-verified intake quantities or measured carbon footp
 
 ## Reproducibility
 
-All commands run in the feature-branch worktree; `main` and the real partner database must remain untouched.
+The commands below record the original experiment in its feature-branch worktree. The packet-builder script, public-evidence supplements and tests are now also in this repository. The proxy-label file and generated packets/responses remain private, experiment-local ignored files and are not packaged here; without those exact fixtures the result table cannot be independently regenerated from this repository alone.
 
 ```powershell
 npm test
@@ -44,4 +44,4 @@ node scripts/controlled-ranking-experiment.mjs --mode=analyse --packets=data/con
 node scripts/controlled-ranking-experiment.mjs --mode=analyse --packets=data/controlled-packets-20261029.json --review=data/proxy-review-labelled.json --predictions=data/controlled-qwen-20261029.json --limit=12 --out=data/controlled-qwen-analysis-20261029.json
 ```
 
-**Inference must never load the reference review file.** Only the separate analysis command reads the review labels. Generated local JSON under `data/` is ignored by Git. The returned packet and model-result hashes are checked before evaluation. All commits remain on `feature/evidence-calibrated-ranking-benchmark`.
+**Inference must never load the reference review file.** Only the separate analysis command reads the review labels. Generated local JSON under `data/` is ignored by Git. The returned packet and model-result hashes are checked before evaluation. The original experiment ran on `feature/evidence-calibrated-ranking-benchmark`; its later prototype integration is a separate code change and does not make the proxy labels CoffeeBot ground truth.
