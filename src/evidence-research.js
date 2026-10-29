@@ -20,22 +20,48 @@ export function extractMaterialEvidence(html){
  }
  return selected.map(x=>x.slice(0,400));
 }
-export async function researchOrganisationEvidence(partner,{httpFetch=fetch,timeoutMs=4500,signal}={}){
- const url=publicWebUrl(partner.websiteUrl);
- if(!url||url.protocol!=='https:')return {checkedAt:new Date().toISOString(),entries:[],reason:'No valid HTTPS organisation website'};
- signal?.throwIfAborted();
- try{
-  const r=await httpFetch(url.href,{signal:signal?AbortSignal.any([signal,AbortSignal.timeout(timeoutMs)]):AbortSignal.timeout(timeoutMs),
-   redirect:'manual',headers:{Accept:'text/html','User-Agent':'CoffeeBot-IS463-Prototype/0.4'}});
-  if(!r.ok||r.status>=300||!/html|text/i.test(r.headers?.get?.('content-type')||'text/html'))
-   return {checkedAt:new Date().toISOString(),entries:[],reason:'No accessible text page'};
-  const snippets=extractMaterialEvidence((await r.text()).slice(0,220000));
-  return {checkedAt:new Date().toISOString(),entries:snippets.map(claim=>({
-   source:'Organisation website excerpt (unverified)',
-   url:url.href,claim,checkedAt:new Date().toISOString()
-  })),reason:snippets.length?'Published material-specific excerpts found':'No specific reuse or cultivation text found'};
- }catch(err){
-  signal?.throwIfAborted();
-  return {checkedAt:new Date().toISOString(),entries:[],reason:'Organisation website unavailable'};
+// Only inspect clearly relevant, same-origin public pages linked by the organisation.
+// Never broaden a directory entry into an assumed organisation website.
+export function findEvidencePages(html,home){
+ const result=[],seen=new Set([home.href]);
+ for(const match of String(html||'').matchAll(/<a\b[^>]*\bhref\s*=\s*(["'])(.*?)\1[^>]*>([\s\S]*?)<\/a>/gi)){
+  let next;
+  try{next=new URL(match[2],home.href);}catch{continue;}
+  if(next.protocol!=='https:'||next.origin!==home.origin||next.username||next.password)continue;
+  if(/\.(?:pdf|docx?|xlsx?|zip|png|jpe?g|svg)(?:$|[?#])/i.test(next.pathname))continue;
+  next.hash='';
+  if(seen.has(next.href))continue;
+  const hint=(next.pathname+' '+plain(match[3])).toLowerCase();
+  if(!/(?:about|service|project|research|production|process|grow|garden|farm|nursery|compost|mushroom|substrate|horticultur|sustainab|environment|waste|recycl|facilit)/.test(hint))continue;
+  seen.add(next.href);
+  const priority=/(?:service|project|research|production|process|grow|garden|farm|compost|mushroom|substrate|waste|recycl)/.test(hint)?2:1;
+  result.push({url:next.href,priority});
  }
+ return result.sort((a,b)=>b.priority-a.priority).slice(0,2).map(x=>x.url);
+}
+export async function researchOrganisationEvidence(partner,{httpFetch=fetch,timeoutMs=4500,signal}={}){
+ const home=publicWebUrl(partner.websiteUrl);
+ const checkedAt=new Date().toISOString();
+ if(!home||home.protocol!=='https:')return {checkedAt,entries:[],pagesRead:0,reason:'No valid HTTPS organisation website'};
+ signal?.throwIfAborted();
+ const urls=[home.href],entries=[],seenClaims=new Set();
+ let pagesRead=0;
+ for(let i=0;i<urls.length&&i<3;i++){
+  signal?.throwIfAborted();
+  try{
+   const r=await httpFetch(urls[i],{signal:signal?AbortSignal.any([signal,AbortSignal.timeout(timeoutMs)]):AbortSignal.timeout(timeoutMs),
+    redirect:'manual',headers:{Accept:'text/html','User-Agent':'CoffeeBot-IS463-Prototype/0.4'}});
+   if(!r.ok||r.status>=300||!/html|text/i.test(r.headers?.get?.('content-type')||'text/html'))continue;
+   const html=(await r.text()).slice(0,220000);
+   pagesRead++;
+   if(i===0)urls.push(...findEvidencePages(html,home));
+   for(const claim of extractMaterialEvidence(html).slice(0,2)){
+    if(seenClaims.has(claim))continue;
+    seenClaims.add(claim);
+    entries.push({source:'Organisation website excerpt (unverified)',url:urls[i],claim,checkedAt});
+   }
+  }catch(err){signal?.throwIfAborted();/* One inaccessible page must not block another. */}
+ }
+ return {checkedAt,entries:entries.slice(0,6),pagesRead,
+  reason:entries.length?'Published material-specific excerpts found':pagesRead?'No specific reuse or cultivation text found':'No accessible text page'};
 }
