@@ -1,4 +1,5 @@
 import {distanceKm} from './core.js';
+import {publicWebUrl} from './contacts.js';
 
 export const SCHOOL_PROGRAMMES_URL='https://data.gov.sg/datasets/d_db1faeea02c646fa3abccfa5aba99214/view';
 export const SCHOOL_DIRECTORY_URL='https://data.gov.sg/datasets/d_688b934f82c1059ed0a6993d2a829089/view';
@@ -19,6 +20,12 @@ export function parseCSV(csv) {
  return rows.map(values=>Object.fromEntries(headers.map((h,i)=>[h,(values[i]||'').trim()])));
 }
 const key=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+// Official MOE directory website only; never guess a domain from the school name.
+const schoolWebsite=row=>{
+ const raw=row?.url_address||row?.website||row?.school_website||'';
+ const url=publicWebUrl(raw);
+ return url?.protocol==='https:'?url.href:'';
+};
 export function enrichSchoolGardenLocations(partners,directory) {
  const official=new Map((directory||[]).map(row=>[key(row.school_name),row]));
  let resolved=0;
@@ -27,6 +34,7 @@ export function enrichSchoolGardenLocations(partners,directory) {
   if(!/registered Community in Bloom location|Address not recorded|^Singapore/i.test(String(p.location||'')))continue;
   const contact=official.get(key(p.name));
   if(!contact?.address)continue;
+  if(!p.websiteUrl)p.websiteUrl=schoolWebsite(contact);
   const postal=/^\d{5,6}$/.test(contact.postal_code||'')?contact.postal_code.padStart(6,'0'):'';
   p.location=contact.address.trim().replace(/\s+/g,' ')+(postal?' Singapore '+postal:'');
   if(postal)p.postalCode=postal;
@@ -48,7 +56,7 @@ export function moeSchoolCandidates(programmes,directory,reference) {
   const programme=[row.alp_title,row.llp_title].find(v=>programmePattern.test(v||''))||row.alp_domain||'Sustainability-related school programme';
   const description='MOE-listed programme: '+programme+'. This does NOT establish a garden, composting, or spent-grounds acceptance.';
   return {id:'moe-'+key(name),name,category:'school programme',status:'suggested',capacityKg:null,verified:false,confirmed:false,frequency:'unknown',
-    use:description,source:'MOE School Distinctive Programmes',sourceUrl:SCHOOL_PROGRAMMES_URL,location:contact?.address?(contact.address.trim()+(contact.postal_code&&/^\d{5,6}$/.test(contact.postal_code)?' Singapore '+contact.postal_code.padStart(6,'0'):'')):'Address not recorded',postalCode:contact?.postal_code&&/^\d{5,6}$/.test(contact.postal_code)?contact.postal_code.padStart(6,'0'):null,
+    use:description,source:'MOE School Distinctive Programmes',sourceUrl:SCHOOL_PROGRAMMES_URL,websiteUrl:schoolWebsite(contact),location:contact?.address?(contact.address.trim()+(contact.postal_code&&/^\d{5,6}$/.test(contact.postal_code)?' Singapore '+contact.postal_code.padStart(6,'0'):'')):'Address not recorded',postalCode:contact?.postal_code&&/^\d{5,6}$/.test(contact.postal_code)?contact.postal_code.padStart(6,'0'):null,
     lat:null,lon:null,distanceKm:null,contactName:'',contactEmail:'',notes:'',
     evidenceEntries:[
       {source:'MOE School Distinctive Programmes',url:SCHOOL_PROGRAMMES_URL,claim:'MOE lists '+programme+' for '+name},
