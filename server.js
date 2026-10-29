@@ -198,15 +198,15 @@ export function chooseForAssessment(partners,limit=24){return selectSourceBalanc
 async function enrichWebsiteEvidence(p,{signal}={}){
  if(!p.websiteUrl)return 0;
  const checked=Date.parse(p.evidenceResearch?.checkedAt||'');
- if(Number.isFinite(checked)&&Date.now()-checked<7*86400000)return 0;
+ if(p.evidenceResearch?.version===2&&Number.isFinite(checked)&&Date.now()-checked<7*86400000)return 0;
  const researched=await researchOrganisationEvidence(p,{signal});
- p.evidenceResearch={checkedAt:researched.checkedAt,result:researched.reason};
+ p.evidenceResearch={version:2,checkedAt:researched.checkedAt,result:researched.reason,pagesRead:researched.pagesRead||0};
  const entries=p.evidenceEntries||[];
  for(const e of researched.entries){
   if(!entries.some(x=>x.url===e.url&&x.claim===e.claim))entries.push(e);
  }
  p.evidenceEntries=entries.slice(0,30);
- return researched.entries.length;
+ return researched.pagesRead||0;
 }
 
 export function saveEvidenceResults(partners,results,{provider,runId}){
