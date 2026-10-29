@@ -292,7 +292,7 @@ async function discover(s,{provider=AI_PROVIDER,assessmentGenerator=generateJSON
    run.assessmentSkipped=Math.max(0,candidates.length-pending.length);
    const batches=[];for(let i=0;i<pending.length;i+=6)batches.push(pending.slice(i,i+6));
    discoveryStatus={active:true,phase:'Assessing and Ranking Partners',
-    detail:batches.length?'Evidence assessment batch 1 of '+batches.length:'No new evidence-rich leads to assess',
+    detail:batches.length?'Evidence assessment batch 1 of '+batches.length:'No eligible partners awaiting AI assessment',
     completed:2,total:4,batchCompleted:0,batchTotal:batches.length,runId};
    for(let i=0;i<batches.length;i++){
     const batch=batches[i],prompt=evidencePrompt(batch),started=Date.now();
