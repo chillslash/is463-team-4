@@ -34,3 +34,40 @@ test('unrelated page content and redirects cannot be treated as material evidenc
   {httpFetch:async()=>new Response(html,{status:302,headers:{Location:'http://127.0.0.1/admin'}})});
  assert.deepEqual(r.entries,[]);
 });
+
+test('website research follows at most two relevant same-origin pages and cites their exact URLs',async()=>{
+ const called=[];
+ const page='<html><a href="/services/composting">Composting Services</a>'+
+  '<a href="/research/mushrooms">Mushroom Research</a>'+
+  '<a href="/about-us">About Us</a>'+
+  '<a href="https://unrelated.example/composting">External research</a>'+
+  '<a href="/brochure.pdf">Download composting PDF</a></html>';
+ const httpFetch=async url=>{
+  called.push(url);
+  if(url==='https://org.example/')return new Response(page,{status:200,headers:{'Content-Type':'text/html'}});
+  if(url.endsWith('/services/composting'))return new Response('<p>Our team processes garden cuttings and organic food waste into managed compost for horticultural growing operations.</p>',{status:200,headers:{'Content-Type':'text/html'}});
+  if(url.endsWith('/research/mushrooms'))return new Response('<p>We cultivate mushrooms using prepared organic by-products under monitored indoor growing conditions.</p>',{status:200,headers:{'Content-Type':'text/html'}});
+  throw Error('unexpected URL');
+ };
+ const result=await researchOrganisationEvidence({websiteUrl:'https://org.example/'},{httpFetch});
+ assert.deepEqual(called,['https://org.example/','https://org.example/services/composting','https://org.example/research/mushrooms']);
+ assert.equal(result.pagesRead,3);
+ assert.equal(result.entries.length,2);
+ assert.ok(result.entries.every(e=>called.includes(e.url)));
+ assert.ok(result.entries.some(e=>e.url.endsWith('/services/composting')));
+ assert.ok(result.entries.some(e=>e.url.endsWith('/research/mushrooms')));
+});
+
+test('website research does not follow redirects on secondary pages',async()=>{
+ const called=[];
+ const httpFetch=async url=>{
+  called.push(url);
+  if(url==='https://org.example/')return new Response('<a href="/services">Services</a><p>We cultivate mushrooms using carefully formulated organic by-products as the growing substrate.</p>',{status:200,headers:{'Content-Type':'text/html'}});
+  return new Response('',{status:302,headers:{Location:'http://127.0.0.1/internal'}});
+ };
+ const result=await researchOrganisationEvidence({websiteUrl:'https://org.example/'},{httpFetch});
+ assert.equal(called.length,2);
+ assert.equal(result.pagesRead,1);
+ assert.equal(result.entries.length,1);
+ assert.equal(result.entries[0].url,'https://org.example/');
+});
