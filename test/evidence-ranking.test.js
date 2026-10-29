@@ -76,7 +76,7 @@ test('prompt requires cited evidence indices, source-limited reasoning and no in
  assert.match(prompt,/sourceEvidence/i);
  assert.match(prompt,/documented acceptance of used coffee grounds is strong/i);
  assert.match(prompt,/NOT reasons to deduct technical suitability or factual evidence twice/i);
- assert.match(prompt,/Only recorded partner facts contribute to the separate operational score/i);
+ assert.match(prompt,/They are recorded separately, not supplied by AI/i);
  assert.ok(prompt.includes(explicit));
 });
 
