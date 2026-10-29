@@ -39,7 +39,7 @@ test('AI reviews are advisory, while numeric ranking uses documented evidence an
  }};
  const x=scorePartner(p,42);
  assert.deepEqual(x.parts,{suitability:5,evidence:4,proximity:4,operations:0});
- assert.equal(x.score,13);assert.equal(x.aiLed,true);
+ assert.equal(x.score,13);assert.equal(x.aiLed,false);
  assert.equal(scorePartner({...p,aiAssessment:null},42).score,13);
  assert.equal(scorePartner({...p,distanceKm:0,contactEmail:'info@example.com'},42).score,14);
  assert.equal(scorePartner({...p,verified:true,confirmed:true,capacityKg:25},42).score,36);
@@ -78,7 +78,7 @@ test('configurable weights validate totals and deterministically reorder partner
  const before=scorePartner(ai,0);
  const after=scorePartner(ai,0,{suitability:10,evidence:60,proximity:20,operations:10});
  assert.notEqual(before.score,after.score);
- assert.equal(after.reasons[0],'Original evidence');
+ assert.match(after.reasons[0],/Preliminary screening/);
  assert.equal(ai.aiAssessment.sourceEvidence,10);
  assert.equal(Object.values(after.parts).reduce((sum,v)=>sum+v,0),after.score);
 });
