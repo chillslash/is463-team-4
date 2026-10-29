@@ -10,7 +10,7 @@ test('AI qualitative findings persist without self-reinforcing numeric promotion
  assert.equal(saveAIResults(saved,[copies[0]],results,{provider:'codex',prompt:'test',runId:'run'}),1);
  assert.equal(saved[0].aiAssessment.rubricVersion,'ai-led-v1');
  assert.equal(copies[0].aiAssessment,undefined);
- assert.equal(scorePartner(saved[0],10).aiLed,true);
+ assert.equal(scorePartner(saved[0],10).aiLed,false,'Advisory notes are not an active numerical AI score');
  assert.equal(scorePartner(saved[0],10).score,prior);
  assert.equal(rankPartners(saved,10)[0].id,'a');
  assert.equal(saved[0].aiAssessment.basedOn[0].url,'https://example.org/evidence');
