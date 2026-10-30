@@ -1,6 +1,6 @@
 # CoffeeBot Circularity Copilot — Current UI Guide
 
-**Current as of 23 October 2026.** This guide covers the implemented application. If wording conflicts with source code, inspect public/app.js, public/app.css, src/core.js and tests first.
+**Current as of 30 October 2026.** This guide covers the implemented application. If wording conflicts with source code, inspect public/app.js, public/app.css, src/core.js and tests first.
 
 ## Navigation and workflow
 
