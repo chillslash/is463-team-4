@@ -41,7 +41,7 @@ test('discovery assesses an existing eligible partner with zero newly discovered
  const after=(await api('/api/state')).body;
  const partner=after.ranked.find(p=>p.id==='existing-evidence-farm');
  assert.equal(partner.match.method,'AI-assisted');assert.equal(partner.aiEvidenceReview.provider,'codex');
- assert.equal(partner.match.parts.operations,0);
+ assert.equal('operations' in partner.match.parts,false);
  assert.equal(after.discoveryRuns[0].newLeads,0);assert.equal(after.discoveryRuns[0].reviewed,1);
 });
 
