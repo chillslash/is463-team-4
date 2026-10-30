@@ -6,10 +6,10 @@ import {join} from 'node:path';
 
 export const AI_PROVIDERS = ['template', 'codex', 'claude', 'qwen', 'llama'];
 const LIMIT = 120000;
-export function cliInvocation(provider, platform = process.platform, env = process.env) {
+export function cliInvocation(provider, platform = process.platform, env = process.env, {webSearch=false} = {}) {
   if (!['codex', 'claude'].includes(provider)) throw new Error('Choose Codex or Claude in AI settings');
   const args = provider === 'codex'
-    ? ['exec', '--ephemeral', '--sandbox', 'read-only', '--skip-git-repo-check', '--json', '-']
+    ? [...(webSearch?['--search']:[]),'exec', '--ephemeral', '--sandbox', 'read-only', '--skip-git-repo-check', '--json', '-']
     : ['-p', '--output-format', 'json', '--max-turns', '1', '--no-session-persistence', '--tools', '', '--disallowedTools', 'mcp__*'];
   // A teammate may explicitly override Codex's location; otherwise use the normal PATH lookup.
   const codexPath = provider === 'codex' ? env.CODEX_PATH?.trim() : null;
@@ -71,10 +71,10 @@ export function parseAIOutput(text,provider){
 }
 // CLIs use the signed-in local user's subscription. Prompts are passed on stdin, never shell-interpolated.
 // Tools are disabled for Claude and Codex is read-only; neither may edit project files.
-export async function generateJSON(provider, prompt, {runner=spawn, timeoutMs=90000, withUsage=false, signal} = {}) {
+export async function generateJSON(provider, prompt, {runner=spawn, timeoutMs=90000, withUsage=false, signal, webSearch=false} = {}) {
   signal?.throwIfAborted();
   if(provider==='qwen'||provider==='llama')return generateLocalJSON(provider,prompt,{withUsage,signal,timeoutMs:Math.max(timeoutMs,240000)});
-  const {command, args} = cliInvocation(provider);
+  const {command, args} = cliInvocation(provider,process.platform,process.env,{webSearch:webSearch&&provider==='codex'});
   return new Promise((resolve, reject) => {
     let child, stdout = '', stderr = '', finished = false;
     const complete = (err, result) => {if (finished) return; finished = true; clearTimeout(timer); signal?.removeEventListener('abort',onAbort); err ? reject(err) : resolve(result);};
