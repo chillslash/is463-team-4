@@ -789,16 +789,17 @@ async function handleAction(el){const action=el.dataset.action;
   ];
   const rows=weightRows.map(([label,key,value])=>`<div class="co-assessment-weight-row"><label for="f-${key}">${label}</label><div class="co-assessment-weight-input"><input id="f-${key}" name="${key}" type="number" min="0" max="100" step="1" value="${esc(value)}" aria-describedby="assessment-weight-total"><span>%</span></div></div>`).join('');
   const html=`<div class="co-assessment-weight-list">${rows}<div class="co-assessment-total"><strong>Total</strong><output id="assessment-weight-total" aria-live="polite">100/100%</output></div></div>`+
-    '<div class="co-assessment-reset"><label class="co-field" for="assessment-budget">AI assessments per discovery run (0–24 partners)<input id="assessment-budget" name="automaticAIAssessments" type="number" min="0" max="24" step="1" value="'+esc(data.settings.automaticAIAssessments??24)+'"></label><button type="button" class="co-button alt small" id="reset-assessment-settings">Reset to Default Settings</button></div>';
+    '<div class="co-assessment-controls"><div class="co-field co-assessment-budget"><label for="assessment-budget">AI Assessments per Discovery Run</label><div class="co-assessment-budget-control"><input id="assessment-budget" name="automaticAIAssessments" type="number" min="0" max="24" step="1" value="'+esc(data.settings.automaticAIAssessments??24)+'"><span class="co-assessment-budget-note">0–24 Partners</span></div></div><button type="button" class="co-button alt small" id="reset-assessment-settings">Reset to Default Settings</button></div>';
   dialog('Assessment Settings',html,async f=>{
    const weights={suitability:Number(f.weightSuitability),evidence:Number(f.weightEvidence),proximity:Number(f.weightProximity),operations:Number(f.weightOperations)};
    if(Object.values(weights).some(v=>!Number.isInteger(v)||v<0||v>100)||Object.values(weights).reduce((a,b)=>a+b,0)!==100)
     throw Error('Rating weights must be whole percentages adding up to 100.');
    const automaticAIAssessments=Number(f.automaticAIAssessments);
    if(!Number.isInteger(automaticAIAssessments)||automaticAIAssessments<0||automaticAIAssessments>24)
-    throw Error('The evidence research and AI budget must be a whole number from 0 to 24.');
+    throw Error('AI assessments per discovery run must be a whole number from 0 to 24.');
    return request('/api/settings',{method:'PATCH',body:JSON.stringify({ratingWeights:weights,automaticAIAssessments})});
   });
+  $('.co-dialog')?.classList.add('co-dialog-assessment');
   const updateWeightTotal=()=>{
    const total=['Suitability','Evidence','Proximity','Operations'].reduce((sum,key)=>sum+Number($('#f-weight'+key)?.value||0),0);
    const output=$('#assessment-weight-total');if(output){output.value=total+'/100%';output.textContent=total+'/100%';output.classList.toggle('co-invalid',total!==100);}
@@ -807,7 +808,10 @@ async function handleAction(el){const action=el.dataset.action;
   updateWeightTotal();
   $('#reset-assessment-settings')?.addEventListener('click',()=>{
    const defaults={weightSuitability:30,weightEvidence:30,weightProximity:5,weightOperations:35,automaticAIAssessments:24};
-   for(const [name,value] of Object.entries(defaults))$('#f-'+name).value=value;
+   for(const [name,value] of Object.entries(defaults)){
+    const input=name==='automaticAIAssessments'?$('#assessment-budget'):$('#f-'+name);
+    if(input)input.value=value;
+   }
    updateWeightTotal();
   });
   return;
