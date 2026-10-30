@@ -12,6 +12,7 @@ import {generateJSON,validateDraft,validateActivitySuggestion,ensureCoffeeBotSub
 import {discoverAll} from './src/discovery.js';
 import {resolveLocations} from './src/geocode.js';
 import {researchPublicContact,publicWebUrl} from './src/contacts.js';
+import {websiteResolutionPrompt,validateWebsiteResolutions,verifyResolvedWebsite} from './src/website-resolution.js';
 import {parseCSV, enrichSchoolGardenLocations, SCHOOL_DIRECTORY_ID} from './src/moe.js';
 
 const ROOT=process.cwd();
@@ -195,6 +196,37 @@ export function saveAIResults(partners,batch,results,{provider,prompt,runId,manu
 }
 export function chooseForAssessment(partners,limit=24){return selectSourceBalanced(partners,limit);}
 
+const WEBSITE_RESOLUTION_MAX_AGE_MS=30*86400000;
+function websiteResolutionDue(p){
+ if(p.websiteUrl)return false;
+ const checked=Date.parse(p.websiteResolution?.checkedAt||'');
+ return !Number.isFinite(checked)||Date.now()-checked>=WEBSITE_RESOLUTION_MAX_AGE_MS;
+}
+async function resolveOfficialWebsiteBatch(partners,{generator,signal}={}){
+ if(!generator||!partners.length)return {resolved:0,usage:null};
+ const generated=await generator('codex',websiteResolutionPrompt(partners),
+  {withUsage:true,signal,webSearch:true,timeoutMs:90000});
+ const rows=validateWebsiteResolutions(generated.result,partners);
+ const byId=new Map(rows.map(x=>[x.id,x]));let resolved=0;
+ for(const p of partners){
+  signal?.throwIfAborted();
+  const row=byId.get(p.id);
+  if(!row)continue;
+  if(!row.websiteUrl){
+   p.websiteResolution={checkedAt:new Date().toISOString(),result:'not-found',reason:row.reason||'No confident official website found',method:'codex-web-search'};
+   continue;
+  }
+  const verified=await verifyResolvedWebsite(p,row.websiteUrl,{signal});
+  p.websiteResolution={checkedAt:verified.checkedAt,result:verified.ok?'verified':'unverified',
+   reason:verified.ok?(row.reason||verified.reason):verified.reason,method:'codex-web-search',
+   candidateUrl:row.websiteUrl};
+  if(verified.ok&&!p.websiteUrl){
+   p.websiteUrl=verified.websiteUrl;p.websiteOrigin='codex-web-search';resolved++;
+  }
+ }
+ return {resolved,usage:generated.usage};
+}
+
 async function enrichWebsiteEvidence(p,{signal}={}){
  if(!p.websiteUrl)return 0;
  const checked=Date.parse(p.evidenceResearch?.checkedAt||'');
@@ -223,11 +255,11 @@ export function saveEvidenceResults(partners,results,{provider,runId}){
  return count;
 }
 
-async function discover(s,{provider=AI_PROVIDER,assessmentGenerator=generateJSON,discoveryProvider=discoverAll,signal}={}){
+async function discover(s,{provider=AI_PROVIDER,assessmentGenerator=generateJSON,websiteResearchGenerator=null,discoveryProvider=discoverAll,signal}={}){
   const check=()=>{if(signal?.aborted)throw stoppedError();};
  const runId=randomUUID(),startedAt=new Date().toISOString();
  discoveryStatus={active:true,phase:'Discovering Partners',detail:'Retrieving sources and matching locations',completed:0,total:4,runId};
- const run={id:runId,startedAt,provider,sources:[],warnings:[],newLeads:0,existingRefreshed:0,reviewed:0,assessmentFailed:0,assessmentSkipped:0,aiCalls:0,aiUsage:[],contactsFound:0,contactPagesChecked:0,evidencePagesChecked:0};
+ const run={id:runId,startedAt,provider,sources:[],warnings:[],newLeads:0,existingRefreshed:0,reviewed:0,assessmentFailed:0,assessmentSkipped:0,aiCalls:0,aiUsage:[],websiteResolutionCalls:0,websitesResolved:0,contactsFound:0,contactPagesChecked:0,evidencePagesChecked:0};
  try{
   const result=await discoveryProvider(s.settings,{signal});
    check();
@@ -260,9 +292,37 @@ async function discover(s,{provider=AI_PROVIDER,assessmentGenerator=generateJSON
    }
    if(!ids.has(p.id)){s.partners.push(p);ids.add(p.id);run.newLeads++;if(p.contactEmail)run.contactsFound++;}
   }
-  discoveryStatus={active:true,phase:'Researching Contacts',detail:'Checking published contact details',completed:1,total:4,runId};
-  const sites=rankPartners(s.partners,numbers(s.settings,s.partners,s.handovers).gapKg,s.settings.ratingWeights)
-   .filter(p=>p.status==='suggested'&&!p.contactEmail&&p.websiteUrl&&(!p.contactSearch?.checkedAt||Date.now()-Date.parse(p.contactSearch.checkedAt)>7*86400000)).slice(0,5);
+  discoveryStatus={active:true,phase:'Researching Organisations',detail:'Resolving official websites and published details',completed:1,total:4,runId};
+  const preResearch=rankPartners(s.partners,numbers(s.settings,s.partners,s.handovers).gapKg,s.settings.ratingWeights)
+   .filter(p=>p.status==='suggested'&&p.source!=='Fictional Stitch scenario');
+  const researchCohort=chooseForAssessment(preResearch,s.settings.automaticAIAssessments);
+  if(provider==='codex'&&websiteResearchGenerator){
+   const unresolved=researchCohort.filter(websiteResolutionDue);
+   for(let i=0;i<unresolved.length;i+=6){
+    check();const batch=unresolved.slice(i,i+6),started=Date.now();
+    let usage=null,success=false,error=null;
+    try{
+     run.websiteResolutionCalls++;
+     const result=await resolveOfficialWebsiteBatch(batch,{generator:websiteResearchGenerator,signal});
+     check();run.websitesResolved+=result.resolved;usage=result.usage;success=true;
+    }catch(err){check();error=err.message;run.warnings.push('Website research batch '+(Math.floor(i/6)+1)+': '+error);}
+    finally{
+     const log={id:randomUUID(),at:new Date().toISOString(),kind:'website-resolution',
+      provider:'codex',runId,batch:Math.floor(i/6)+1,candidates:batch.length,success,error,
+      durationMs:Date.now()-started,...(usage||{inputTokens:null,outputTokens:null,cachedInputTokens:null})};
+     run.aiUsage.push(log);appendAILog(s,log);
+    }
+   }
+  }
+  // Read organisation-specific material evidence from every website in the bounded
+  // research cohort before AI evaluation. These HTTP reads are cached for seven days.
+  for(const ranked of researchCohort.filter(p=>p.websiteUrl)){
+   check();const target=s.partners.find(p=>p.id===ranked.id);
+   if(target)run.evidencePagesChecked+=await enrichWebsiteEvidence(target,{signal});
+  }
+  const sites=researchCohort
+   .filter(p=>!p.contactEmail&&p.websiteUrl&&(!p.contactSearch?.checkedAt||Date.now()-Date.parse(p.contactSearch.checkedAt)>7*86400000))
+   .slice(0,5);
   for(const ranked of sites){
    const target=s.partners.find(p=>p.id===ranked.id);if(!target)continue;
    check();const found=await researchPublicContact(target,{signal});check();
@@ -273,28 +333,12 @@ async function discover(s,{provider=AI_PROVIDER,assessmentGenerator=generateJSON
   }
   discoveryStatus={active:true,phase:'Ranking Partners',detail:'Ranking sourced leads',completed:2,total:4,runId};
   if(AUTO_AI_REVIEW && provider!=='template'){
-   // Assess the configured top-N across sources. Lack of a detailed website
-   // is a confidence issue for the AI, not a prerequisite for evaluation.
-   const previouslyRanked=rankPartners(s.partners,numbers(s.settings,s.partners,s.handovers).gapKg,s.settings.ratingWeights)
-    .filter(p=>p.status==='suggested'&&p.source!=='Fictional Stitch scenario');
-   // Research a few already-reviewed, high-priority organisation sites before
-   // selecting new AI calls. Reassess only when new cited facts actually appear.
-   for(const ranked of previouslyRanked.filter(p=>activeEvidenceReview(p)&&p.websiteUrl).slice(0,6)){
-    check();
-    const target=s.partners.find(x=>x.id===ranked.id);
-    if(target)run.evidencePagesChecked+=await enrichWebsiteEvidence(target,{signal});
-   }
+   // Re-rank after shared organisation research, then assess the configured
+   // source-balanced top-N whose current evidence has not already been reviewed.
    const candidates=rankPartners(s.partners,numbers(s.settings,s.partners,s.handovers).gapKg,s.settings.ratingWeights)
     .filter(p=>p.status==='suggested'&&p.source!=='Fictional Stitch scenario');
    const eligible=candidates.filter(p=>!activeEvidenceReview(p)&&!hasRecentEvidenceFailure(p));
    const selected=chooseForAssessment(eligible,s.settings.automaticAIAssessments);
-   // Optional lightweight research on already-selected organisation websites.
-   // It never controls who may be assessed. Reuse cached results where possible.
-   for(const ranked of selected.filter(p=>p.websiteUrl).slice(0,6)){
-    check();
-    const target=s.partners.find(x=>x.id===ranked.id);
-    if(target)run.evidencePagesChecked+=await enrichWebsiteEvidence(target,{signal});
-   }
    const pending=selected.map(p=>s.partners.find(x=>x.id===p.id)).filter(Boolean);
    run.assessmentSkipped=Math.max(0,candidates.length-pending.length);
    const batches=[];for(let i=0;i<pending.length;i+=6)batches.push(pending.slice(i,i+6));
@@ -340,7 +384,7 @@ async function discover(s,{provider=AI_PROVIDER,assessmentGenerator=generateJSON
   run.sourceFreshness=run.sources.some(x=>!x.cached)?(run.sources.some(x=>x.cached)?'mixed':'fresh'):'cached';
   return {runId,found:result.candidates.length,added:run.newLeads,existingRefreshed:run.existingRefreshed,
    assessed:run.reviewed,assessmentFailed:run.assessmentFailed,assessmentSkipped:run.assessmentSkipped,
-   evidencePagesChecked:run.evidencePagesChecked,aiCalls:run.aiCalls,provider,sources:run.sources,
+   evidencePagesChecked:run.evidencePagesChecked,websiteResolutionCalls:run.websiteResolutionCalls,websitesResolved:run.websitesResolved,aiCalls:run.aiCalls,provider,sources:run.sources,
    sourceFreshness:run.sourceFreshness,warnings:run.warnings,contactsFound:run.contactsFound};
  }catch(err){if(!signal?.aborted)discoveryStatus={active:false,phase:'Failed: '+err.message,completed:0,total:4,runId};throw err;}
 }
@@ -383,7 +427,7 @@ async function aiFollowUpDraft(p,state,provider){
  return {subject:FOLLOWUP_SUBJECT,body:draft.body,mode:provider+' CLI-assisted follow-up — review before use',usage:output.usage};
 }
 
-export function createApp({aiProvider=AI_PROVIDER,assessmentGenerator=generateJSON,contactResearcher=researchPublicContact,discoveryProvider=discoverAll}={}){const activityAnalysisRuns=new Map();return createServer(async(req,res)=>{
+export function createApp({aiProvider=AI_PROVIDER,assessmentGenerator=generateJSON,websiteResearchGenerator=null,contactResearcher=researchPublicContact,discoveryProvider=discoverAll}={}){const activityAnalysisRuns=new Map();return createServer(async(req,res)=>{
  try{
   const url=new URL(req.url,'http://localhost');const path=url.pathname;
   if(path==='/api/health')return response(res,200,{ok:true,service:'CoffeeBot Circularity Copilot'});
@@ -411,7 +455,7 @@ export function createApp({aiProvider=AI_PROVIDER,assessmentGenerator=generateJS
    discoveryController=controller;
    discoveryStatus={active:true,phase:'Discovering Partners',detail:'Retrieving sources and matching locations',completed:0,total:4};
    try{
-    const result=await mutation(s=>discover(s,{provider:aiProvider,assessmentGenerator,discoveryProvider,signal:controller.signal}),{signal:controller.signal,guard:controller});
+    const result=await mutation(s=>discover(s,{provider:aiProvider,assessmentGenerator,websiteResearchGenerator,discoveryProvider,signal:controller.signal}),{signal:controller.signal,guard:controller});
     discoveryStatus={active:false,phase:result.warnings.some(w=>w.startsWith('AI batch'))?'Completed with partial AI results':'Completed',completed:4,total:4,runId:result.runId};
     return response(res,200,result);
    }catch(err){
@@ -766,4 +810,4 @@ export function createApp({aiProvider=AI_PROVIDER,assessmentGenerator=generateJS
   const blob=await readFile(file);res.writeHead(200,{'Content-Type':FILE_TYPES[extname(file)]||'application/octet-stream','Cache-Control':'no-cache','X-Content-Type-Options':'nosniff'});res.end(blob);
  }catch(err){response(res,err.status||500,{error:err.message||'Server error'});}
  });}
-if(process.argv[1] && resolve(process.argv[1])===resolve(new URL(import.meta.url).pathname.replace(/^\/(\w:)\//,'$1/'))){createApp().listen(PORT,()=>console.log(`Circularity Copilot http://localhost:${PORT}`));}
+if(process.argv[1] && resolve(process.argv[1])===resolve(new URL(import.meta.url).pathname.replace(/^\/(\w:)\//,'$1/'))){createApp({websiteResearchGenerator:generateJSON}).listen(PORT,()=>console.log(`Circularity Copilot http://localhost:${PORT}`));}
