@@ -63,7 +63,7 @@ test('AI may not award operational points or infer permission, recurring intake,
  p.aiEvidenceReview={...validateEvidenceAssessments(x,[p])[0],assessedAt:new Date().toISOString()};
  const result=scorePartner(p,0);
  assert.equal('operations' in result.parts,false);
- assert.match(result.reasons.join(' '),/capacity unknown/);
+ assert.match(result.reasons.join(' '),/Confirm intake quantity, frequency and collection arrangements during outreach/);
  assert.equal(result.method,'AI-assisted');
  assert.equal(p.capacityKg,null);
 });
