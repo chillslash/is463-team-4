@@ -905,3 +905,17 @@ test('Best Fit tie order stays independent of AI review status',async()=>{
  const ids=[...root.innerHTML.matchAll(/data-listing-id="([^"]+)"/g)].map(x=>x[1]);
  assert.deepEqual(ids.slice(0,3),['p0','p1','p10']);
 });
+
+test('Assessment Settings keeps the AI budget separate from reset controls',()=>{
+ const js=readFileSync(new URL('../public/app.js',import.meta.url),'utf8');
+ const css=readFileSync(new URL('../public/app.css',import.meta.url),'utf8');
+ assert.match(js,/class="co-assessment-controls"/);
+ assert.match(js,/class="co-field co-assessment-budget"><label for="assessment-budget"/);
+ assert.match(js,/class="co-assessment-budget-control"/);
+ assert.match(js,/classList\.add\('co-dialog-assessment'\)/);
+ assert.match(js,/name==='automaticAIAssessments'\?\$\('#assessment-budget'\):\$\('#f-'\+name\)/);
+ assert.match(css,/\.co-assessment-controls\{display:flex;/);
+ assert.match(css,/\.co-dialog-assessment #reset-assessment-settings/);
+ assert.match(css,/@media\(max-width:580px\)/);
+ assert.doesNotMatch(js,/class="co-assessment-reset"/);
+});
