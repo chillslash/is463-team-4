@@ -69,7 +69,7 @@ test('discovery resolves and verifies an official site before evidence-only AI e
  assert.equal(run.status,200);
  assert.equal(run.body.websiteResolutionCalls,1);
  assert.equal(run.body.websitesResolved,1);
- assert.ok(run.body.evidencePagesChecked>=1);
+ assert.ok(run.body.evidencePagesChecked>=1,JSON.stringify(run.body));
  assert.equal(run.body.assessed,1);
  assert.equal(websiteCalls,1);
  assert.equal(assessmentCalls,1);
