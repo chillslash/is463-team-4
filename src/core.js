@@ -23,8 +23,8 @@ export const LEGACY_SEEDED_PARTNER_NOTES=Object.freeze([
  'This is an NParks-managed physical site, NOT an organisation confirmed to accept grounds. Staff must identify its authorised decision-maker and verify any reuse agreement.'
 ]);
 // Sponsor priority: meaningful intake quantity, then dependable logistics and reuse.
-export const DEFAULT_RATING_WEIGHTS = Object.freeze({suitability:30,evidence:30,proximity:5,operations:35});
-export const LEGACY_RATING_WEIGHTS = Object.freeze({suitability:40,evidence:35,proximity:10,operations:15});
+export const DEFAULT_RATING_WEIGHTS = Object.freeze({suitability:55,evidence:30,proximity:15});
+export const LEGACY_RATING_WEIGHTS = Object.freeze({suitability:30,evidence:30,proximity:5,operations:35});
 // All five sponsor locations report TOTAL beverages per month, not coffee drinks.
 export const COFFEEBOT_MONTHLY_CUP_VOLUMES = Object.freeze([
  {region:'North',location:'Republic Polytechnic',minCups:700,maxCups:700},
@@ -39,7 +39,7 @@ export const SPONSOR_MONTHLY_CUPS = Object.freeze({
 });
 // 52 weeks / 12 months; use the range midpoint as the editable initial forecast.
 const SPONSOR_WEEKLY_CUPS = Math.round((SPONSOR_MONTHLY_CUPS.min+SPONSOR_MONTHLY_CUPS.max)/2*12/52);
-export function validRatingWeights(weights){return !!weights && typeof weights==='object' && Object.keys(DEFAULT_RATING_WEIGHTS).every(k=>Number.isInteger(weights[k])&&weights[k]>=0&&weights[k]<=100) && Object.keys(weights).length===4 && Object.values(weights).reduce((sum,v)=>sum+v,0)===100;}
+export function validRatingWeights(weights){return !!weights && typeof weights==='object' && Object.keys(DEFAULT_RATING_WEIGHTS).every(k=>Number.isInteger(weights[k])&&weights[k]>=0&&weights[k]<=100) && Object.keys(weights).length===3 && Object.values(weights).reduce((sum,v)=>sum+v,0)===100;}
 export const DEFAULT_SETTINGS = { ratingWeights: {...DEFAULT_RATING_WEIGHTS}, sponsorAssumptionsVersion: 1, cupsPerWeek: SPONSOR_WEEKLY_CUPS, coffeeSharePercent: 60, gramsPerCup: 15, referenceLat: 1.3275, referenceLon: 103.8723, referenceLabel: 'CoffeeBot HQ, 8 Lor Bakar Batu, #05-01, Singapore 348743 (approximate coordinates)', automaticAIAssessments: 24, aiProvider: 'template' };
 // Upgrade only untouched historical demo assumptions. Staff-edited forecasts and
 // real partner records must never be silently replaced by sponsor sample data.
@@ -186,28 +186,16 @@ export function scorePartner(p,gap,ratingWeights=DEFAULT_RATING_WEIGHTS){
  const km=Number(p.distanceKm);
  // Straight-line distance is a weak convenience proxy, never a delivery-route promise.
  const proximity=p.distanceKm==null||!Number.isFinite(km)?0:Math.round(Math.max(0,10-0.35*Math.max(0,km)));
- // Missing intake, frequency and transport information earns no points, rather than
- // being interpreted as an inability to take grounds. Staff-entered but unverified
- // quantities earn limited provisional credit; verified intake earns full credit.
- const capacity= p.capacityKg==null || p.capacityKg==='' ? 0 : Number(p.capacityKg);
- const knownCapacity=Number.isFinite(capacity)&&capacity>0;
- const intake=knownCapacity?Math.round(Math.min(capacity/10,1)*26*(p.verified?1:0.4)):0;
- const freq=String(p.frequency||'').toLowerCase();
- const repeated=/daily|weekly|fortnight|monthly|recurr|regular|every\s+\d/.test(freq);
- const frequency=repeated?(p.verified?6:3):0;
- const transport=['partner-collects','either'].includes(p.transportArrangement)
-  ?(p.transportArrangement==='partner-collects'?6:4):0;
- const documentedUse=p.agreedUse&&String(p.agreedUse).trim()?2:0;
- const operations=Math.min(40,intake+frequency+transport+documentedUse);
- const rawParts={suitability:q.reuse,evidence:q.evidence,proximity,operations};
- const maxima={suitability:40,evidence:35,proximity:10,operations:40};
+ // Outreach Priority is intentionally pre-contact. Intake quantity, frequency,
+ // willingness and transport are CoffeeBot's eventual operating criteria, but they
+ // are usually unknown before outreach and therefore must not depress discovery scores.
+ const rawParts={suitability:q.reuse,evidence:q.evidence,proximity};
+ const maxima={suitability:40,evidence:35,proximity:10};
  const parts=Object.fromEntries(Object.keys(maxima).map(key=>[key,Math.round(Math.max(0,Math.min(1,rawParts[key]/maxima[key]))*weights[key])]));
  const score=Object.values(parts).reduce((sum,v)=>sum+v,0);
  const reasons=[review?review.reason:(p.directCoffeeEvidence?'Source explicitly mentions used coffee grounds':'Preliminary screening based on source category and available evidence')];
  if(p.distanceKm!=null)reasons.push('Approximately '+p.distanceKm+' km straight-line from HQ');
- if(knownCapacity)reasons.push(capacity+' kg/week intake '+(p.verified?'verified by staff':'reported, not yet verified'));
- if(!knownCapacity)reasons.push('Intake capacity unknown; confirm with partner');
- if(transport)reasons.push('Collection preference: '+(p.transportArrangement==='partner-collects'?'partner collects':'either arrangement'));
+ reasons.push('Confirm intake quantity, frequency and collection arrangements during outreach');
  return {score,aiLed,provisional:!review,method:review?'AI-assisted':'Rule-ranked',
   evidenceReferences:review?review.evidenceIds:[],parts,weights:{...weights},
   reasons,checks:[review?review.check:(aiLed?a.check:'Confirm actual grounds reuse and acceptance arrangements')]};
