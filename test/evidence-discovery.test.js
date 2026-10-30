@@ -27,7 +27,8 @@ const assessmentGenerator=async(_provider,prompt)=>{
   pathway:'Potential fungal substrate component',reason:'The organisation documents mushroom cultivation using agricultural by-products; coffee-ground acceptance is unverified.',
   check:'Can prepared coffee grounds be accepted in the documented substrate?'}]},usage:{inputTokens:100,outputTokens:30}};
 };
-const discoveryProvider=async()=>({candidates:[],sources:[{name:'Cached fixture source',found:0,cached:true}],warnings:[]});
+let refreshedCandidates=[];
+const discoveryProvider=async()=>({candidates:refreshedCandidates,sources:[{name:'Cached fixture source',found:refreshedCandidates.length,cached:true}],warnings:[]});
 const server=createApp({aiProvider:'codex',assessmentGenerator,discoveryProvider});
 server.listen(0,'127.0.0.1');await once(server,'listening');
 const api=async(path,method='GET')=>{const r=await fetch('http://127.0.0.1:'+server.address().port+path,{method});return {status:r.status,body:await r.json()};};
@@ -42,4 +43,33 @@ test('discovery assesses an existing eligible partner with zero newly discovered
  assert.equal(partner.match.method,'AI-assisted');assert.equal(partner.aiEvidenceReview.provider,'codex');
  assert.equal(partner.match.parts.operations,0);
  assert.equal(after.discoveryRuns[0].newLeads,0);assert.equal(after.discoveryRuns[0].reviewed,1);
+});
+
+test('unchanged source claims retain AI reviews despite a new download timestamp',async()=>{
+ const previous=(await api('/api/state')).body.partners.find(p=>p.id==='existing-evidence-farm');
+ const first=previous.evidenceEntries[0];
+ refreshedCandidates=[{
+  id:previous.id,name:previous.name,category:previous.category,status:'suggested',
+  source:previous.source,sourceUrl:previous.sourceUrl,lat:1.33,lon:103.87,
+  lastSeenAt:new Date().toISOString(),
+  evidenceEntries:[{...first,checkedAt:new Date(Date.now()+60000).toISOString()}]
+ }];
+ const run=await api('/api/discover','POST');
+ assert.equal(run.status,200);
+ assert.equal(run.body.reviewed,0);
+ assert.equal(run.body.aiCalls,0);
+ assert.equal(calls,1);
+ const partner=(await api('/api/state')).body.ranked.find(p=>p.id===previous.id);
+ assert.equal(partner.match.method,'AI-assisted');
+ assert.equal(partner.evidenceEntries[0].checkedAt,first.checkedAt);
+});
+
+test('a substantive change to a sourced claim can trigger reassessment',async()=>{
+ refreshedCandidates[0].evidenceEntries[0].claim=
+  'We cultivate fungal crops using composted organic by-products in indoor substrate production.';
+ const run=await api('/api/discover','POST');
+ assert.equal(run.status,200);
+ assert.equal(run.body.reviewed,1);
+ assert.equal(run.body.aiCalls,1);
+ assert.equal(calls,2);
 });
