@@ -56,7 +56,7 @@ test('unchanged source claims retain AI reviews despite a new download timestamp
  }];
  const run=await api('/api/discover','POST');
  assert.equal(run.status,200);
- assert.equal(run.body.reviewed,0);
+ assert.equal(run.body.assessed,0);
  assert.equal(run.body.aiCalls,0);
  assert.equal(calls,1);
  const partner=(await api('/api/state')).body.ranked.find(p=>p.id===previous.id);
@@ -69,7 +69,7 @@ test('a substantive change to a sourced claim can trigger reassessment',async()=
   'We cultivate fungal crops using composted organic by-products in indoor substrate production.';
  const run=await api('/api/discover','POST');
  assert.equal(run.status,200);
- assert.equal(run.body.reviewed,1);
+ assert.equal(run.body.assessed,1);
  assert.equal(run.body.aiCalls,1);
  assert.equal(calls,2);
 });
