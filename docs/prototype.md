@@ -6,7 +6,7 @@
 
 **Sponsor:** CoffeeBot
 
-**Status:** Functional prototype updated 27 October 2026 following CoffeeBot feedback. Numeric operational criteria remain provisional.
+**Status:** Functional prototype updated 30 October 2026. Pre-contact Outreach Priority and organisation-evidence research reflect CoffeeBot feedback; operational thresholds remain provisional.
 **Companions:** [Problem statement](problem-statement.md), [run/setup instructions](../README.md), [UI conventions](ui-guidelines.md).
 
 ## Purpose and boundaries
