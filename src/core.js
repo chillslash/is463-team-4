@@ -58,8 +58,7 @@ export function migrateSponsorAssumptions(state){
     p.capacityKg=values[1];
   }
  }
- if([LEGACY_RATING_WEIGHTS,OLDER_RATING_WEIGHTS].some(weights=>JSON.stringify(settings.ratingWeights)===JSON.stringify(weights)))
-  settings.ratingWeights={...DEFAULT_RATING_WEIGHTS};
+ if(!validRatingWeights(settings.ratingWeights))settings.ratingWeights={...DEFAULT_RATING_WEIGHTS};
  if(!Number.isFinite(settings.coffeeSharePercent)||settings.coffeeSharePercent<0||settings.coffeeSharePercent>100)
   settings.coffeeSharePercent=DEFAULT_SETTINGS.coffeeSharePercent;
  settings.sponsorAssumptionsVersion=1;
