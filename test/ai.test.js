@@ -43,6 +43,14 @@ test('AI-led assessment validator rejects old labels and unbounded scores',()=>{
  assert.equal(result.length,1);assert.equal(result[0].reuseSuitability,32);
  assert.throws(()=>validateAssessment({assessments:[{id:'p1',priority:'high',reason:'Old contract'}]},['p1']),/valid/);
 });
+test('Codex web search is opt-in and only enabled for shared research calls',()=>{
+ const normal=cliInvocation('codex','linux',{},{}).args;
+ const searched=cliInvocation('codex','linux',{}, {webSearch:true}).args;
+ assert.equal(normal.includes('--search'),false);
+ assert.equal(searched[0],'--search');
+ assert.equal(searched[1],'exec');
+});
+
 test('CODEX_PATH overrides PATH only for Codex, without hardcoded machine fallbacks',()=>{
  const custom='C:/Program Files/OpenAI/Codex/codex.exe';
  const a=cliInvocation('codex','win32',{CODEX_PATH:custom,ComSpec:'cmd.exe'});
