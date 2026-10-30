@@ -52,7 +52,7 @@ The system therefore should not maximise the *number of matches*. It should help
 
 - **Earlier planning:** Estimate weekly available grounds from existing cup-count data and compare them with *agreed Regular-partner* weekly capacity.
 - **Better discovery:** Surface potential recipients from traceable sources, including non-commercial recipients, while distinguishing plausible leads from verified interest.
-- **Better-fit recommendations:** Explain recommendations using distance, quantity, regularity, intended use, logistics, and cost to CoffeeBot — and clearly display unknown information.
+- **Better discovery prioritisation:** Use pre-contact suitability, organisation-specific evidence and distance to decide who is worth contacting; then capture quantity, regularity, intended use, logistics, fees and willingness as relationship facts instead of guessing them from public listings.
 - **Lower administrative burden:** Assist staff with research and personalised outreach while preserving human approval.
 - **More genuine reuse:** Record actual kilograms transferred, associate potential and agreed reuse with the partner profile, and do not count searches, emails, matches or intentions as demonstrated reuse.
 
