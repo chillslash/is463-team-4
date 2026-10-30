@@ -243,7 +243,14 @@ async function discover(s,{provider=AI_PROVIDER,assessmentGenerator=generateJSON
     existing.lastSeenAt=p.lastSeenAt;
     // Earlier imports have no reliable first-seen timestamp; do not fabricate one.
     const prev=existing.evidenceEntries||[{source:existing.source,url:existing.sourceUrl,claim:'Previous source record'}];
-    existing.evidenceEntries=[...p.evidenceEntries,...prev].filter((x,i,arr)=>arr.findIndex(y=>y.source===x.source&&y.url===x.url)===i);
+    // A fresh source download is not new evidence when the claim is unchanged.
+    // Keep its original checkedAt to avoid invalidating cited AI reviews every run.
+    const incoming=(p.evidenceEntries||[]).map(e=>{
+      const unchanged=prev.find(old=>old.source===e.source&&old.url===e.url&&old.claim===e.claim);
+      return unchanged?{...e,checkedAt:unchanged.checkedAt||e.checkedAt,
+       publishedAt:unchanged.publishedAt||e.publishedAt}:e;
+    });
+    existing.evidenceEntries=[...incoming,...prev].filter((x,i,arr)=>arr.findIndex(y=>y.source===x.source&&y.url===x.url)===i);
     if(!Number.isFinite(existing.lat)&&Number.isFinite(p.lat)){existing.lat=p.lat;existing.lon=p.lon;existing.distanceKm=p.distanceKm;}
     if(!existing.websiteUrl&&p.websiteUrl)existing.websiteUrl=p.websiteUrl;
     if(!existing.directCoffeeEvidence&&p.directCoffeeEvidence){existing.directCoffeeEvidence=true;existing.materialEvidence=p.materialEvidence;existing.use=p.use;}
@@ -268,6 +275,15 @@ async function discover(s,{provider=AI_PROVIDER,assessmentGenerator=generateJSON
   if(AUTO_AI_REVIEW && provider!=='template'){
    // Assess the configured top-N across sources. Lack of a detailed website
    // is a confidence issue for the AI, not a prerequisite for evaluation.
+   const previouslyRanked=rankPartners(s.partners,numbers(s.settings,s.partners,s.handovers).gapKg,s.settings.ratingWeights)
+    .filter(p=>p.status==='suggested'&&p.source!=='Fictional Stitch scenario');
+   // Research a few already-reviewed, high-priority organisation sites before
+   // selecting new AI calls. Reassess only when new cited facts actually appear.
+   for(const ranked of previouslyRanked.filter(p=>activeEvidenceReview(p)&&p.websiteUrl).slice(0,6)){
+    check();
+    const target=s.partners.find(x=>x.id===ranked.id);
+    if(target)run.evidencePagesChecked+=await enrichWebsiteEvidence(target,{signal});
+   }
    const candidates=rankPartners(s.partners,numbers(s.settings,s.partners,s.handovers).gapKg,s.settings.ratingWeights)
     .filter(p=>p.status==='suggested'&&p.source!=='Fictional Stitch scenario');
    const eligible=candidates.filter(p=>!activeEvidenceReview(p)&&!hasRecentEvidenceFailure(p));
