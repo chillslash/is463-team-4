@@ -296,8 +296,9 @@ async function discover(s,{provider=AI_PROVIDER,assessmentGenerator=generateJSON
   const preResearch=rankPartners(s.partners,numbers(s.settings,s.partners,s.handovers).gapKg,s.settings.ratingWeights)
    .filter(p=>p.status==='suggested'&&p.source!=='Fictional Stitch scenario');
   const researchCohort=chooseForAssessment(preResearch,s.settings.automaticAIAssessments);
+  const researchTargets=researchCohort.map(ranked=>s.partners.find(p=>p.id===ranked.id)).filter(Boolean);
   if(provider==='codex'&&websiteResearchGenerator){
-   const unresolved=researchCohort.filter(websiteResolutionDue);
+   const unresolved=researchTargets.filter(websiteResolutionDue);
    for(let i=0;i<unresolved.length;i+=6){
     check();const batch=unresolved.slice(i,i+6),started=Date.now();
     let usage=null,success=false,error=null;
@@ -314,15 +315,12 @@ async function discover(s,{provider=AI_PROVIDER,assessmentGenerator=generateJSON
     }
    }
   }
-  // Resolve back to live state records: rankPartners() returns copies, and website
-  // resolution above may just have added a URL to the underlying partner.
-  const researchedTargets=researchCohort.map(ranked=>s.partners.find(p=>p.id===ranked.id)).filter(Boolean);
   // Read organisation-specific material evidence from every website in the bounded
   // research cohort before AI evaluation. These HTTP reads are cached for seven days.
-  for(const target of researchedTargets.filter(p=>p.websiteUrl)){
+  for(const target of researchTargets.filter(p=>p.websiteUrl)){
    check();run.evidencePagesChecked+=await enrichWebsiteEvidence(target,{signal});
   }
-  const sites=researchedTargets
+  const sites=researchTargets
    .filter(p=>!p.contactEmail&&p.websiteUrl&&(!p.contactSearch?.checkedAt||Date.now()-Date.parse(p.contactSearch.checkedAt)>7*86400000))
    .slice(0,5);
   for(const ranked of sites){
