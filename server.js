@@ -314,13 +314,15 @@ async function discover(s,{provider=AI_PROVIDER,assessmentGenerator=generateJSON
     }
    }
   }
+  // Resolve back to live state records: rankPartners() returns copies, and website
+  // resolution above may just have added a URL to the underlying partner.
+  const researchedTargets=researchCohort.map(ranked=>s.partners.find(p=>p.id===ranked.id)).filter(Boolean);
   // Read organisation-specific material evidence from every website in the bounded
   // research cohort before AI evaluation. These HTTP reads are cached for seven days.
-  for(const ranked of researchCohort.filter(p=>p.websiteUrl)){
-   check();const target=s.partners.find(p=>p.id===ranked.id);
-   if(target)run.evidencePagesChecked+=await enrichWebsiteEvidence(target,{signal});
+  for(const target of researchedTargets.filter(p=>p.websiteUrl)){
+   check();run.evidencePagesChecked+=await enrichWebsiteEvidence(target,{signal});
   }
-  const sites=researchCohort
+  const sites=researchedTargets
    .filter(p=>!p.contactEmail&&p.websiteUrl&&(!p.contactSearch?.checkedAt||Date.now()-Date.parse(p.contactSearch.checkedAt)>7*86400000))
    .slice(0,5);
   for(const ranked of sites){
