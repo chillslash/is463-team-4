@@ -112,7 +112,11 @@ function discoveryViewProgress(status){
   (completedBatches>=totalBatches?'Evaluated All '+totalBatches+' Batches':
    'Evaluating Batch '+(completedBatches+1)+' of '+totalBatches):
   status?.detail||'';
- return {percentage,phase:assessing?'Assessing And Ranking Partners':phase,detail,label:percentage+'% Complete'};
+ // Keep the underlying server phases as stable keys. Only title-case their
+ // displayed headings and subtitles, with 'of' deliberately kept lowercase.
+ const displayCase=value=>titleCase(value).replace(/\bOf\b/g,'of');
+ return {percentage,phase:phase.startsWith('Failed:')?phase:displayCase(phase),
+  detail:displayCase(detail),label:percentage+'% Complete'};
 }
 function contactRouteBlock(p){
  const email=String(p.contactEmail||'').trim();
