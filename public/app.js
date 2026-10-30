@@ -163,13 +163,12 @@ function findView(){
    const evidenceSummary=claim?'<div class="co-compact-source-evidence"><strong>Source Evidence</strong><span>'+esc(claim.length>220?claim.slice(0,217)+'…':claim)+'</span>'+ (citedEvidence?'<span>AI cited: '+citedEvidence+'</span>':'')+'</div>':'';
   const dimensions=[
    {label:'Reuse Suitability',value:p.match.parts?.suitability??0,max:p.match.weights?.suitability??40,colour:'suitability'},
-   {label:'Source Evidence',value:p.match.parts?.evidence??0,max:p.match.weights?.evidence??35,colour:'evidence'},
-   {label:'HQ Proximity',value:p.match.parts?.proximity??0,max:p.match.weights?.proximity??10,colour:'proximity'},
-   {label:'Intake & Operations',value:p.match.parts?.operations??0,max:p.match.weights?.operations??35,colour:'readiness'}
+   {label:'Organisation-Specific Evidence',value:p.match.parts?.evidence??0,max:p.match.weights?.evidence??30,colour:'evidence'},
+   {label:'HQ Proximity',value:p.match.parts?.proximity??0,max:p.match.weights?.proximity??15,colour:'proximity'}
   ];
   const filled=dimensions.reduce((total,item)=>total+Math.min(item.max,Math.max(0,item.value)),0);
-  const composition=`<div class="co-fit-composition"><div class="co-fit-composition-head"><strong>Fit Score</strong><span>${p.match.score}/100</span></div><div class="co-fit-segments" role="img" aria-label="Fit Score composition: ${dimensions.map(x=>x.label+' '+x.value+' of '+x.max).join(', ')}">${dimensions.map(x=>`<span class="co-fit-segment co-fit-${x.colour}" style="width:${Math.min(x.max,Math.max(0,x.value))}%"></span>`).join('')}<span class="co-fit-segment co-fit-unearned" style="width:${Math.max(0,100-filled)}%"></span></div><div class="co-fit-legend">${dimensions.map(x=>`<div><i class="co-fit-dot co-fit-${x.colour}"></i><span>${x.label}</span><strong>${x.value}/${x.max}</strong></div>`).join('')}</div></div>`;
-  return `<article class="co-discovery-card" data-listing-id="${esc(p.id)}" tabindex="0" aria-label="Toggle details for ${esc(p.name)}" aria-controls="listing-details-${esc(p.id)}" aria-expanded="false"><div><div class="co-listing-head"><h3>${esc(p.name)}</h3>${sourceLink}${pBadge(p)}</div><div class="co-listing-meta"><span><b><span class="material-symbols-outlined" aria-hidden="true">category</span>Category</b>${esc(titleCase(p.category))}</span><span><b><span class="material-symbols-outlined" aria-hidden="true">near_me</span>Distance From HQ</b>${p.distanceKm==null?'Unknown':m(p.distanceKm)+' km'}</span><span><b><span class="material-symbols-outlined" aria-hidden="true">alternate_email</span>Contact Route</b>${esc(contact.label)}</span></div>${recommendation}<details class="co-candidate-details" id="listing-details-${esc(p.id)}"><summary>Details</summary><div class="co-details-sourced"><span class="material-symbols-outlined" aria-hidden="true">calendar_today</span><span>Date Sourced</span><strong>${timeLabel(p.sourcedAt)}</strong></div>${composition}${evidenceSummary}${contact.html}</details></div><div class="co-card-actions"><div class="co-fit-meter co-fit-${p.match.score>=75?'good':p.match.score>=50?'moderate':'low'}" role="img" aria-label="Fit score ${p.match.score} out of 100"><div class="co-fit-meter-score">${p.match.score}/100</div><div class="co-fit-meter-method">${esc(p.match.method==='AI-assisted'?'AI-Assisted':p.match.method==='Rule-ranked'?'Rule-Ranked':p.match.method||'Rule-Ranked')}</div><div class="co-fit-meter-track"><span class="co-fit-meter-fill" style="width:${Math.max(0,Math.min(100,p.match.score))}%"></span></div></div><button class="co-button small" data-href="/outreach?partner=${encodeURIComponent(p.id)}">Draft Outreach</button><button class="co-button alt small" data-action="edit" data-id="${esc(p.id)}">Edit Partner</button><button class="co-button alt small" data-action="ai-review" data-id="${esc(p.id)}" ${ui.reviewingId?'disabled':''}>${ui.reviewingId===p.id?'Reviewing…':'AI Review'}</button></div></article>`;
+  const composition=`<div class="co-fit-composition"><div class="co-fit-composition-head"><strong>Outreach Priority</strong><span>${p.match.score}/100</span></div><div class="co-fit-segments" role="img" aria-label="Outreach Priority composition: ${dimensions.map(x=>x.label+' '+x.value+' of '+x.max).join(', ')}">${dimensions.map(x=>`<span class="co-fit-segment co-fit-${x.colour}" style="width:${Math.min(x.max,Math.max(0,x.value))}%"></span>`).join('')}<span class="co-fit-segment co-fit-unearned" style="width:${Math.max(0,100-filled)}%"></span></div><div class="co-fit-legend">${dimensions.map(x=>`<div><i class="co-fit-dot co-fit-${x.colour}"></i><span>${x.label}</span><strong>${x.value}/${x.max}</strong></div>`).join('')}</div></div>`;
+  return `<article class="co-discovery-card" data-listing-id="${esc(p.id)}" tabindex="0" aria-label="Toggle details for ${esc(p.name)}" aria-controls="listing-details-${esc(p.id)}" aria-expanded="false"><div><div class="co-listing-head"><h3>${esc(p.name)}</h3>${sourceLink}${pBadge(p)}</div><div class="co-listing-meta"><span><b><span class="material-symbols-outlined" aria-hidden="true">category</span>Category</b>${esc(titleCase(p.category))}</span><span><b><span class="material-symbols-outlined" aria-hidden="true">near_me</span>Distance From HQ</b>${p.distanceKm==null?'Unknown':m(p.distanceKm)+' km'}</span><span><b><span class="material-symbols-outlined" aria-hidden="true">alternate_email</span>Contact Route</b>${esc(contact.label)}</span></div>${recommendation}<details class="co-candidate-details" id="listing-details-${esc(p.id)}"><summary>Details</summary><div class="co-details-sourced"><span class="material-symbols-outlined" aria-hidden="true">calendar_today</span><span>Date Sourced</span><strong>${timeLabel(p.sourcedAt)}</strong></div>${composition}${evidenceSummary}${contact.html}</details></div><div class="co-card-actions"><div class="co-fit-meter co-fit-${p.match.score>=75?'good':p.match.score>=50?'moderate':'low'}" role="img" aria-label="Outreach priority ${p.match.score} out of 100"><div class="co-fit-meter-score">${p.match.score}/100</div><div class="co-fit-meter-method">${esc(p.match.method==='AI-assisted'?'AI-Assisted':p.match.method==='Rule-ranked'?'Rule-Ranked':p.match.method||'Rule-Ranked')}</div><div class="co-fit-meter-track"><span class="co-fit-meter-fill" style="width:${Math.max(0,Math.min(100,p.match.score))}%"></span></div></div><button class="co-button small" data-href="/outreach?partner=${encodeURIComponent(p.id)}">Draft Outreach</button><button class="co-button alt small" data-action="edit" data-id="${esc(p.id)}">Edit Partner</button><button class="co-button alt small" data-action="ai-review" data-id="${esc(p.id)}" ${ui.reviewingId?'disabled':''}>${ui.reviewingId===p.id?'Reviewing…':'AI Review'}</button></div></article>`;
  }).join('');
  const pageNumbers=[...new Set([1,ui.page-1,ui.page,ui.page+1,totalPages].filter(n=>n>=1&&n<=totalPages))].sort((a,b)=>a-b);
  const pageButton=n=>'<button class="co-page-button" data-action="page" data-page="'+n+'" '+(ui.page===n?'aria-current="page"':'')+'>'+n+'</button>';
@@ -192,7 +191,7 @@ function findView(){
     </label>
     <label class="co-discovery-filter-field" for="sort-filter">Sort
      <select id="sort-filter">
-      <option value="fit" ${ui.sort==='fit'?'selected':''}>Best Fit</option>
+      <option value="fit" ${ui.sort==='fit'?'selected':''}>Outreach Priority</option>
       <option value="nearest" ${ui.sort==='nearest'?'selected':''}>Nearest</option>
       <option value="recent" ${ui.sort==='recent'?'selected':''}>Recently Sourced</option>
      </select>
@@ -780,18 +779,17 @@ async function handleAction(el){const action=el.dataset.action;
  if(action==='settings'){const settings=data.settings;const ref=data.sponsorReference;const refHtml=ref?'<details class="co-source-evidence"><summary>CoffeeBot Reference Volumes</summary><p>Estimated total beverages per month:</p><p>'+ref.locations.map(x=>esc(x.location)+': '+m(x.minCups)+(x.maxCups!==x.minCups?'–'+m(x.maxCups):'')).join(' · ')+'</p></details>':'';const html=`<div class="co-field-row">${formField('Total Beverages per Week','cupsPerWeek',settings.cupsPerWeek,'number')}${formField('Coffee-Based Beverages (%)','coffeeSharePercent',settings.coffeeSharePercent??60,'number')}</div>${formField('Grounds per Coffee (g)','gramsPerCup',settings.gramsPerCup,'number')}${refHtml}`;dialog('Edit Forecast',html,async f=>request('/api/settings',{method:'PATCH',body:JSON.stringify(f)}));return;}
 
  if(action==='assessment-settings'){
-  const w=data.settings.ratingWeights||{suitability:30,evidence:30,proximity:5,operations:35};
+  const w=data.settings.ratingWeights||{suitability:55,evidence:30,proximity:15};
   const weightRows=[
    ['Reuse Suitability','weightSuitability',w.suitability],
-   ['Source Evidence','weightEvidence',w.evidence],
-   ['HQ Proximity','weightProximity',w.proximity],
-   ['Intake & Operations','weightOperations',w.operations]
+   ['Organisation-Specific Evidence','weightEvidence',w.evidence],
+   ['HQ Proximity','weightProximity',w.proximity]
   ];
   const rows=weightRows.map(([label,key,value])=>`<div class="co-assessment-weight-row"><label for="f-${key}">${label}</label><div class="co-assessment-weight-input"><input id="f-${key}" name="${key}" type="number" min="0" max="100" step="1" value="${esc(value)}" aria-describedby="assessment-weight-total"><span>%</span></div></div>`).join('');
   const html=`<div class="co-assessment-weight-list">${rows}<div class="co-assessment-total"><strong>Total</strong><output id="assessment-weight-total" aria-live="polite">100/100%</output></div></div>`+
     '<div class="co-assessment-controls"><div class="co-field co-assessment-budget"><label for="assessment-budget">AI Assessments per Discovery Run</label><div class="co-assessment-budget-control"><input id="assessment-budget" name="automaticAIAssessments" type="number" min="0" max="24" step="1" value="'+esc(data.settings.automaticAIAssessments??24)+'"><span class="co-assessment-budget-note">0–24 Partners</span></div></div><button type="button" class="co-button alt small" id="reset-assessment-settings">Reset to Default Settings</button></div>';
   dialog('Assessment Settings',html,async f=>{
-   const weights={suitability:Number(f.weightSuitability),evidence:Number(f.weightEvidence),proximity:Number(f.weightProximity),operations:Number(f.weightOperations)};
+   const weights={suitability:Number(f.weightSuitability),evidence:Number(f.weightEvidence),proximity:Number(f.weightProximity)};
    if(Object.values(weights).some(v=>!Number.isInteger(v)||v<0||v>100)||Object.values(weights).reduce((a,b)=>a+b,0)!==100)
     throw Error('Rating weights must be whole percentages adding up to 100.');
    const automaticAIAssessments=Number(f.automaticAIAssessments);
@@ -801,13 +799,13 @@ async function handleAction(el){const action=el.dataset.action;
   });
   $('.co-dialog')?.classList.add('co-dialog-assessment');
   const updateWeightTotal=()=>{
-   const total=['Suitability','Evidence','Proximity','Operations'].reduce((sum,key)=>sum+Number($('#f-weight'+key)?.value||0),0);
+   const total=['Suitability','Evidence','Proximity'].reduce((sum,key)=>sum+Number($('#f-weight'+key)?.value||0),0);
    const output=$('#assessment-weight-total');if(output){output.value=total+'/100%';output.textContent=total+'/100%';output.classList.toggle('co-invalid',total!==100);}
   };
-  for(const key of ['Suitability','Evidence','Proximity','Operations'])$('#f-weight'+key)?.addEventListener('input',updateWeightTotal);
+  for(const key of ['Suitability','Evidence','Proximity'])$('#f-weight'+key)?.addEventListener('input',updateWeightTotal);
   updateWeightTotal();
   $('#reset-assessment-settings')?.addEventListener('click',()=>{
-   const defaults={weightSuitability:30,weightEvidence:30,weightProximity:5,weightOperations:35,automaticAIAssessments:24};
+   const defaults={weightSuitability:55,weightEvidence:30,weightProximity:15,automaticAIAssessments:24};
    for(const [name,value] of Object.entries(defaults)){
     const input=name==='automaticAIAssessments'?$('#assessment-budget'):$('#f-'+name);
     if(input)input.value=value;
