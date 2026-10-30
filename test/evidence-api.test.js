@@ -64,7 +64,7 @@ test('AI evidence review increases relative suitability and has an auditable exp
  const p=after.ranked.find(p=>p.id==='material-farm');
  assert.equal(p.match.method,'AI-assisted');
  assert.ok(p.match.score>initial.score);
- assert.equal(p.match.parts.operations,0);
+ assert.equal('operations' in p.match.parts,false);
  assert.equal(p.capacityKg,null);
  assert.equal(p.aiEvidenceReview.provider,'codex');
  assert.ok(after.aiActivity.some(x=>x.kind==='manual-evidence-review'&&x.success));
