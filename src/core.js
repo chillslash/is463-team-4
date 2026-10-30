@@ -25,6 +25,7 @@ export const LEGACY_SEEDED_PARTNER_NOTES=Object.freeze([
 // Sponsor priority: meaningful intake quantity, then dependable logistics and reuse.
 export const DEFAULT_RATING_WEIGHTS = Object.freeze({suitability:55,evidence:30,proximity:15});
 export const LEGACY_RATING_WEIGHTS = Object.freeze({suitability:30,evidence:30,proximity:5,operations:35});
+export const OLDER_RATING_WEIGHTS = Object.freeze({suitability:40,evidence:35,proximity:10,operations:15});
 // All five sponsor locations report TOTAL beverages per month, not coffee drinks.
 export const COFFEEBOT_MONTHLY_CUP_VOLUMES = Object.freeze([
  {region:'North',location:'Republic Polytechnic',minCups:700,maxCups:700},
@@ -57,7 +58,7 @@ export function migrateSponsorAssumptions(state){
     p.capacityKg=values[1];
   }
  }
- if(JSON.stringify(settings.ratingWeights)===JSON.stringify(LEGACY_RATING_WEIGHTS))
+ if([LEGACY_RATING_WEIGHTS,OLDER_RATING_WEIGHTS].some(weights=>JSON.stringify(settings.ratingWeights)===JSON.stringify(weights)))
   settings.ratingWeights={...DEFAULT_RATING_WEIGHTS};
  if(!Number.isFinite(settings.coffeeSharePercent)||settings.coffeeSharePercent<0||settings.coffeeSharePercent>100)
   settings.coffeeSharePercent=DEFAULT_SETTINGS.coffeeSharePercent;
