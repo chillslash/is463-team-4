@@ -26,7 +26,7 @@ test('v2 AI can distinguish differently evidenced partners from the same categor
  const afterA=scorePartner(a,0),afterB=scorePartner(b,0);
  assert.equal(afterA.method,'AI-assisted');assert.equal(afterB.method,'AI-assisted');
  assert.ok(afterA.score>afterB.score+15,'Specific evidence creates meaningful relative ordering');
- assert.equal(afterA.parts.operations,0);assert.equal(afterB.parts.operations,0);
+ assert.equal('operations' in afterA.parts,false);assert.equal('operations' in afterB.parts,false);
  assert.equal(a.capacityKg,null);assert.equal(b.capacityKg,null);
  assert.deepEqual(rankPartners([a,b],0).map(p=>p.id),['a','b']);
 });
@@ -62,7 +62,7 @@ test('AI may not award operational points or infer permission, recurring intake,
  x.assessments[0].capacityKg=100;
  p.aiEvidenceReview={...validateEvidenceAssessments(x,[p])[0],assessedAt:new Date().toISOString()};
  const result=scorePartner(p,0);
- assert.equal(result.parts.operations,0);
+ assert.equal('operations' in result.parts,false);
  assert.match(result.reasons.join(' '),/capacity unknown/);
  assert.equal(result.method,'AI-assisted');
  assert.equal(p.capacityKg,null);
