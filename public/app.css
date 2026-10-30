@@ -261,7 +261,28 @@ body>aside nav a[aria-current="page"]{font-size:14px!important;line-height:1.35!
 @media(max-width:1180px){.co-discovery-layout{grid-template-columns:minmax(0,1fr)}.co-discovery-sidebar{grid-column:1;grid-row:1;position:static}.co-discovery-main{grid-column:1;grid-row:2}.co-discovery-filter-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:620px){.co-discovery-filter-fields{grid-template-columns:1fr}.co-discovery-sidebar{padding:16px}}
 .co-assessment-weights-heading{font-family:Inter,system-ui,Arial,sans-serif;font-size:13px;font-weight:650;line-height:1.5;letter-spacing:normal;color:var(--forest);margin:16px 0 12px}
-.co-assessment-reset{display:flex;justify-content:flex-start;margin-top:18px}
+/* Assessment Settings reuses the shared dialog hierarchy, with its own compact controls. */
+.co-dialog-assessment{width:min(650px,calc(100vw - 24px));max-height:min(90dvh,780px);display:flex;flex-direction:column;padding:0;overflow:hidden}
+.co-dialog-assessment .co-dialog-titlebar{padding:22px 26px 18px;border-bottom:1px solid var(--line);flex-shrink:0}
+.co-dialog-assessment .co-dialog-titlebar h2{margin:0}
+.co-dialog-assessment .co-dialog-form{display:flex;flex-direction:column;min-height:0}
+.co-dialog-assessment .co-dialog-scroll{min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:18px 26px 24px}
+.co-dialog-assessment .co-dialog-footer{margin:0;padding:15px 26px;border-top:1px solid var(--line);flex-shrink:0}
+.co-dialog-assessment .co-assessment-weight-list{margin:0;border-top:0}
+.co-assessment-controls{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;flex-wrap:wrap;margin-top:18px;padding-top:20px;border-top:1px solid var(--line)}
+.co-dialog-assessment .co-assessment-budget{margin:0;min-width:0;max-width:100%}
+.co-assessment-budget-control{display:flex;align-items:center;gap:12px;margin-top:2px}
+.co-dialog-assessment .co-assessment-budget-control input{width:104px;min-width:0}
+.co-assessment-budget-note{font-size:12px;line-height:1.5;color:var(--sub);white-space:nowrap}
+.co-dialog-assessment #reset-assessment-settings{height:42px;min-height:42px;padding:8px 13px;white-space:normal;text-align:center}
+@media(max-width:580px){
+ .co-dialog-assessment{width:100%;max-height:calc(100dvh - 20px)}
+ .co-dialog-assessment .co-dialog-titlebar{padding:17px 18px 13px}
+ .co-dialog-assessment .co-dialog-scroll{padding:16px 18px 20px}
+ .co-dialog-assessment .co-dialog-footer{padding:13px 18px}
+ .co-assessment-controls{flex-direction:column;align-items:stretch}
+ .co-dialog-assessment #reset-assessment-settings{align-self:flex-start}
+}
 
 /* Discovery controls on the left; results on the right. */
 @media(min-width:1181px){
