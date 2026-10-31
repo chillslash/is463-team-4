@@ -23,8 +23,9 @@ let calls=0;
 const assessmentGenerator=async(_provider,prompt)=>{
  calls++;
  assert.match(prompt,/Existing Fungal Farm/);
- return {result:{assessments:[{id:'existing-evidence-farm',reuseSuitability:34,sourceEvidence:29,evidenceIds:[0],
+ return {result:{assessments:[{id:'existing-evidence-farm',reuseSuitability:34,sourceEvidence:29,potentialIntake:11,evidenceIds:[0],intakeEvidenceIds:[0],
   pathway:'Potential fungal substrate component',reason:'The organisation documents mushroom cultivation using agricultural by-products; coffee-ground acceptance is unverified.',
+  intakeReason:'Documented ongoing substrate production supports moderate potential intake, but actual throughput is unknown.',
   check:'Can prepared coffee grounds be accepted in the documented substrate?'}]},usage:{inputTokens:100,outputTokens:30}};
 };
 let refreshedCandidates=[];
