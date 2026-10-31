@@ -77,11 +77,11 @@ test('draft fallback and explicit reset',async()=>{
 
 test('rating weights persist and server recalculates scores without AI',async()=>{
  const before=(await call('/api/state')).data;
- assert.deepEqual(before.settings.ratingWeights,{suitability:55,evidence:30,proximity:15});
+ assert.deepEqual(before.settings.ratingWeights,{suitability:40,evidence:25,intake:20,proximity:15});
  const original=before.ranked.find(p=>p.status==='trial');
- assert.equal((await call('/api/settings','PATCH',{ratingWeights:{suitability:40,evidence:35,proximity:25}})).status,200);
- assert.equal((await call('/api/settings','PATCH',{ratingWeights:{suitability:40,evidence:35,proximity:25,extra:0}})).status,400);
- const weights={suitability:20,evidence:20,proximity:60};
+ assert.equal((await call('/api/settings','PATCH',{ratingWeights:{suitability:40,evidence:25,intake:20,proximity:15}})).status,200);
+ assert.equal((await call('/api/settings','PATCH',{ratingWeights:{suitability:40,evidence:25,intake:20,proximity:15,extra:0}})).status,400);
+ const weights={suitability:20,evidence:20,intake:20,proximity:40};
  assert.equal((await call('/api/settings','PATCH',{ratingWeights:weights})).status,200);
  const after=(await call('/api/state')).data;
  assert.deepEqual(after.settings.ratingWeights,weights);
@@ -89,7 +89,7 @@ test('rating weights persist and server recalculates scores without AI',async()=
  assert.deepEqual(revised.match.weights,weights);
  assert.notEqual(revised.match.score,original.match.score);
  assert.equal(revised.match.score,Object.values(revised.match.parts).reduce((sum,v)=>sum+v,0));
- assert.equal((await call('/api/settings','PATCH',{ratingWeights:{suitability:55,evidence:30,proximity:15}})).status,200);
+ assert.equal((await call('/api/settings','PATCH',{ratingWeights:{suitability:40,evidence:25,intake:20,proximity:15}})).status,200);
 });
 test('manual outreach and lifecycle keep durable activity records',async()=>{
  const id='p5';
