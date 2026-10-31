@@ -51,6 +51,15 @@ test('stale sources and falsified evidence IDs cannot affect the score',()=>{
  assert.equal(validateEvidenceAssessments({...answer(p,36,30),assessments:[{...answer(p,36,30).assessments[0],evidenceIds:[999]}]},[p]).length,0);
  assert.equal(validateEvidenceAssessments({...answer(p,36,30),assessments:[{...answer(p,36,30).assessments[0],intakeEvidenceIds:[999]}]},[p]).length,0);
 });
+test('post-contact facts do not invalidate a pre-contact evidence review',()=>{
+ const p=source('stable','Stable Farm',explicit);
+ p.aiEvidenceReview={...validateEvidenceAssessments(answer(p,30,25,10),[p])[0],assessedAt:new Date().toISOString()};
+ assert.equal(scorePartner(p,0).method,'AI-assisted');
+ p.capacityKg=50;p.verified=true;p.frequency='weekly';p.transportArrangement='partner-collects';p.agreedUse='Composting';
+ assert.equal(scorePartner(p,0).method,'AI-assisted');
+ assert.equal(activeEvidenceReview(p).potentialIntake,10);
+});
+
 test('AI assessments expire after 30 days and return to rule-ranked fallback',()=>{
  const p=source('old','Old Evidence',explicit);
  p.aiEvidenceReview={...validateEvidenceAssessments(answer(p,38,32),[p])[0],assessedAt:new Date().toISOString()};
