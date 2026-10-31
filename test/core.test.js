@@ -38,11 +38,11 @@ test('legacy advisory AI does not alter the evidence-grounded outreach priority'
   rubricVersion:'ai-led-v1',reuseSuitability:30,sourceEvidence:20,operationalCompatibility:7,reason:'Source-backed activity',check:'Confirm use'
  }};
  const x=scorePartner(p,42);
- assert.deepEqual(x.parts,{suitability:10,evidence:4,proximity:11});
- assert.equal(x.score,25);assert.equal(x.aiLed,false);
- assert.equal(scorePartner({...p,aiAssessment:null},42).score,25);
- assert.equal(scorePartner({...p,distanceKm:0,contactEmail:'info@example.com'},42).score,29);
- assert.equal(scorePartner({...p,verified:true,confirmed:true,capacityKg:25},42).score,25);
+ assert.deepEqual(x.parts,{suitability:7,evidence:4,intake:6,proximity:11});
+ assert.equal(x.score,28);assert.equal(x.aiLed,false);
+ assert.equal(scorePartner({...p,aiAssessment:null},42).score,28);
+ assert.equal(scorePartner({...p,distanceKm:0,contactEmail:'info@example.com'},42).score,32);
+ assert.equal(scorePartner({...p,verified:true,confirmed:true,capacityKg:25},42).score,28);
  assert.equal(scorePartner({...p,aiAssessment:{priority:'high'}},42).provisional,true);
 });
 test('draft has relevant caveats and does not promise acceptance',()=>{
@@ -64,28 +64,29 @@ test('configurable weights validate totals and deterministically reorder partner
  const a={name:'A',status:'suggested',category:'composting',source:'NEA',directCoffeeEvidence:true,distanceKm:30};
  const b={name:'B',status:'suggested',category:'garden',source:'LIAS',distanceKm:0};
  assert.equal(rankPartners([a,b],30)[0].name,'A');
- const w={suitability:0,evidence:0,proximity:100};
+ const w={suitability:0,evidence:0,intake:0,proximity:100};
  assert.equal(validRatingWeights(w),true);
  const ranked=rankPartners([a,b],30,w);
  assert.equal(ranked[0].name,'B');
  assert.equal(ranked[0].match.score,100);
- assert.deepEqual(ranked[0].match.parts,{suitability:0,evidence:0,proximity:100});
- assert.deepEqual(DEFAULT_RATING_WEIGHTS,{suitability:55,evidence:30,proximity:15});
- assert.equal(validRatingWeights({suitability:40,evidence:35,proximity:25}),true);
+ assert.deepEqual(ranked[0].match.parts,{suitability:0,evidence:0,intake:0,proximity:100});
+ assert.deepEqual(DEFAULT_RATING_WEIGHTS,{suitability:40,evidence:25,intake:20,proximity:15});
+ assert.equal(validRatingWeights({suitability:40,evidence:25,intake:20,proximity:15}),true);
  assert.equal(validRatingWeights({suitability:40,evidence:35,proximity:10,operations:15}),false);
  assert.equal(validRatingWeights({...DEFAULT_RATING_WEIGHTS,extra:0}),false);
  const ai={name:'AI',status:'suggested',category:'garden',source:'NParks',distanceKm:5,
   aiAssessment:{rubricVersion:'ai-led-v1',reuseSuitability:30,sourceEvidence:10,operationalCompatibility:2,reason:'Original evidence',check:'Verify capacity'}};
  const before=scorePartner(ai,0);
- const after=scorePartner(ai,0,{suitability:10,evidence:70,proximity:20});
+ const after=scorePartner(ai,0,{suitability:10,evidence:50,intake:20,proximity:20});
  assert.notEqual(before.score,after.score);
  assert.match(after.reasons[0],/Preliminary screening/);
  assert.equal(ai.aiAssessment.sourceEvidence,10);
  assert.equal(Object.values(after.parts).reduce((sum,v)=>sum+v,0),after.score);
 });
-test('unknown intake and logistics are deliberately outside pre-contact outreach priority',()=>{
+test('actual intake and logistics stay outside pre-contact priority while relative intake scale remains a source-based prior',()=>{
  const base={status:'suggested',category:'urban farm',source:'SFA crop-farm licence',distanceKm:7,capacityKg:null};
  const unknown=scorePartner(base,5);
+ assert.ok(unknown.parts.intake>0,'Crop-farm category carries only a cautious relative intake prior');
  assert.equal(scorePartner({...base,capacityKg:10},5).score,unknown.score);
  assert.equal(scorePartner({...base,capacityKg:10,verified:true},5).score,unknown.score);
  assert.equal(scorePartner({...base,frequency:'weekly',transportArrangement:'partner-collects',verified:true},5).score,unknown.score);
