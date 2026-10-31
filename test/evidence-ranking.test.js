@@ -10,17 +10,18 @@ const source = (id,name,claim)=>({
 });
 const explicit='This organisation cultivates mushrooms using agricultural by-products as an indoor growing substrate.';
 const irrelevant='This business focuses on rubber flooring for playgrounds and sport facilities rather than growing activities.';
-function answer(p,reuseSuitability,sourceEvidence){
- return {assessments:[{id:p.id,reuseSuitability,sourceEvidence,evidenceIds:[0],
+function answer(p,reuseSuitability,sourceEvidence,potentialIntake=8){
+ return {assessments:[{id:p.id,reuseSuitability,sourceEvidence,potentialIntake,evidenceIds:[0],intakeEvidenceIds:[0],
   reason:'Specific cited substrate or material evidence supports a distinct potential pathway; acceptance unverified.',
+  intakeReason:'The cited operation supports a cautious relative intake estimate; actual kg/week and willingness remain unknown.',
   check:'Can the organisation accept prepared spent grounds?',pathway:'Verify compatible material use'}]};
 }
 test('v2 AI can distinguish differently evidenced partners from the same category',()=>{
  const a=source('a','Fungal Growers',explicit),b=source('b','Surface Materials',irrelevant);
  const priorA=scorePartner(a,0),priorB=scorePartner(b,0);
  assert.equal(priorA.score,priorB.score,'Both begin with source-only category ranking');
- const outputA=validateEvidenceAssessments(answer(a,37,31),[a]);
- const outputB=validateEvidenceAssessments(answer(b,3,5),[b]);
+ const outputA=validateEvidenceAssessments(answer(a,37,31,12),[a]);
+ const outputB=validateEvidenceAssessments(answer(b,3,5,2),[b]);
  assert.equal(outputA.length,1);assert.equal(outputB.length,1);
  assert.equal(saveEvidenceResults([a,b],[...outputA,...outputB],{provider:'codex',runId:'test'}),2);
  const afterA=scorePartner(a,0),afterB=scorePartner(b,0);
@@ -48,6 +49,7 @@ test('stale sources and falsified evidence IDs cannot affect the score',()=>{
  assert.equal(scorePartner(p,0).method,'Rule-ranked');
  assert.equal(activeEvidenceReview(p),null);
  assert.equal(validateEvidenceAssessments({...answer(p,36,30),assessments:[{...answer(p,36,30).assessments[0],evidenceIds:[999]}]},[p]).length,0);
+ assert.equal(validateEvidenceAssessments({...answer(p,36,30),assessments:[{...answer(p,36,30).assessments[0],intakeEvidenceIds:[999]}]},[p]).length,0);
 });
 test('AI assessments expire after 30 days and return to rule-ranked fallback',()=>{
  const p=source('old','Old Evidence',explicit);
@@ -55,14 +57,16 @@ test('AI assessments expire after 30 days and return to rule-ranked fallback',()
  p.aiEvidenceReview.assessedAt=new Date(Date.now()-31*86400000).toISOString();
  assert.equal(scorePartner(p,0).method,'Rule-ranked');
 });
-test('AI may not award operational points or infer permission, recurring intake, or logistics',()=>{
+test('AI may estimate relative intake scale but not infer permission, actual kg, recurring agreement, or logistics',()=>{
  const p=source('a','A',explicit);
- const x=answer(p,40,35);
+ const x=answer(p,40,35,14);
  x.assessments[0].operationalCompatibility=10;
  x.assessments[0].capacityKg=100;
  p.aiEvidenceReview={...validateEvidenceAssessments(x,[p])[0],assessedAt:new Date().toISOString()};
  const result=scorePartner(p,0);
  assert.equal('operations' in result.parts,false);
+ assert.ok(result.parts.intake>0);
+ assert.match(result.reasons.join(' '),/relative intake estimate/i);
  assert.match(result.reasons.join(' '),/Confirm intake quantity, frequency and collection arrangements during outreach/);
  assert.equal(result.method,'AI-assisted');
  assert.equal(p.capacityKg,null);
@@ -74,9 +78,12 @@ test('prompt requires cited evidence indices, source-limited reasoning and no in
  assert.match(prompt,/no browsing/i);
  assert.match(prompt,/do not score distance or logistics/i);
  assert.match(prompt,/sourceEvidence/i);
+ assert.match(prompt,/potentialIntake/i);
+ assert.match(prompt,/intakeEvidenceIds/i);
+ assert.match(prompt,/RELATIVE PRE-CONTACT ABSORPTION SCALE/i);
  assert.match(prompt,/documented acceptance of used coffee grounds is strong/i);
  assert.match(prompt,/NOT reasons to deduct technical suitability or factual evidence twice/i);
- assert.match(prompt,/They are recorded separately, not supplied by AI/i);
+ assert.match(prompt,/never convert it into kg\/week or imply willingness/i);
  assert.ok(prompt.includes(explicit));
 });
 
