@@ -22,7 +22,7 @@ if(existsSync(localConfig))loadEnvFile(localConfig);
 const DB_PATH=process.env.DATA_FILE || join(ROOT,'data','state.json');
 const PORT=Number(process.env.PORT || 4173);
 const FOLLOWUP_SUBJECT='CoffeeBot | Spent Coffee Grounds Reuse Follow-Up';
-const AI_PROVIDER=['codex','claude','qwen','llama'].includes(process.env.AI_PROVIDER)?process.env.AI_PROVIDER:'template';
+const AI_PROVIDER=process.env.AI_PROVIDER==='codex'?'codex':'template';
 const AUTO_AI_REVIEW=process.env.AUTO_AI_REVIEW===undefined?AI_PROVIDER!=='template':/^(1|true)$/i.test(process.env.AUTO_AI_REVIEW);
 const SFA_LOCATION_ENRICHMENT_LIMIT=12;
 let discoveryStatus={active:false,phase:'Idle',completed:0,total:4};
@@ -586,7 +586,7 @@ export function createApp({aiProvider=AI_PROVIDER,assessmentGenerator=generateJS
    if(!message||message.length>10000)fail('Enter a message (up to 10,000 characters) before AI analysis');
    const state=await readState(),p=state.partners.find(x=>x.id===aa[1]);
    if(!p)fail('Partner not found');
-   if(aiProvider==='template')return response(res,503,{error:'AI analysis requires a configured Codex or Claude provider. You can still log activity manually.'});
+   if(aiProvider==='template')return response(res,503,{error:'AI analysis requires Codex. You can still log activity manually.'});
    if(activityAnalysisRuns.has(p.id))return response(res,409,{error:'AI analysis is already running for this partner'});
    const controller=new AbortController();
    activityAnalysisRuns.set(p.id,controller);
