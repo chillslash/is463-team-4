@@ -1,26 +1,22 @@
-import {generateLocalJSON} from './ollama.js';
 import {spawn} from 'node:child_process';
 import {isAbsolute as isWinAbsolute} from 'node:path/win32';
 import {isAbsolute as isPosixAbsolute} from 'node:path/posix';
 import {join} from 'node:path';
 
-export const AI_PROVIDERS = ['template', 'codex', 'claude', 'qwen', 'llama'];
+export const AI_PROVIDERS = ['template', 'codex'];
 const LIMIT = 120000;
 export function cliInvocation(provider, platform = process.platform, env = process.env, {webSearch=false} = {}) {
-  if (!['codex', 'claude'].includes(provider)) throw new Error('Choose Codex or Claude in AI settings');
-  const args = provider === 'codex'
-    ? [...(webSearch?['--search']:[]),'exec', '--ephemeral', '--sandbox', 'read-only', '--skip-git-repo-check', '--json', '-']
-    : ['-p', '--output-format', 'json', '--max-turns', '1', '--no-session-persistence', '--tools', '', '--disallowedTools', 'mcp__*'];
-  // A teammate may explicitly override Codex's location; otherwise use the normal PATH lookup.
-  const codexPath = provider === 'codex' ? env.CODEX_PATH?.trim() : null;
+  if (provider !== 'codex') throw new Error('Only Codex is supported as the AI provider');
+  const args = [...(webSearch?['--search']:[]),'exec', '--ephemeral', '--sandbox', 'read-only', '--skip-git-repo-check', '--json', '-'];
+  const codexPath = env.CODEX_PATH?.trim();
   if (codexPath) {
     const isAbsolute = platform === 'win32' ? isWinAbsolute : isPosixAbsolute;
     if (!isAbsolute(codexPath)) throw new Error('CODEX_PATH must be an absolute path to the Codex executable');
     return {command: codexPath, args};
   }
   return platform === 'win32'
-    ? {command: env.ComSpec || 'cmd.exe', args: ['/d', '/s', '/c', provider, ...args]}
-    : {command: provider, args};
+    ? {command: env.ComSpec || 'cmd.exe', args: ['/d', '/s', '/c', 'codex', ...args]}
+    : {command: 'codex', args};
 }
 function cliEnvironment(provider){
   const env={...process.env};
@@ -29,13 +25,9 @@ function cliEnvironment(provider){
   if(provider==='codex'&&!env.CODEX_HOME&&env.USERPROFILE)env.CODEX_HOME=join(env.USERPROFILE,'.codex');
   return env;
 }
-export function parseAIJSON(text, provider) {
+export function parseAIJSON(text, provider='codex') {
+  if (provider !== 'codex') throw new Error('Only Codex responses are supported');
   let output = text.trim();
-  if (provider === 'claude') {
-    const wrapper = JSON.parse(output);
-    if (wrapper.is_error || typeof wrapper.result !== 'string') throw new Error('Claude did not return a successful response');
-    output = wrapper.result.trim();
-  }
   output = output.replace(/^\x60\x60\x60(?:json)?\s*/i, '').replace(/\s*\x60\x60\x60$/, '').trim();
   try { return JSON.parse(output); }
   catch {
@@ -44,17 +36,13 @@ export function parseAIJSON(text, provider) {
     return JSON.parse(output.slice(start, end + 1));
   }
 }
-export function tokenUsage(raw,provider){
+export function tokenUsage(raw){
  if(!raw||typeof raw!=='object')return null;
  const get=(key)=>Number.isFinite(raw[key])&&raw[key]>=0?raw[key]:null;
- const input=get('input_tokens'),output=get('output_tokens');
- return {inputTokens:input,outputTokens:output,cachedInputTokens:provider==='claude'?get('cache_read_input_tokens'):get('cached_input_tokens')};
+ return {inputTokens:get('input_tokens'),outputTokens:get('output_tokens'),cachedInputTokens:get('cached_input_tokens')};
 }
-export function parseAIOutput(text,provider){
- if(provider==='claude'){
-  const wrapper=JSON.parse(text.trim());
-  return {result:parseAIJSON(text,provider),usage:tokenUsage(wrapper.usage,provider)};
- }
+export function parseAIOutput(text,provider='codex'){
+ if(provider!=='codex')throw new Error('Only Codex responses are supported');
  const lines=text.trim().split(/\r?\n/);
  let events=[];
  try{events=lines.map(line=>JSON.parse(line));}catch{}
@@ -62,19 +50,19 @@ export function parseAIOutput(text,provider){
   let answer=null,usage=null;
   for(const e of events){
    if(e.type==='item.completed'&&e.item?.type==='agent_message'&&typeof e.item.text==='string')answer=e.item.text;
-   if(e.type==='turn.completed')usage=tokenUsage(e.usage,'codex');
+   if(e.type==='turn.completed')usage=tokenUsage(e.usage);
   }
   if(!answer)throw new Error('Codex did not return a completed response');
   return {result:parseAIJSON(answer,'codex'),usage};
  }
  return {result:parseAIJSON(text,provider),usage:null};
 }
-// CLIs use the signed-in local user's subscription. Prompts are passed on stdin, never shell-interpolated.
-// Tools are disabled for Claude and Codex is read-only; neither may edit project files.
+// Codex uses the signed-in local user's subscription. Prompts are passed on stdin, never shell-interpolated.
+// Codex is read-only here and cannot edit project files.
 export async function generateJSON(provider, prompt, {runner=spawn, timeoutMs=90000, withUsage=false, signal, webSearch=false} = {}) {
   signal?.throwIfAborted();
-  if(provider==='qwen'||provider==='llama')return generateLocalJSON(provider,prompt,{withUsage,signal,timeoutMs:Math.max(timeoutMs,240000)});
-  const {command, args} = cliInvocation(provider,process.platform,process.env,{webSearch:webSearch&&provider==='codex'});
+  if(provider!=='codex')throw new Error('Only Codex is supported as the AI provider');
+  const {command, args} = cliInvocation('codex',process.platform,process.env,{webSearch});
   return new Promise((resolve, reject) => {
     let child, stdout = '', stderr = '', finished = false;
     const complete = (err, result) => {if (finished) return; finished = true; clearTimeout(timer); signal?.removeEventListener('abort',onAbort); err ? reject(err) : resolve(result);};
