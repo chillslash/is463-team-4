@@ -10,8 +10,8 @@ import {randomUUID,createHash} from 'node:crypto';
 import {initialState, numbers, rankPartners, distanceKm, draftTemplate, OUTREACH_SUBJECT, suggestedReuse, outreachSalutation, proposedReuseContext, RESPONSE_STATUSES, ACTIVITY_OUTCOMES, LEGACY_ACTIVITY_OUTCOMES, STATUSES, AI_RUBRIC_VERSION, hasAIFit, validRatingWeights, migrateSponsorAssumptions, COFFEEBOT_MONTHLY_CUP_VOLUMES, SPONSOR_MONTHLY_CUPS, enrichDemoProfiles, DEMO_ACTIVITY, LEGACY_DEMO_NOTES, LEGACY_SEEDED_PARTNER_NOTES} from './src/core.js';
 import {generateJSON,validateDraft,validateActivitySuggestion,ensureCoffeeBotSubject} from './src/ai.js';
 import {discoverAll} from './src/discovery.js';
-import {resolveLocations} from './src/geocode.js';
-import {researchPublicContact,publicWebUrl} from './src/contacts.js';
+import {resolveLocations,postalCoordinates} from './src/geocode.js';
+import {researchPublicContact,researchPublishedLocation,publicWebUrl} from './src/contacts.js';
 import {websiteResolutionPrompt,validateWebsiteResolutions,verifyResolvedWebsite} from './src/website-resolution.js';
 import {parseCSV, enrichSchoolGardenLocations, SCHOOL_DIRECTORY_ID} from './src/moe.js';
 
@@ -24,6 +24,7 @@ const PORT=Number(process.env.PORT || 4173);
 const FOLLOWUP_SUBJECT='CoffeeBot | Spent Coffee Grounds Reuse Follow-Up';
 const AI_PROVIDER=['codex','claude','qwen','llama'].includes(process.env.AI_PROVIDER)?process.env.AI_PROVIDER:'template';
 const AUTO_AI_REVIEW=process.env.AUTO_AI_REVIEW===undefined?AI_PROVIDER!=='template':/^(1|true)$/i.test(process.env.AUTO_AI_REVIEW);
+const SFA_LOCATION_ENRICHMENT_LIMIT=12;
 let discoveryStatus={active:false,phase:'Idle',completed:0,total:4};
 let discoveryController=null;
 const stoppedError=()=>Object.assign(new Error('Discovery stopped; changes discarded'),{status:409,code:'DISCOVERY_STOPPED'});
@@ -259,7 +260,7 @@ async function discover(s,{provider=AI_PROVIDER,assessmentGenerator=generateJSON
   const check=()=>{if(signal?.aborted)throw stoppedError();};
  const runId=randomUUID(),startedAt=new Date().toISOString();
  discoveryStatus={active:true,phase:'Discovering Partners',detail:'Retrieving sources and matching locations',completed:0,total:4,runId};
- const run={id:runId,startedAt,provider,sources:[],warnings:[],newLeads:0,existingRefreshed:0,reviewed:0,assessmentFailed:0,assessmentSkipped:0,aiCalls:0,aiUsage:[],websiteResolutionCalls:0,websitesResolved:0,contactsFound:0,contactPagesChecked:0,evidencePagesChecked:0};
+ const run={id:runId,startedAt,provider,sources:[],warnings:[],newLeads:0,existingRefreshed:0,reviewed:0,assessmentFailed:0,assessmentSkipped:0,aiCalls:0,aiUsage:[],websiteResolutionCalls:0,websitesResolved:0,publishedLocationsFound:0,contactsFound:0,contactPagesChecked:0,evidencePagesChecked:0};
  try{
   const result=await discoveryProvider(s.settings,{signal});
    check();
@@ -297,8 +298,18 @@ async function discover(s,{provider=AI_PROVIDER,assessmentGenerator=generateJSON
    .filter(p=>p.status==='suggested'&&p.source!=='Fictional Stitch scenario');
   const researchCohort=chooseForAssessment(preResearch,s.settings.automaticAIAssessments);
   const researchTargets=researchCohort.map(ranked=>s.partners.find(p=>p.id===ranked.id)).filter(Boolean);
+  // SFA's licence register contains company names but no addresses. Enrich a small,
+  // separate cohort so crop farms do not all inherit "unknown proximity". Only
+  // verified official sites can contribute a published Singapore postcode.
+  const sfaLocationTargets=[];
+  for(const ranked of preResearch.filter(p=>p.source==='SFA Licensed Crop Farms'&&!Number.isFinite(p.distanceKm))){
+   const target=s.partners.find(p=>p.id===ranked.id);
+   if(target&&(target.websiteUrl||websiteResolutionDue(target)))sfaLocationTargets.push(target);
+   if(sfaLocationTargets.length>=SFA_LOCATION_ENRICHMENT_LIMIT)break;
+  }
+  const websiteTargets=[...new Map([...researchTargets,...sfaLocationTargets].map(p=>[p.id,p])).values()];
   if(provider==='codex'&&websiteResearchGenerator){
-   const unresolved=researchTargets.filter(websiteResolutionDue);
+   const unresolved=websiteTargets.filter(websiteResolutionDue);
    for(let i=0;i<unresolved.length;i+=6){
     check();const batch=unresolved.slice(i,i+6),started=Date.now();
     let usage=null,success=false,error=null;
@@ -314,6 +325,23 @@ async function discover(s,{provider=AI_PROVIDER,assessmentGenerator=generateJSON
      run.aiUsage.push(log);appendAILog(s,log);
     }
    }
+  }
+  const postalLookup=await postalCoordinates();
+  if(postalLookup){
+   const beforeResolved=sfaLocationTargets.filter(p=>Number.isFinite(p.distanceKm)).length;
+   for(const target of sfaLocationTargets.filter(p=>p.websiteUrl&&!Number.isFinite(p.distanceKm))){
+    check();
+    const found=await researchPublishedLocation(target,{signal,postalLookup});check();
+    target.locationSearch={checkedAt:found.checkedAt,result:found.postalCode?'postal-found':found.ambiguous?'ambiguous':'not-found',pagesChecked:found.pagesRead||0};
+    if(found.postalCode){
+     target.postalCode=found.postalCode;
+     target.location='Singapore '+found.postalCode;
+     target.locationEvidence={source:'Organisation Website',url:found.sourceUrl,checkedAt:found.checkedAt,
+      claim:'Official organisation website publishes Singapore postal code '+found.postalCode+'.'};
+    }
+   }
+   await resolveLocations(sfaLocationTargets,s.settings,{lookup:postalLookup,allowOneMap:false,signal});
+   run.publishedLocationsFound+=Math.max(0,sfaLocationTargets.filter(p=>Number.isFinite(p.distanceKm)).length-beforeResolved);
   }
   // Read organisation-specific material evidence from every website in the bounded
   // research cohort before AI evaluation. These HTTP reads are cached for seven days.
@@ -384,7 +412,7 @@ async function discover(s,{provider=AI_PROVIDER,assessmentGenerator=generateJSON
   run.sourceFreshness=run.sources.some(x=>!x.cached)?(run.sources.some(x=>x.cached)?'mixed':'fresh'):'cached';
   return {runId,found:result.candidates.length,added:run.newLeads,existingRefreshed:run.existingRefreshed,
    assessed:run.reviewed,assessmentFailed:run.assessmentFailed,assessmentSkipped:run.assessmentSkipped,
-   evidencePagesChecked:run.evidencePagesChecked,websiteResolutionCalls:run.websiteResolutionCalls,websitesResolved:run.websitesResolved,aiCalls:run.aiCalls,provider,sources:run.sources,
+   evidencePagesChecked:run.evidencePagesChecked,websiteResolutionCalls:run.websiteResolutionCalls,websitesResolved:run.websitesResolved,publishedLocationsFound:run.publishedLocationsFound,aiCalls:run.aiCalls,provider,sources:run.sources,
    sourceFreshness:run.sourceFreshness,warnings:run.warnings,contactsFound:run.contactsFound};
  }catch(err){if(!signal?.aborted)discoveryStatus={active:false,phase:'Failed: '+err.message,completed:0,total:4,runId};throw err;}
 }
