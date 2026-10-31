@@ -50,9 +50,10 @@ const assessmentGenerator=async(provider,prompt)=>{
  assert.ok(candidate,'Selected candidate must reach AI evaluation');
  const index=candidate.sourceEvidence.findIndex(e=>/black soldier fly/i.test(e.claim));
  assert.ok(index>=0,'Organisation-specific website evidence must be gathered before evaluation');
- return {result:{assessments:[{id:'ento-test',reuseSuitability:28,sourceEvidence:24,evidenceIds:[index],
+ return {result:{assessments:[{id:'ento-test',reuseSuitability:28,sourceEvidence:24,potentialIntake:14,evidenceIds:[index],intakeEvidenceIds:[index],
   pathway:'Potential organic-waste processing input subject to facility requirements',
   reason:'The organisation website documents a specific organic-waste processing pathway.',
+  intakeReason:'The documented organic-waste processing operation supports relatively high intake potential, without implying a kg/week commitment.',
   check:'Can sun-dried spent coffee grounds enter the documented process?'}]},
   usage:{inputTokens:100,outputTokens:40,cachedInputTokens:0}};
 };
