@@ -6,7 +6,7 @@ const qs = new URLSearchParams(location.search);
 let data=null;
 let journalSuggestion=null;
 let journalAnalysisRun=null;
-let ui={category:'all',sort:'fit',aiAssessedOnly:false,contactableFirst:false,search:'',page:1,discoveryRunning:false,discoveryStopping:false,discoveryStatus:null,reviewingId:null,draft:null,selectedId:qs.get('partner')||null,manageSearch:'',manageCategory:'all',manageStage:'active',manageSort:'name',managePage:1,partnerTab:'relationship'};
+let ui={category:'all',sort:'fit',aiAssessedOnly:false,contactableFirst:false,search:'',page:1,discoveryRunning:false,discoveryStopping:false,discoveryStatus:null,reviewingId:null,draft:null,selectedId:qs.get('partner')||null,manageSearch:'',manageCategory:'all',manageStage:'active',manageSort:'name',managePage:1,partnerTab:'relationship',reuseGuides:{},guideEditing:false};
 const nav={ '/':'dashboard','/dashboard':'dashboard','/this-week':'dashboard','/find-partners':'find_partners','/outreach':'outreach_draft','/pipeline':'manage_partners','/manage-partners':'manage_partners','/partner':'partner_detail'};
 const current=nav[location.pathname]||'dashboard';
 const partner=id=>data.partners.find(p=>p.id===id);
@@ -16,6 +16,10 @@ async function request(url,opts={}) {const response=await fetch(url,{...opts,hea
 async function refresh(){
  const [state,status]=await Promise.all([request('/api/state'),request('/api/discovery-status')]);
  data=state;
+ if(current==='outreach_draft'){
+  const chosen=partner(ui.selectedId)||data.ranked[0]||data.partners[0];
+  if(chosen)try{await loadReuseGuide(chosen.id);}catch{ /* A guide outage must not block outreach. */ }
+ }
  if(current==='find_partners'){
   ui.discoveryRunning=!!status.active;ui.discoveryStopping=!!status.stopping;
   ui.discoveryStatus=status.active?status:null;
@@ -224,6 +228,30 @@ function findView(){
    </div>
   </div>`;
 }
+const GUIDE_TITLES=[['pathway','Potential Reuse Pathway'],['supply','What CoffeeBot Can Provide'],['before','Before Starting a Trial'],['learn',"What We'd Like to Learn"]];
+async function loadReuseGuide(id){
+ if(!ui.reuseGuides[id]){
+  const guide=await request('/api/reuse-guide?partnerId='+encodeURIComponent(id));
+  if(!guide?.sections?.pathway||!guide.sections.before)throw Error('Reuse guide unavailable');
+  ui.reuseGuides[id]=guide;
+ }
+}
+function reuseGuideCopy(g){
+ return 'Reuse Guide: '+g.partnerName+'\n\n'+GUIDE_TITLES.map(([key,title])=>title+'\n'+g.sections[key]).join('\n\n')+
+  (g.source?'\n\nSource to verify: '+g.source.url:'')+'\n\n'+g.note;
+}
+function reuseGuideCard(p){
+ const g=ui.reuseGuides[p.id];
+ if(!g?.sections)return '<section class="co-card co-reuse-guide" aria-label="Reuse Guide"><h2>Reuse Guide</h2><p>Guide unavailable for this partner.</p></section>';
+ const parts=GUIDE_TITLES.map(([key,heading])=>`<section class="co-guide-section"><h3>${esc(heading)}</h3>${ui.guideEditing?`<textarea data-guide-field="${key}" aria-label="${esc(heading)}" rows="${key==='before'||key==='learn'?7:4}">${esc(g.sections[key])}</textarea>`:`<p>${esc(g.sections[key])}</p>`}</section>`).join('');
+ return `<section class="co-card co-reuse-guide" aria-labelledby="reuse-guide-title">
+  <div class="co-guide-header"><div><h2 id="reuse-guide-title">Reuse Guide</h2><p>For ${esc(g.partnerName)}</p></div>
+  <div class="co-guide-actions"><button type="button" class="co-button alt small" data-action="guide-edit">${ui.guideEditing?'Done Editing':'Edit Guide'}</button><button type="button" class="co-button alt small" data-action="guide-copy"><span class="material-symbols-outlined" aria-hidden="true">content_copy</span>Copy Guide</button></div></div>
+  <div class="co-guide-sections">${parts}</div>
+  ${g.source?`<p class="co-guide-source"><a href="${esc(g.source.url)}" target="_blank" rel="noopener noreferrer">Check published source</a> before sharing</p>`:''}
+  <p class="co-guide-note">${esc(g.note)}</p>
+ </section>`;
+}
 function outreachView(){
  const isFollowUp=qs.get('mode')==='followup';
  const chosen=partner(ui.selectedId)||data.ranked[0]||data.partners[0];
@@ -249,7 +277,7 @@ function outreachView(){
   </div>
   <div class="co-field co-outreach-body"><label for="draft-body">Email Body</label><textarea id="draft-body" rows="15" placeholder="Generate a draft to get started.">${esc(d?.body||'')}</textarea></div>
   <div class="co-outreach-actions"><div class="co-outreach-actions-left"><button class="co-button alt" data-action="generate"><span class="material-symbols-outlined" aria-hidden="true">auto_awesome</span>${isFollowUp?'Generate Follow-Up':'Generate Draft'}</button><button class="co-button alt" data-action="copy"><span class="material-symbols-outlined" aria-hidden="true">content_copy</span>Copy Email</button></div><button class="co-button" data-action="record-sent">Record Sent<span class="material-symbols-outlined" aria-hidden="true">send</span></button></div>
- </div></div>`;
+ </div>${reuseGuideCard(chosen)}</div>`;
 }
 function draftCandidates(search=''){
  const q=search.toLowerCase().trim();
@@ -272,10 +300,12 @@ function closeDraftOptions(reset=true){
  if(list)list.hidden=true;
  if(input){input.setAttribute('aria-expanded','false');input.removeAttribute('aria-activedescendant');if(reset)input.value=partner(ui.selectedId)?.name||'';}
 }
-function chooseDraftPartner(id){
+async function chooseDraftPartner(id){
  if(!data.partners.some(p=>p.id===id&&p.status!=='closed'))return;
- ui.selectedId=id;ui.draft=null;ui.draftOptionIndex=0;
- history.replaceState(null,'','/outreach?partner='+encodeURIComponent(id)+(qs.get('mode')==='followup'?'&mode=followup':''));render();
+ ui.selectedId=id;ui.draft=null;ui.draftOptionIndex=0;ui.guideEditing=false;
+ history.replaceState(null,'','/outreach?partner='+encodeURIComponent(id)+(qs.get('mode')==='followup'?'&mode=followup':''));
+ try{await loadReuseGuide(id);}catch{notice('Could not prepare the reuse guide.','error');}
+ render();
 }
 const manageStages=[
  {key:'contacted',icon:'outgoing_mail',label:'Contacted'},
@@ -890,6 +920,19 @@ async function handleAction(el){const action=el.dataset.action;
    return;
   }
   if(action==='draft-pick'){chooseDraftPartner(el.dataset.id);return;}
+  if(action==='guide-edit'){
+   if(!ui.reuseGuides[ui.selectedId])return;
+   ui.guideEditing=!ui.guideEditing;
+   const card=$('.co-reuse-guide');if(card)card.outerHTML=reuseGuideCard(partner(ui.selectedId));
+   return;
+  }
+  if(action==='guide-copy'){
+   const guide=ui.reuseGuides[ui.selectedId];
+   if(!guide)return;
+   try{await navigator.clipboard.writeText(reuseGuideCopy(guide));notice('Reuse guide copied; not sent.');}
+   catch{notice('Clipboard unavailable; select and copy manually.','error');}
+   return;
+  }
   if(action==='generate'){el.disabled=true;el.textContent='Preparing draft…';try{ui.draft=await request(qs.get('mode')==='followup'?'/api/draft/follow-up':'/api/draft',{method:'POST',body:JSON.stringify({partnerId:ui.selectedId})});render();notice('Draft prepared.');}catch(err){notice(err.message,'error');el.disabled=false;el.textContent='Generate draft';}return;}
  if(action==='record-sent'){
    const body=$('#draft-body')?.value?.trim()||'';
@@ -919,6 +962,11 @@ async function handleAction(el){const action=el.dataset.action;
    return;
   }
 }
+document.addEventListener('input',e=>{
+ if(current!=='outreach_draft'||!e.target.matches?.('[data-guide-field]'))return;
+ const guide=ui.reuseGuides[ui.selectedId],key=e.target.dataset.guideField;
+ if(guide&&Object.hasOwn(guide.sections,key))guide.sections[key]=e.target.value;
+});
 document.addEventListener('click',async e=>{
  if(!e.target.closest('.co-activity-menu'))document.querySelectorAll?.('.co-activity-menu[open]').forEach(m=>m.open=false);
  if(current==='outreach_draft'&&!e.target.closest('.co-partner-combobox'))closeDraftOptions();

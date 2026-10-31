@@ -1,4 +1,5 @@
 import {researchOrganisationEvidence} from './src/evidence-research.js';
+import {generateReuseGuide} from './src/reuse-guide.js';
 import {activeEvidenceReview,hasCurrentSpecificEvidence,hasRecentEvidenceFailure,evidenceFingerprint,evidencePrompt,validateEvidenceAssessments} from './src/evidence-review.js';
 import {selectSourceBalanced} from './src/assessment-selection.js';
 import {createServer} from 'node:http';
@@ -465,6 +466,11 @@ export function createApp({aiProvider=AI_PROVIDER,assessmentGenerator=generateJS
  try{
   const url=new URL(req.url,'http://localhost');const path=url.pathname;
   if(path==='/api/health')return response(res,200,{ok:true,service:'CoffeeBot Circularity Copilot'});
+  if(path==='/api/reuse-guide'&&req.method==='GET'){
+   const s=await readState(),p=s.partners.find(x=>x.id===url.searchParams.get('partnerId'));
+   if(!p)return response(res,404,{error:'Partner not found'});
+   return response(res,200,generateReuseGuide(p));
+  }
   if(path==='/api/state'&&req.method==='GET'){const s=await readState();return response(res,200,{...s,metrics:numbers(s.settings,s.partners,s.handovers),sponsorReference:{estimated:true,locations:COFFEEBOT_MONTHLY_CUP_VOLUMES,monthlyTotalCups:SPONSOR_MONTHLY_CUPS,coffeeSharePercent:60,gramsPerCoffee:15},ranked:rankPartners(s.partners,numbers(s.settings,s.partners,s.handovers).gapKg,s.settings.ratingWeights)});}
   if(path==='/api/settings'&&req.method==='PATCH'){
    const v=await input(req);if(Object.hasOwn(v,'aiProvider'))fail('AI provider must be configured in the local repository environment');const changed=await mutation(s=>{for(const [key,min,max] of [['cupsPerWeek',0,10000000],['coffeeSharePercent',0,100],['gramsPerCup',1,1000],['referenceLat',1.1,1.55],['referenceLon',103.5,104.1]])if(Object.hasOwn(v,key))s.settings[key]=validNumber(v[key],key,min,max);
