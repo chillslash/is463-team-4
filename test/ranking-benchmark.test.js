@@ -33,3 +33,13 @@ test('local models use loopback JSON endpoint and report actual tokens',async()=
   assert.ok(calls.every(x=>x.request.format==='json'&&x.request.options.temperature===0));
  }finally{globalThis.fetch=orig;}
 });
+
+test('direct llama.cpp disables model thinking for JSON-only evaluation',async()=>{
+ const orig=globalThis.fetch,prior=process.env.QWEN_LLAMA_CPP_URL,calls=[];
+ process.env.QWEN_LLAMA_CPP_URL='http://127.0.0.1:11436';
+ globalThis.fetch=async(url,request)=>{calls.push({url:String(url),request:JSON.parse(request.body)});return {ok:true,json:async()=>({choices:[{message:{content:'{"assessments":[]}'}}],usage:{prompt_tokens:15,completion_tokens:7}})};};
+ try{assert.equal((await generateLocalJSON('qwen','test',{withUsage:true})).usage.inputTokens,15);}
+ finally{globalThis.fetch=orig;if(prior===undefined)delete process.env.QWEN_LLAMA_CPP_URL;else process.env.QWEN_LLAMA_CPP_URL=prior;}
+ assert.equal(calls[0].url,'http://127.0.0.1:11436/v1/chat/completions');
+ assert.deepEqual(calls[0].request.chat_template_kwargs,{enable_thinking:false});
+});

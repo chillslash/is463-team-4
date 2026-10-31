@@ -2,7 +2,7 @@
 
 **31 October current workflow:** CoffeeBot uses deterministic pre-ranking to choose a configurable source-balanced research cohort. Source-provided official websites are reused; missing sites may be resolved with a bounded Codex web-search step, and every returned site is independently verified before bounded same-site evidence extraction. The configured evaluator then receives that frozen evidence packet and does **not** browse. Active ranking is a pre-contact **Outreach Priority**: Reuse Suitability 40%, Organisation-Specific Evidence 25%, Potential Intake Scale 20%, HQ Proximity 15%. Potential Intake is only a relative evidence-backed estimate of plausible absorption scale; actual kg/week, frequency, willingness and logistics remain post-contact facts.
 
-**Status:** The 23 October comparison below is historical and its rules-only implementation decision has been superseded. The 29 October controlled rerun is diagnostic only; it does not externally validate CoffeeBot rankings or partner acceptance.
+**Status:** The 31 October evaluator comparison is the current model-selection result. Earlier 23/29 October comparisons remain historical or diagnostic; none externally validates CoffeeBot rankings, partner acceptance or environmental impact.
 
 ## Current prototype decision (31 October 2026)
 
@@ -61,22 +61,45 @@ The 36-item set at `scripts/benchmark-cases.json` comprises **six items from eac
 
 Methods: rules-only screening; existing Codex CLI; Qwen3.5 4B; and Llama 3.2 3B. All LLMs use identical `sourceFacts` and `assessmentPrompt`, with numerical validation, reference evidence and no web browsing. Metrics are **held-out nDCG@10**, pairwise ordering agreement, coverage, false-positive review and source-grounded explanations. Invalid responses count as missing, *not* zero scores disguised as successful ranking. Call metadata contains elapsed time and available token counts; checkpoints prevent rerunning already successful local calls.
 
+## Current evaluator comparison (31 October 2026)
+
+After freezing the current discovery/ranking pipeline, the evaluator comparison used the same **18-case holdout**, current `evidence-v4-intake` prompt, frozen candidate evidence, and **batch size 3** for every AI model. The evaluator itself had no web access. Qwen3.5 4B and Llama 3.2 3B ran through the existing loopback `llama.cpp` runtime with temperature 0 / seed 463; Qwen thinking was disabled for the constrained JSON task. Codex used the configured CLI path.
+
+| Evaluator | Valid assessments | Holdout nDCG@10 | Pairwise agreement | Wall-clock inference |
+| --- | ---: | ---: | ---: | ---: |
+| Deterministic rules | **18/18** | 0.6297 | 0.5057 | ~0.1 s |
+| **Codex** | **18/18** | 0.6291 | 0.4540 | **84.0 s** |
+| Qwen3.5 4B | 17/18 | **0.6393** | **0.5063** | 1,358.8 s (~22.6 min) |
+| Llama 3.2 3B | 6/18 | 0.7456* | 0.5000* | 436.2 s (~7.3 min) |
+
+`*` Llama's ranking metrics are **not comparable** because only 6/18 outputs passed the same schema/citation/range validation. The metric implementation excludes missing scores rather than treating invalid responses as successful rankings, so coverage must be read alongside nDCG/pairwise results.
+
+**Interpretation.** Qwen has the highest nominal nDCG among the sufficiently covered AI runs, but the margin over Codex/rules is only about one hundredth and Qwen produced one invalid assessment. It also took about **16x** as long as Codex on this laptop/runtime. Llama completed faster than Qwen but failed validation for two-thirds of the cohort, so it is unsuitable for automatic assessment in the current workflow.
+
+Codex is therefore the **current front runner for the AI evaluator** because it is the only tested model with complete 18/18 validated coverage and it is dramatically faster operationally than the local alternatives. This is a reliability/deployment decision, not a claim that Codex has proven superior real-world ranking accuracy. An earlier current-rubric Codex run using 36 cases / batch size 6 gave holdout nDCG@10 **0.6388** and pairwise **0.5460**, showing that the small internal proxy is sensitive to batch/context composition. Differences of this size between Codex, Qwen and deterministic rules should not be over-interpreted.
+
+For green-computing conclusions, deterministic screening remains effectively immediate and is still used to bound AI work. The local-model wall times above are useful compute observations but **not measured energy or carbon**; hosted Codex energy cannot be inferred from wall time or token counts, and token accounting differs across runtimes. The defensible design conclusion is to keep the source-based deterministic first pass, cap AI evaluations, and use Codex where the richer evidence judgement is useful rather than applying an LLM indiscriminately to every lead.
+
+**Model decision:** keep **Codex** as the configured prototype evaluator; retain **Qwen3.5 4B** as the principal local comparison / optional experiment; do not use **Llama 3.2 3B** for automatic assessment under the current rubric. No production ranking weights were changed as a result of this benchmark.
 ## Running
 
 ```powershell
 npm test
-node scripts/ranking-benchmark.mjs --models=rules,codex --split=all --batch=6
-# With Qwen / Llama installed and running on loopback in Ollama:
-ollama pull qwen3.5:4b
-ollama pull llama3.2:3b
-node scripts/ranking-benchmark.mjs --models=qwen,llama --split=all --batch=1
+node scripts/ranking-benchmark.mjs --models=rules,codex --split=holdout --limit=18 --batch=3
+
+# With the existing local llama.cpp servers bound to loopback only:
+$env:QWEN_LLAMA_CPP_URL='http://127.0.0.1:11436'
+node scripts/ranking-benchmark.mjs --models=qwen --split=holdout --limit=18 --batch=3
+Remove-Item Env:QWEN_LLAMA_CPP_URL
+
+$env:LLAMA_LLAMA_CPP_URL='http://127.0.0.1:11435'
+node scripts/ranking-benchmark.mjs --models=llama --split=holdout --limit=18 --batch=3
+Remove-Item Env:LLAMA_LLAMA_CPP_URL
 ```
 
-If Windows Ollama cannot load an otherwise present model, the local `llama.cpp` server can be used via `QWEN_LLAMA_CPP_URL=http://127.0.0.1:11436` or `LLAMA_LLAMA_CPP_URL=http://127.0.0.1:11435`. Qwen's hybrid reasoning should be disabled for this short constrained scoring task (e.g. `--reasoning off`) to avoid wasting generation on invisible reasoning. Neither endpoint should bind a public interface. Local provider choices in the ignored `.env` are `AI_PROVIDER=qwen` / `AI_PROVIDER=llama`; use the CLI reference with `AI_PROVIDER=codex`. `--limit=2` and `--batch=1` support smoke tests. The benchmark requires the saved local source snapshot containing the fixture IDs and never rewrites it.
+The local adapter also supports Ollama on `127.0.0.1:11434`, but the 31 October comparison used the existing `llama.cpp` model blobs directly. The direct Qwen request explicitly disables hybrid thinking for this constrained JSON task, matching the Ollama `think:false` path. Neither endpoint should bind a public interface. Local provider choices in the ignored `.env` are `AI_PROVIDER=qwen` / `AI_PROVIDER=llama`; use the CLI reference with `AI_PROVIDER=codex`. `--limit=2` and `--batch=1` support smoke tests. The benchmark requires the saved local source snapshot containing the fixture IDs and never rewrites it.
 
-## Selection and sustainability
-
-Choose **reliable, source-faithful triage that helps staff act** rather than maximising model usage. Compare model validity, unsupported acceptance/fee/capacity assertions, top-five relevance, ranking stability, manual review time and deployment practicality. Local CPU time and emitted tokens are *not* measured energy or carbon, nor comparable to hosted Codex without hardware and lifecycle boundaries. The environmentally responsible option might be deterministic screening plus optional human-requested LLM assistance, rather than evaluating every discovered lead automatically.
+## Selection and sustainabilityChoose **reliable, source-faithful triage that helps staff act** rather than maximising model usage. Compare model validity, unsupported acceptance/fee/capacity assertions, top-five relevance, ranking stability, manual review time and deployment practicality. Local CPU time and emitted tokens are *not* measured energy or carbon, nor comparable to hosted Codex without hardware and lifecycle boundaries. The environmentally responsible option might be deterministic screening plus optional human-requested LLM assistance, rather than evaluating every discovered lead automatically.
 
 ## Outstanding sponsor decisions
 

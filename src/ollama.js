@@ -15,7 +15,7 @@ export async function generateLocalJSON(provider,prompt,{withUsage=false,signal,
   let direct;
   try{direct=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},
    body:JSON.stringify({model,messages:[{role:'user',content:prompt}],temperature:0,seed:463,
-     max_tokens:2200,response_format:{type:'json_object'}}),signal:combined});
+     max_tokens:2200,response_format:{type:'json_object'},chat_template_kwargs:{enable_thinking:false}}),signal:combined});
   }catch(err){if(signal?.aborted)throw signal.reason;throw new Error('Local llama.cpp call failed: '+err.message);}
   if(!direct.ok)throw new Error('Local llama.cpp '+model+' HTTP '+direct.status+': '+(await direct.text()).slice(0,250));
   const raw=await direct.json();
