@@ -198,10 +198,16 @@ export function saveAIResults(partners,batch,results,{provider,prompt,runId,manu
 export function chooseForAssessment(partners,limit=24){return selectSourceBalanced(partners,limit);}
 
 const WEBSITE_RESOLUTION_MAX_AGE_MS=30*86400000;
+const LOCATION_RESEARCH_MAX_AGE_MS=30*86400000;
 function websiteResolutionDue(p){
  if(p.websiteUrl)return false;
  const checked=Date.parse(p.websiteResolution?.checkedAt||'');
  return !Number.isFinite(checked)||Date.now()-checked>=WEBSITE_RESOLUTION_MAX_AGE_MS;
+}
+function locationResearchDue(p){
+ if(Number.isFinite(p.distanceKm))return false;
+ const checked=Date.parse(p.locationSearch?.checkedAt||'');
+ return !Number.isFinite(checked)||Date.now()-checked>=LOCATION_RESEARCH_MAX_AGE_MS;
 }
 async function resolveOfficialWebsiteBatch(partners,{generator,signal}={}){
  if(!generator||!partners.length)return {resolved:0,usage:null};
@@ -304,7 +310,7 @@ async function discover(s,{provider=AI_PROVIDER,assessmentGenerator=generateJSON
   const sfaLocationTargets=[];
   for(const ranked of preResearch.filter(p=>p.source==='SFA Licensed Crop Farms'&&!Number.isFinite(p.distanceKm))){
    const target=s.partners.find(p=>p.id===ranked.id);
-   if(target&&(target.websiteUrl||websiteResolutionDue(target)))sfaLocationTargets.push(target);
+   if(target&&((target.websiteUrl&&locationResearchDue(target))||websiteResolutionDue(target)))sfaLocationTargets.push(target);
    if(sfaLocationTargets.length>=SFA_LOCATION_ENRICHMENT_LIMIT)break;
   }
   const websiteTargets=[...new Map([...researchTargets,...sfaLocationTargets].map(p=>[p.id,p])).values()];
@@ -329,7 +335,7 @@ async function discover(s,{provider=AI_PROVIDER,assessmentGenerator=generateJSON
   const postalLookup=await postalCoordinates();
   if(postalLookup){
    const beforeResolved=sfaLocationTargets.filter(p=>Number.isFinite(p.distanceKm)).length;
-   for(const target of sfaLocationTargets.filter(p=>p.websiteUrl&&!Number.isFinite(p.distanceKm))){
+   for(const target of sfaLocationTargets.filter(p=>p.websiteUrl&&locationResearchDue(p))){
     check();
     const found=await researchPublishedLocation(target,{signal,postalLookup});check();
     target.locationSearch={checkedAt:found.checkedAt,result:found.postalCode?'postal-found':found.ambiguous?'ambiguous':'not-found',pagesChecked:found.pagesRead||0};
@@ -337,7 +343,7 @@ async function discover(s,{provider=AI_PROVIDER,assessmentGenerator=generateJSON
      target.postalCode=found.postalCode;
      target.location='Singapore '+found.postalCode;
      target.locationEvidence={source:'Organisation Website',url:found.sourceUrl,checkedAt:found.checkedAt,
-      claim:'Official organisation website publishes Singapore postal code '+found.postalCode+'.'};
+      claim:'Official organisation website publishes Singapore postal code '+found.postalCode+'.',excerpt:String(found.excerpt||'').slice(0,320)};
     }
    }
    await resolveLocations(sfaLocationTargets,s.settings,{lookup:postalLookup,allowOneMap:false,signal});
