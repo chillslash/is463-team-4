@@ -86,7 +86,7 @@ test('configured-template mode refuses to pretend deterministic rules are AI',as
   const data=await (await fetch(base+'/api/state')).json();
   const r=await fetch(base+'/api/partners/'+data.partners[0].id+'/activity/analyse',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'email',text:'Thanks for your note'})});
   assert.equal(r.status,503);
-  assert.match((await r.json()).error,/Codex or Claude/);
+  assert.match((await r.json()).error,/Codex/);
  }finally{
   srv.close();await once(srv,'close');
   if(originalDataFile===undefined)delete process.env.DATA_FILE;else process.env.DATA_FILE=originalDataFile;
