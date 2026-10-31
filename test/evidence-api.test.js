@@ -39,9 +39,10 @@ const assessmentGenerator=async(_provider,prompt)=>{
  const [input]=JSON.parse(prompt.split('\n').at(-1));
  const generic=input.id==='generic-farm';
  return {result:{assessments:[{id:input.id,reuseSuitability:invalid?40:generic?12:36,
-  sourceEvidence:generic?4:30,evidenceIds:[invalid?99:0],
+  sourceEvidence:generic?4:30,potentialIntake:generic?5:11,evidenceIds:[invalid?99:0],intakeEvidenceIds:[invalid?99:0],
   reason:generic?'Only an organisation directory listing is known; material compatibility is unverified.':
     'The company documents organic-by-product fungal substrate production, not verified grounds acceptance.',
+  intakeReason:generic?'The directory supports only a cautious small-to-moderate scale prior; actual throughput is unknown.':'Documented fungal substrate production suggests moderate recurring material demand; actual quantity is unknown.',
   check:'Can prepared coffee grounds be used in a documented process?',
   pathway:generic?'Unknown; verify organisation-specific use':'Fungal cultivation trial'}]},usage:{inputTokens:250,outputTokens:70}};
 };
