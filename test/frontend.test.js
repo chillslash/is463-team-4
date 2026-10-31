@@ -912,6 +912,9 @@ test('Assessment Settings keeps the AI budget separate from reset controls',()=>
  assert.match(js,/class="co-assessment-controls"/);
  assert.match(js,/class="co-field co-assessment-budget"><label for="assessment-budget"/);
  assert.match(js,/class="co-assessment-budget-control"/);
+ assert.match(js,/Potential Intake Scale/);
+ assert.match(js,/weightIntake/);
+ assert.match(js,/weightSuitability:40,weightEvidence:25,weightIntake:20,weightProximity:15/);
  assert.match(js,/classList\.add\('co-dialog-assessment'\)/);
  assert.match(js,/name==='automaticAIAssessments'\?\$\('#assessment-budget'\):\$\('#f-'\+name\)/);
  assert.match(css,/\.co-assessment-controls\{display:flex;/);
