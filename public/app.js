@@ -163,7 +163,8 @@ function findView(){
    const evidenceSummary=claim?'<div class="co-compact-source-evidence"><strong>Source Evidence</strong><span>'+esc(claim.length>220?claim.slice(0,217)+'…':claim)+'</span>'+ (citedEvidence?'<span>AI cited: '+citedEvidence+'</span>':'')+'</div>':'';
   const dimensions=[
    {label:'Reuse Suitability',value:p.match.parts?.suitability??0,max:p.match.weights?.suitability??40,colour:'suitability'},
-   {label:'Organisation-Specific Evidence',value:p.match.parts?.evidence??0,max:p.match.weights?.evidence??30,colour:'evidence'},
+   {label:'Organisation-Specific Evidence',value:p.match.parts?.evidence??0,max:p.match.weights?.evidence??25,colour:'evidence'},
+   {label:'Potential Intake Scale',value:p.match.parts?.intake??0,max:p.match.weights?.intake??20,colour:'readiness'},
    {label:'HQ Proximity',value:p.match.parts?.proximity??0,max:p.match.weights?.proximity??15,colour:'proximity'}
   ];
   const filled=dimensions.reduce((total,item)=>total+Math.min(item.max,Math.max(0,item.value)),0);
@@ -779,17 +780,18 @@ async function handleAction(el){const action=el.dataset.action;
  if(action==='settings'){const settings=data.settings;const ref=data.sponsorReference;const refHtml=ref?'<details class="co-source-evidence"><summary>CoffeeBot Reference Volumes</summary><p>Estimated total beverages per month:</p><p>'+ref.locations.map(x=>esc(x.location)+': '+m(x.minCups)+(x.maxCups!==x.minCups?'–'+m(x.maxCups):'')).join(' · ')+'</p></details>':'';const html=`<div class="co-field-row">${formField('Total Beverages per Week','cupsPerWeek',settings.cupsPerWeek,'number')}${formField('Coffee-Based Beverages (%)','coffeeSharePercent',settings.coffeeSharePercent??60,'number')}</div>${formField('Grounds per Coffee (g)','gramsPerCup',settings.gramsPerCup,'number')}${refHtml}`;dialog('Edit Forecast',html,async f=>request('/api/settings',{method:'PATCH',body:JSON.stringify(f)}));return;}
 
  if(action==='assessment-settings'){
-  const w=data.settings.ratingWeights||{suitability:55,evidence:30,proximity:15};
+  const w=data.settings.ratingWeights||{suitability:40,evidence:25,intake:20,proximity:15};
   const weightRows=[
    ['Reuse Suitability','weightSuitability',w.suitability],
    ['Organisation-Specific Evidence','weightEvidence',w.evidence],
+   ['Potential Intake Scale','weightIntake',w.intake],
    ['HQ Proximity','weightProximity',w.proximity]
   ];
   const rows=weightRows.map(([label,key,value])=>`<div class="co-assessment-weight-row"><label for="f-${key}">${label}</label><div class="co-assessment-weight-input"><input id="f-${key}" name="${key}" type="number" min="0" max="100" step="1" value="${esc(value)}" aria-describedby="assessment-weight-total"><span>%</span></div></div>`).join('');
   const html=`<div class="co-assessment-weight-list">${rows}<div class="co-assessment-total"><strong>Total</strong><output id="assessment-weight-total" aria-live="polite">100/100%</output></div></div>`+
     '<div class="co-assessment-controls"><div class="co-field co-assessment-budget"><label for="assessment-budget">AI Assessments per Discovery Run</label><div class="co-assessment-budget-control"><input id="assessment-budget" name="automaticAIAssessments" type="number" min="0" max="24" step="1" value="'+esc(data.settings.automaticAIAssessments??24)+'"><span class="co-assessment-budget-note">0–24 Partners</span></div></div><button type="button" class="co-button alt small" id="reset-assessment-settings">Reset to Default Settings</button></div>';
   dialog('Assessment Settings',html,async f=>{
-   const weights={suitability:Number(f.weightSuitability),evidence:Number(f.weightEvidence),proximity:Number(f.weightProximity)};
+   const weights={suitability:Number(f.weightSuitability),evidence:Number(f.weightEvidence),intake:Number(f.weightIntake),proximity:Number(f.weightProximity)};
    if(Object.values(weights).some(v=>!Number.isInteger(v)||v<0||v>100)||Object.values(weights).reduce((a,b)=>a+b,0)!==100)
     throw Error('Rating weights must be whole percentages adding up to 100.');
    const automaticAIAssessments=Number(f.automaticAIAssessments);
@@ -799,13 +801,13 @@ async function handleAction(el){const action=el.dataset.action;
   });
   $('.co-dialog')?.classList.add('co-dialog-assessment');
   const updateWeightTotal=()=>{
-   const total=['Suitability','Evidence','Proximity'].reduce((sum,key)=>sum+Number($('#f-weight'+key)?.value||0),0);
+   const total=['Suitability','Evidence','Intake','Proximity'].reduce((sum,key)=>sum+Number($('#f-weight'+key)?.value||0),0);
    const output=$('#assessment-weight-total');if(output){output.value=total+'/100%';output.textContent=total+'/100%';output.classList.toggle('co-invalid',total!==100);}
   };
-  for(const key of ['Suitability','Evidence','Proximity'])$('#f-weight'+key)?.addEventListener('input',updateWeightTotal);
+  for(const key of ['Suitability','Evidence','Intake','Proximity'])$('#f-weight'+key)?.addEventListener('input',updateWeightTotal);
   updateWeightTotal();
   $('#reset-assessment-settings')?.addEventListener('click',()=>{
-   const defaults={weightSuitability:55,weightEvidence:30,weightProximity:15,automaticAIAssessments:24};
+   const defaults={weightSuitability:40,weightEvidence:25,weightIntake:20,weightProximity:15,automaticAIAssessments:24};
    for(const [name,value] of Object.entries(defaults)){
     const input=name==='automaticAIAssessments'?$('#assessment-budget'):$('#f-'+name);
     if(input)input.value=value;
