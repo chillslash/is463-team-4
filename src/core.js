@@ -23,7 +23,8 @@ export const LEGACY_SEEDED_PARTNER_NOTES=Object.freeze([
  'This is an NParks-managed physical site, NOT an organisation confirmed to accept grounds. Staff must identify its authorised decision-maker and verify any reuse agreement.'
 ]);
 // Sponsor priority: meaningful intake quantity, then dependable logistics and reuse.
-export const DEFAULT_RATING_WEIGHTS = Object.freeze({suitability:55,evidence:30,proximity:15});
+export const DEFAULT_RATING_WEIGHTS = Object.freeze({suitability:40,evidence:25,intake:20,proximity:15});
+export const LEGACY_THREE_FACTOR_RATING_WEIGHTS = Object.freeze({suitability:55,evidence:30,proximity:15});
 export const LEGACY_RATING_WEIGHTS = Object.freeze({suitability:30,evidence:30,proximity:5,operations:35});
 export const OLDER_RATING_WEIGHTS = Object.freeze({suitability:40,evidence:35,proximity:10,operations:15});
 // All five sponsor locations report TOTAL beverages per month, not coffee drinks.
@@ -40,7 +41,7 @@ export const SPONSOR_MONTHLY_CUPS = Object.freeze({
 });
 // 52 weeks / 12 months; use the range midpoint as the editable initial forecast.
 const SPONSOR_WEEKLY_CUPS = Math.round((SPONSOR_MONTHLY_CUPS.min+SPONSOR_MONTHLY_CUPS.max)/2*12/52);
-export function validRatingWeights(weights){return !!weights && typeof weights==='object' && Object.keys(DEFAULT_RATING_WEIGHTS).every(k=>Number.isInteger(weights[k])&&weights[k]>=0&&weights[k]<=100) && Object.keys(weights).length===3 && Object.values(weights).reduce((sum,v)=>sum+v,0)===100;}
+export function validRatingWeights(weights){return !!weights && typeof weights==='object' && Object.keys(DEFAULT_RATING_WEIGHTS).every(k=>Number.isInteger(weights[k])&&weights[k]>=0&&weights[k]<=100) && Object.keys(weights).length===4 && Object.values(weights).reduce((sum,v)=>sum+v,0)===100;}
 export const DEFAULT_SETTINGS = { ratingWeights: {...DEFAULT_RATING_WEIGHTS}, sponsorAssumptionsVersion: 1, cupsPerWeek: SPONSOR_WEEKLY_CUPS, coffeeSharePercent: 60, gramsPerCup: 15, referenceLat: 1.3275, referenceLon: 103.8723, referenceLabel: 'CoffeeBot HQ, 8 Lor Bakar Batu, #05-01, Singapore 348743 (approximate coordinates)', automaticAIAssessments: 24, aiProvider: 'template' };
 // Upgrade only untouched historical demo assumptions. Staff-edited forecasts and
 // real partner records must never be silently replaced by sponsor sample data.
@@ -154,23 +155,32 @@ export function hasAIFit(p){
 // Screening is a temporary, explainable fallback, never labelled as AI assessment.
 function screen(p){
  const src=String(p.source||'').toLowerCase(),cat=String(p.category||'').toLowerCase(),mat=String(p.materialEvidence||'').toLowerCase();
- if(p.directCoffeeEvidence)return {reuse:38,evidence:33,operational:0};
+ const equipment=/equipment|machiner|parts|irrigation|technology/.test(String(p.name||'').toLowerCase());
+ // Potential intake is relative pre-contact scale, never an estimate of kg/week or willingness.
+ // Category/source evidence only earns a cautious baseline; organisation-specific evidence can refine it later.
+ let intake=3;
+ if(src.includes('nea')||cat.includes('organic waste recycler'))intake=12;
+ else if(/compost/.test(cat))intake=11;
+ else if(src.includes('sfa')||cat.includes('crop farm'))intake=7;
+ else if(src.includes('community in bloom')||cat.includes('community garden'))intake=3;
+ else if(src.includes('moe')||cat.includes('school programme')||cat.includes('school garden'))intake=2;
+ else if(src.includes('nparks')||cat.includes('public park'))intake=6;
+ else if(src.includes('lias')||cat.includes('landscap'))intake=equipment?2:7;
+ else if(/garden|nursery|horticultur|farm/.test(cat))intake=6;
+ if(p.directCoffeeEvidence)return {reuse:38,evidence:33,intake:Math.max(intake,12)};
  if(src.includes('nea')||cat.includes('organic waste recycler')){
   const broad=/mixed food waste|food waste|organic waste/.test(mat);
-  return {reuse:broad?13:8,evidence:broad?13:10,operational:0};
+  return {reuse:broad?13:8,evidence:broad?13:10,intake};
  }
- if(cat.includes('public park'))return {reuse:7,evidence:5,operational:0};
- if(src.includes('community in bloom'))return {reuse:12,evidence:8,operational:0};
- if(src.includes('moe')||cat.includes('school programme'))return {reuse:7,evidence:6,operational:0};
- if(src.includes('nparks')||cat.includes('public park'))return {reuse:7,evidence:5,operational:0};
- if(src.includes('sfa')||cat.includes('crop farm'))return {reuse:12,evidence:10,operational:0};
- if(src.includes('lias')||cat.includes('landscap')){
-  const equipment=/equipment|machiner|parts|irrigation|technology/.test(String(p.name||'').toLowerCase());
-  return {reuse:equipment?4:11,evidence:8,operational:0};
- }
- if(/compost/.test(cat))return {reuse:15,evidence:8,operational:0};
- if(/garden|nursery|horticultur|farm/.test(cat))return {reuse:11,evidence:7,operational:0};
- return {reuse:5,evidence:3,operational:0};
+ if(cat.includes('public park'))return {reuse:7,evidence:5,intake};
+ if(src.includes('community in bloom'))return {reuse:12,evidence:8,intake};
+ if(src.includes('moe')||cat.includes('school programme'))return {reuse:7,evidence:6,intake};
+ if(src.includes('nparks')||cat.includes('public park'))return {reuse:7,evidence:5,intake};
+ if(src.includes('sfa')||cat.includes('crop farm'))return {reuse:12,evidence:10,intake};
+ if(src.includes('lias')||cat.includes('landscap'))return {reuse:equipment?4:11,evidence:8,intake};
+ if(/compost/.test(cat))return {reuse:15,evidence:8,intake};
+ if(/garden|nursery|horticultur|farm/.test(cat))return {reuse:11,evidence:7,intake};
+ return {reuse:5,evidence:3,intake};
 }
 export function scorePartner(p,gap,ratingWeights=DEFAULT_RATING_WEIGHTS){
  const weights=validRatingWeights(ratingWeights)?ratingWeights:DEFAULT_RATING_WEIGHTS;
@@ -181,19 +191,21 @@ export function scorePartner(p,gap,ratingWeights=DEFAULT_RATING_WEIGHTS){
  const base=screen(p);
  const q=review?{
   reuse:(base.reuse+review.reuseSuitability)/2,
-  evidence:(base.evidence+review.sourceEvidence)/2
+  evidence:(base.evidence+review.sourceEvidence)/2,
+  intake:(base.intake+review.potentialIntake)/2
  }:base;
  const km=Number(p.distanceKm);
  // Straight-line distance is a weak convenience proxy, never a delivery-route promise.
  const proximity=p.distanceKm==null||!Number.isFinite(km)?0:Math.round(Math.max(0,10-0.35*Math.max(0,km)));
- // Outreach Priority is intentionally pre-contact. Intake quantity, frequency,
- // willingness and transport are CoffeeBot's eventual operating criteria, but they
- // are usually unknown before outreach and therefore must not depress discovery scores.
- const rawParts={suitability:q.reuse,evidence:q.evidence,proximity};
- const maxima={suitability:40,evidence:35,proximity:10};
+ // Outreach Priority is intentionally pre-contact. Potential Intake Scale is a relative,
+ // evidence-backed estimate of plausible absorption scale, never actual kg/week or willingness.
+ // Frequency, willingness and transport remain post-contact relationship facts.
+ const rawParts={suitability:q.reuse,evidence:q.evidence,intake:q.intake,proximity};
+ const maxima={suitability:40,evidence:35,intake:20,proximity:10};
  const parts=Object.fromEntries(Object.keys(maxima).map(key=>[key,Math.round(Math.max(0,Math.min(1,rawParts[key]/maxima[key]))*weights[key])]));
  const score=Object.values(parts).reduce((sum,v)=>sum+v,0);
  const reasons=[review?review.reason:(p.directCoffeeEvidence?'Source explicitly mentions used coffee grounds':'Preliminary screening based on source category and available evidence')];
+ if(review?.intakeReason)reasons.push(review.intakeReason);
  if(p.distanceKm!=null)reasons.push('Approximately '+p.distanceKm+' km straight-line from HQ');
  reasons.push('Confirm intake quantity, frequency and collection arrangements during outreach');
  return {score,aiLed,provisional:!review,method:review?'AI-assisted':'Rule-ranked',
