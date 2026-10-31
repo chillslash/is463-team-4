@@ -20,8 +20,9 @@ let calls=0;
 const assessmentGenerator=async(_provider,prompt)=>{
  calls++;if(calls===1)throw new Error('Simulated Codex rate limit');
  const input=JSON.parse(prompt.slice(prompt.lastIndexOf('\n')+1));
- return {result:{assessments:input.map(p=>({id:p.id,reuseSuitability:32,sourceEvidence:28,evidenceIds:[0],
+ return {result:{assessments:input.map(p=>({id:p.id,reuseSuitability:32,sourceEvidence:28,potentialIntake:10,evidenceIds:[0],intakeEvidenceIds:[0],
   reason:'The cited organisation documents mushroom cultivation with agricultural by-products; spent grounds acceptance remains unverified.',
+  intakeReason:'Documented recurring substrate cultivation supports moderate relative intake potential; actual volume is unknown.',
   check:'Can prepared coffee grounds be used in this documented process?',pathway:'Potential mushroom substrate component'}))}};
 };
 const discoveryProvider=async()=>({candidates:[],sources:[{name:'Cached source fixture',found:0,cached:true}],warnings:[]});
