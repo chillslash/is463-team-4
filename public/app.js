@@ -237,9 +237,9 @@ async function loadReuseGuide(id){
  }
 }
 function reuseGuideCopy(g){
- return 'Reuse Guide: '+g.partnerName+'\n\n'+GUIDE_TITLES.map(([key,title])=>title+'\n'+g.sections[key]).join('\n\n')+
-  (g.source?'\n\nSource to verify: '+g.source.url:'')+'\n\n'+g.note;
+ return 'Reuse Guide: '+g.partnerName+'\n\n'+GUIDE_TITLES.map(([key,title])=>title+'\n'+g.sections[key]).join('\n\n');
 }
+
 function reuseGuideCard(p){
  const g=ui.reuseGuides[p.id];
  if(!g?.sections)return '<section class="co-card co-reuse-guide" aria-label="Reuse Guide"><h2>Reuse Guide</h2><p>Guide unavailable for this partner.</p></section>';
@@ -248,8 +248,6 @@ function reuseGuideCard(p){
   <div class="co-guide-header"><div><h2 id="reuse-guide-title">Reuse Guide</h2><p>For ${esc(g.partnerName)}</p></div>
   <div class="co-guide-actions"><button type="button" class="co-button alt small" data-action="guide-edit">${ui.guideEditing?'Done Editing':'Edit Guide'}</button><button type="button" class="co-button alt small" data-action="guide-copy"><span class="material-symbols-outlined" aria-hidden="true">content_copy</span>Copy Guide</button></div></div>
   <div class="co-guide-sections">${parts}</div>
-  ${g.source?`<p class="co-guide-source"><a href="${esc(g.source.url)}" target="_blank" rel="noopener noreferrer">Check published source</a> before sharing</p>`:''}
-  <p class="co-guide-note">${esc(g.note)}</p>
  </section>`;
 }
 function outreachView(){
