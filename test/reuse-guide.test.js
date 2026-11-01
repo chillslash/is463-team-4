@@ -164,3 +164,30 @@ test('reuse guide is written for recipients and highlights a concrete possible u
   assert.doesNotMatch(g.sections.before,/Recorded|Staff-entered|internal/i);
  }
 });
+
+test('A1 Environment guide offers three distinct documented reuse opportunities',()=>{
+ const p=base({name:'A1 Environment Pte Ltd',category:'organic waste recycler',source:'NEA Food Waste Recycling Facilities',
+  websiteUrl:'https://a1environment.com.sg/',directCoffeeEvidence:true,
+  evidenceEntries:[{source:'NEA Food Waste Recycling Facilities',
+   claim:'NEA lists A1 Environment Pte Ltd as a recycling facility; accepted materials: Used coffee grounds',
+   url:'https://www.nea.gov.sg/our-services/waste-management/3r-programmes-and-resources/food-waste-management/food-distribution-organisations-local-recycling-facilities-and-suppliers'}]});
+ const g=generateReuseGuide(p);
+ assert.equal(g.evidenceBasis,'curated');assert.equal(g.opportunityCount,3);
+ for(const expected of ['Coffee-ground bio-composite panels','Nanyang Polytechnic','Compost for local farms',
+  'Community-garden composting','CoffeeBot could explore','trial-batch requirements']){
+  assert.ok(g.sections.pathway.includes(expected),expected);
+ }
+ assert.match(g.sections.before,/bio-composite material, farm composting or community-garden use/i);
+ assert.equal(g.sources.length,2);
+ assert.doesNotMatch(formatReuseGuide(g),/https:\/\//i,'source URLs stay in research data');
+ assert.doesNotMatch(formatReuseGuide(g),/already agreed|guaranteed|proven safe/i);
+});
+test('curated A1 pathways require exact identity, trusted host and NEA evidence',()=>{
+ const p=base({name:'A1 Environment Pte Ltd',category:'organic waste recycler',
+ source:'NEA Food Waste Recycling Facilities',websiteUrl:'https://a1environment.com.sg/',
+ evidenceEntries:[{source:'NEA Food Waste Recycling Facilities',claim:'NEA lists A1 Environment Pte Ltd as a recycling facility; accepted materials: Used coffee grounds'}]});
+ assert.equal(generateReuseGuide(p).opportunityCount,3);
+ assert.equal(generateReuseGuide({...p,name:'A1 Environment Partners'}).opportunityCount,1);
+ assert.equal(generateReuseGuide({...p,websiteUrl:'https://example.com/'}).opportunityCount,1);
+ assert.equal(generateReuseGuide({...p,evidenceEntries:[]}).opportunityCount,1);
+});

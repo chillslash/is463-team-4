@@ -14,6 +14,8 @@ test('both CLI formats parse equivalent structured drafts',()=>{
  const payload={subject:'Trial',body:'Hi',guide:'Check source'};
  assert.deepEqual(validateDraft(parseAIJSON(JSON.stringify(payload),'codex')),payload);
  assert.throws(()=>validateDraft({body:'Hi'}));
+ assert.deepEqual(validateDraft({body:'Hi'},{subjectFallback:'CoffeeBot | Spent Coffee Grounds Reuse Partnership'}),{subject:'CoffeeBot | Spent Coffee Grounds Reuse Partnership',body:'Hi',guide:''});
+ assert.throws(()=>validateDraft({body:''},{subjectFallback:'CoffeeBot'}),/body was missing/);
  assert.deepEqual(validateDraft({subject:'Hello',body:'Short enquiry'}),{subject:'Hello',body:'Short enquiry',guide:''});
 });
 test('mock signed-in local CLI receives prompts over stdin',async()=>{

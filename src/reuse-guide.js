@@ -1,3 +1,4 @@
+import {curatedReuseCase} from './reuse-opportunities.js';
 ﻿import {activeEvidenceReview,evidenceQuality} from './evidence-review.js';
 // Rule-based partner guide: no extra AI inference or technical-use guarantees.
 export const GUIDE_SECTIONS=[['pathway','Potential Reuse Pathway'],['supply','What CoffeeBot Can Provide'],['before','Before Starting a Trial'],['learn',"What We'd Like to Learn"]];
@@ -117,8 +118,10 @@ function organisationEvidence(p,type){
  matches.sort((a,b)=>a.rank-b.rank);
  if(matches.length){
   const {signal,e}=matches[0];
+  const alternatives=matches.filter(m=>m.signal!==signal&&m.signal.idea!==signal.idea)
+    .slice(0,1).map(m=>({idea:m.signal.idea,source:{label:m.e.source||'Organisation website',url:m.e.url}}));
   return {description:'An organisation-page excerpt describes '+signal.observation+'. Whether grounds could fit that activity is unconfirmed.',
-   idea:signal.idea,question:signal.question,source:{label:e.source||'Organisation website',url:e.url},kind:'website'};
+   idea:signal.idea,alternatives,question:signal.question,source:{label:e.source||'Organisation website',url:e.url},kind:'website'};
  }
  // NEA names accepted material streams, which must not be conflated with coffee-ground acceptance.
  if(type==='recycler' && review){
@@ -155,22 +158,31 @@ function organisationEvidence(p,type){
  return null;
 }
 export function generateReuseGuide(p){
- const type=guideKind(p),evidence=organisationEvidence(p,type);
- // The intended reader is the potential recipient, not CoffeeBot's internal sales team.
- const pathway=evidence?.idea||pathways[type];
+ const type=guideKind(p),evidence=organisationEvidence(p,type),curated=curatedReuseCase(p);
+ // Suggest multiple independently documented routes only where the evidence permits it.
+ const opportunities=curated
+  ?curated.opportunities.map(o=>o.title+'\n'+o.description+'\n'+o.collaboration)
+  :evidence
+   ?[evidence.idea,...(evidence.alternatives||[]).map(o=>o.idea)]
+   :[pathways[type]];
+ const pathway=opportunities.length>1
+  ?opportunities.map((idea,i)=>(i+1)+'. '+idea).join('\n\n')
+  :opportunities[0];
  const supply='CoffeeBot collects spent grounds from its coffee machines, sun-dries them at HQ and stores them for onward collection. We could discuss a small trial batch and suitable collection or delivery arrangements. Moisture content has not been measured.';
  const before=[
-  '- '+(evidence?.question||questions[type]),
+  '- '+(curated?.firstTrialQuestion||evidence?.question||questions[type]),
   '- What preparation, handling or organisational approvals would you require?',
   '- What initial quantity, schedule and collection or delivery arrangement would work for you?'
  ];
  if(type==='recycler')before[1]='- Are there fees or specific material-condition requirements for a trial?';
- const outcome=type==='garden'&&evidence?.kind==='website'
+ const outcome=curated?'which documented recovery route could make good use of the material':type==='garden'&&evidence?.kind==='website'
   ?'whether a suitable composting or soil-preparation activity could actually use the grounds'
   :feedback[type];
  const learn='If a trial goes ahead, we would value your feedback on '+outcome+', what handling adjustments were needed, and whether future batches might be useful.';
  return {partnerId:p.id,partnerName:p.name,sections:{pathway,supply,before:before.join('\n'),learn},
-  source:evidence?.source||null,evidenceBasis:evidence?.kind||'category'};
+  source:curated?curated.sources[0]:evidence?.source||null,
+  sources:curated?curated.sources:evidence?[evidence.source,...(evidence.alternatives||[]).map(a=>a.source)]:[],
+  opportunityCount:opportunities.length,evidenceBasis:curated?'curated':evidence?.kind||'category'};
 }
 export function formatReuseGuide(g){
  return 'Reuse Guide: '+g.partnerName+'\n\n'+GUIDE_SECTIONS.map(([key,title])=>title+'\n'+g.sections[key]).join('\n\n');

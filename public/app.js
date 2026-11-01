@@ -952,7 +952,7 @@ async function handleAction(el){const action=el.dataset.action;
     if(untouched&&field)field.value=draft.body;
     ui.generatedDraftBody=draft.body;
     ui.draft={...draft,body:untouched?draft.body:currentBody};
-    notice(untouched?'Draft prepared.':'Draft prepared; your email edits were preserved.');
+    notice(draft.aiFailed?'AI email unavailable; a template was prepared.':untouched?'Draft prepared.':'Draft prepared; your email edits were preserved.');
    }
   }catch(err){
    if(ui.selectedId===id)notice(err.message,'error');

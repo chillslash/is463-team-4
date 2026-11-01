@@ -85,9 +85,11 @@ export async function generateJSON(provider, prompt, {runner=spawn, timeoutMs=90
     child.stdin.end(prompt);
   });
 }
-export function validateDraft(o) {
-  if (!o || typeof o.subject !== 'string' || typeof o.body !== 'string' || !o.subject.trim() || !o.body.trim()) throw new Error('AI draft was incomplete');
-  return {subject:o.subject.slice(0,300),body:o.body.slice(0,8000),guide:typeof o.guide==='string'?o.guide.slice(0,2500):''};
+export function validateDraft(o,{subjectFallback=null}={}) {
+  if (!o || typeof o.body !== 'string' || !o.body.trim()) throw new Error('AI email body was missing');
+  const subject=typeof o.subject==='string'&&o.subject.trim()?o.subject.trim():subjectFallback;
+  if(typeof subject!=='string'||!subject.trim())throw new Error('AI email subject was missing');
+  return {subject:subject.slice(0,300),body:o.body.trim().slice(0,8000),guide:typeof o.guide==='string'?o.guide.slice(0,2500):''};
 }
 export function ensureCoffeeBotSubject(subject){
  const original=String(subject??'').trim();
