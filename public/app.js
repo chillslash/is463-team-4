@@ -933,7 +933,7 @@ async function handleAction(el){const action=el.dataset.action;
   ui.generatingDraft=true;
   el.disabled=true;
   const originalLabel=el.innerHTML;
-  el.textContent='Preparing Draftâ€¦';
+  el.textContent='Preparing Draft...';
   // Start the deterministic guide and AI email independently. The guide can appear
   // immediately even if the model is slow or the email request fails.
   const guidePromise=loadReuseGuide(id).then(()=>{

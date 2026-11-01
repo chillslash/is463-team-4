@@ -73,6 +73,11 @@ test('discovery cards highlight on hover and toggle details without intercepting
  assert.ok(css.includes('.co-manage-page .co-manage-row:hover,'));
  assert.ok(css.includes('box-shadow:inset 4px 0 #498565'));
 });
+test('draft loading button uses a clean ASCII ellipsis instead of garbled characters',()=>{
+ assert.ok(script.includes("el.textContent='Preparing Draft...'"));
+ assert.ok(!script.includes('Preparing DraftÃ¢'));
+});
+
 test('draft guidance is ghost text with recipient and subject copy controls',async()=>{
  const {root}=await boot('/outreach');
  assert.ok(root.innerHTML.includes('placeholder="Generate a draft to get started."'));

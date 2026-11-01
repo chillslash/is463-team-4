@@ -8,53 +8,52 @@ const required=g=>{
  assert.deepEqual(Object.keys(g.sections),GUIDE_SECTIONS.map(([key])=>key));
  assert.equal(Object.hasOwn(g,'note'),false,'No extra meta-disclaimer field in generated guide');
  assert.doesNotMatch(formatReuseGuide(g),/Check published source|Source to verify|Staff review required|Public-source descriptions are research leads/i);
- assert.match(formatReuseGuide(g),/To confirm/i);
+ assert.match(g.sections.pathway,/grounds|coffee grounds/i);
+ assert.match(g.sections.before,/quantity/i);
+ assert.ok(g.sections.before.split('\n').length<=4);
  assert.doesNotMatch(formatReuseGuide(g),/COâ‚‚e|carbon savings|guaranteed suitable|verified reuse/i);
 };
 
 test('community garden guide describes only a possible managed process and asks for trial logistics',()=>{
  const g=generateReuseGuide(base({name:'CitySoil',category:'community garden'}));
- required(g);assert.match(g.sections.pathway,/managed composting or horticultural/i);
- assert.match(g.sections.before,/frequency/i);assert.match(g.sections.before,/quantity/i);
- assert.match(g.sections.before,/collect from HQ/i);
+ required(g);assert.match(g.sections.pathway,/managed composting/i);
+ assert.match(g.sections.before,/schedule/i);assert.match(g.sections.before,/quantity/i);
+ assert.match(g.sections.before,/collection or delivery/i);
 });
 test('school guide names education and authorisation rather than assuming garden use',()=>{
  const g=generateReuseGuide(base({name:'Example School',category:'school programme'}));
  required(g);assert.equal(guideKind({category:'school garden'}),'education');
- assert.match(g.sections.pathway,/educational/i);assert.match(g.sections.before,/institutional approvals/i);
+ assert.match(g.sections.pathway,/sustainability or STEM/i);assert.match(g.sections.before,/organisational approvals/i);
  assert.doesNotMatch(g.sections.pathway,/existing garden|accepts grounds/i);
 });
 test('SFA farm guide is cautious and never presumes coffee grounds are accepted',()=>{
  const g=generateReuseGuide(base({name:'Licensed Farm',category:'crop farm',source:'SFA Licensed Crop Farms'}));
- required(g);assert.match(g.sections.pathway,/A farm licence does not establish/i);
- assert.match(g.sections.before,/growing method/i);
+ required(g);assert.match(g.sections.pathway,/existing composting or growing-media preparation process/i);
+ assert.match(g.sections.before,/composting or prepare growing media/i);
  assert.doesNotMatch(g.sections.pathway,/will improve|guaranteed/i);
 });
 test('recycler guide flags material eligibility, fees and downstream outcomes',()=>{
  const g=generateReuseGuide(base({name:'Example Recycler',category:'organic waste recycler',
   directCoffeeEvidence:true,evidenceEntries:[{source:'NEA',url:'https://www.nea.gov.sg/some-directory',claim:'NEA lists Example Recycler as a facility; accepted materials: Used coffee grounds'}]}));
  required(g);assert.match(g.sections.before,/fees/i);assert.match(g.sections.before,/current permitted intake/i);
- assert.match(g.sections.pathway,/current acceptance and handling terms still need confirmation/i);
+ assert.match(g.sections.pathway,/trial batch into that established recycling stream/i);
  assert.equal(g.source.url,'https://www.nea.gov.sg/some-directory');
 });
 test('unknown information remains to confirm; no quantities are invented',()=>{
  const g=generateReuseGuide(base());
- required(g);assert.match(g.sections.pathway,/not establish a specific suitable pathway/i);
- assert.match(g.sections.before,/What quantity could the organisation realistically take/i);
+ required(g);assert.match(g.sections.pathway,/specific use would first need to be identified/i);
+ assert.match(g.sections.before,/What initial quantity, schedule/i);
  assert.doesNotMatch(formatReuseGuide(g),/\d+\s*kg\/week/);
  assert.match(g.sections.supply,/Moisture content has not been measured/);
  assert.doesNotMatch(formatReuseGuide(g),/clean containers/i);
 });
-test('recorded collection arrangement and capacity are distinguished from promises',()=>{
- const collects=generateReuseGuide(base({transportArrangement:'partner-collects',capacityKg:3,frequency:'monthly',status:'interested'}));
- assert.match(collects.sections.before,/partner collects; reconfirm/i);
- assert.match(collects.sections.before,/Recorded proposed intake: 3 kg\/week; reconfirm/i);
- assert.match(collects.sections.before,/Recorded frequency \(reconfirm\): monthly/i);
- const delivers=generateReuseGuide(base({transportArrangement:'coffeebot-delivers'}));
- assert.match(delivers.sections.before,/CoffeeBot delivers; reconfirm route feasibility/i);
- const demo=generateReuseGuide(base({source:'Fictional Stitch scenario',capacityKg:5,frequency:'weekly \(demo\)'}));
- assert.match(demo.sections.before,/Illustrative demo intake/i);
- assert.doesNotMatch(demo.sections.before,/Recorded frequency/i);
+test('internal intake figures and fictional demo values are not promised to prospective partners',()=>{
+ const p=base({transportArrangement:'partner-collects',capacityKg:3,frequency:'monthly',status:'interested'});
+ const g=generateReuseGuide(p);
+ assert.doesNotMatch(formatReuseGuide(g),/3 kg|monthly|partner collects; reconfirm/i);
+ const demo=generateReuseGuide(base({source:'Fictional Stitch scenario',capacityKg:5,frequency:'weekly (demo)'}));
+ assert.doesNotMatch(formatReuseGuide(demo),/5 kg|weekly \(demo\)/i);
+ assert.match(g.sections.before,/collection or delivery/i);
 });
 
 const reviewed=(p,ids=[0])=>{
@@ -74,7 +73,8 @@ test('cited Arista-type compost and cocopeat evidence changes pathway and questi
    checkedAt:new Date().toISOString()}]}));
  const g=generateReuseGuide(p);
  assert.equal(g.evidenceBasis,'website');
- assert.match(g.sections.pathway,/reusing cocopeat together with organic compost after a harvest/);
+ assert.match(g.sections.pathway,/combining compost with reused cocopeat after harvest/)
+ assert.match(g.sections.pathway,/evaluate grounds as an input to the existing compost stage/);
  assert.match(g.sections.before,/cocopeat-and-compost process/);
  assert.doesNotMatch(formatReuseGuide(g),/https:\/\/example-farm.sg\/about-us/);
  assert.equal(g.source.url,'https://example-farm.sg/about-us','Source retained internally for provenance');
@@ -87,7 +87,8 @@ test('GreenSpade-type product listing leads to manufacturing question, not an in
    checkedAt:new Date().toISOString()}]}));
  const g=generateReuseGuide(p);
  assert.equal(g.evidenceBasis,'website');
- assert.match(g.sections.pathway,/potting soils or compost products/);
+ assert.match(g.sections.pathway,/potting mixes and compost products/)
+ assert.match(g.sections.pathway,/If you prepare any compost in-house/);
  assert.match(g.sections.before,/processed in-house or sold as finished products/);
  assert.doesNotMatch(g.sections.pathway,/accepts spent grounds|manufactures compost/i);
 });
@@ -135,7 +136,7 @@ test('NEA adjacent material listing stays distinct from explicit coffee-ground a
  const g=generateReuseGuide(p);
  assert.equal(g.evidenceBasis,'directory-material');
  assert.match(g.sections.pathway,/mixed food waste/);
- assert.match(g.sections.pathway,/does not explicitly establish acceptance of spent coffee grounds/);
+ assert.match(g.sections.pathway,/listing does not confirm grounds acceptance/);
  assert.match(g.sections.before,/sun-dried grounds/i);
  assert.equal(g.source.url,'https://www.nea.gov.sg/recycling');
 });
@@ -146,7 +147,20 @@ test('cited horticultural equipment site does not turn a farm label into proof o
    checkedAt:new Date().toISOString()}]}));
  const g=generateReuseGuide(p);
  assert.equal(g.evidenceBasis,'website');
- assert.match(g.sections.pathway,/horticultural technology or soilless/i);
+ assert.match(g.sections.pathway,/horticultural technology and substrate-based systems/i);
  assert.match(g.sections.before,/rather than only supplying equipment/i);
  assert.doesNotMatch(g.sections.pathway,/accepts coffee grounds/i);
+});
+
+test('reuse guide is written for recipients and highlights a concrete possible use',()=>{
+ const farm=generateReuseGuide(base({category:'crop farm'}));
+ const school=generateReuseGuide(base({category:'school programme'}));
+ const recycler=generateReuseGuide(base({category:'organic waste recycler'}));
+ assert.match(farm.sections.pathway,/trial could assess whether spent grounds/i);
+ assert.match(school.sections.pathway,/supervised sustainability or STEM/i);
+ assert.match(recycler.sections.pathway,/process CoffeeBot spent coffee grounds/i);
+ for(const g of [farm,school,recycler]){
+  assert.match(g.sections.learn,/we would value your feedback/i);
+  assert.doesNotMatch(g.sections.before,/Recorded|Staff-entered|internal/i);
+ }
 });
