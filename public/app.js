@@ -6,7 +6,7 @@ const qs = new URLSearchParams(location.search);
 let data=null;
 let journalSuggestion=null;
 let journalAnalysisRun=null;
-let ui={category:'all',sort:'fit',aiAssessedOnly:false,contactableFirst:false,search:'',page:1,discoveryRunning:false,discoveryStopping:false,discoveryStatus:null,reviewingId:null,draft:null,selectedId:qs.get('partner')||null,manageSearch:'',manageCategory:'all',manageStage:'active',manageSort:'name',managePage:1,partnerTab:'relationship',reuseGuides:{},guideEditing:false};
+let ui={category:'all',sort:'fit',aiAssessedOnly:false,contactableFirst:false,search:'',page:1,discoveryRunning:false,discoveryStopping:false,discoveryStatus:null,reviewingId:null,draft:null,selectedId:qs.get('partner')||null,manageSearch:'',manageCategory:'all',manageStage:'active',manageSort:'name',managePage:1,partnerTab:'relationship',reuseGuides:{},guideEditing:false,guideVisible:false,generatingDraft:false,generatedDraftBody:null};
 const nav={ '/':'dashboard','/dashboard':'dashboard','/this-week':'dashboard','/find-partners':'find_partners','/outreach':'outreach_draft','/pipeline':'manage_partners','/manage-partners':'manage_partners','/partner':'partner_detail'};
 const current=nav[location.pathname]||'dashboard';
 const partner=id=>data.partners.find(p=>p.id===id);
@@ -16,10 +16,6 @@ async function request(url,opts={}) {const response=await fetch(url,{...opts,hea
 async function refresh(){
  const [state,status]=await Promise.all([request('/api/state'),request('/api/discovery-status')]);
  data=state;
- if(current==='outreach_draft'){
-  const chosen=partner(ui.selectedId)||data.ranked[0]||data.partners[0];
-  if(chosen)try{await loadReuseGuide(chosen.id);}catch{ /* A guide outage must not block outreach. */ }
- }
  if(current==='find_partners'){
   ui.discoveryRunning=!!status.active;ui.discoveryStopping=!!status.stopping;
   ui.discoveryStatus=status.active?status:null;
@@ -275,7 +271,7 @@ function outreachView(){
   </div>
   <div class="co-field co-outreach-body"><label for="draft-body">Email Body</label><textarea id="draft-body" rows="15" placeholder="Generate a draft to get started.">${esc(d?.body||'')}</textarea></div>
   <div class="co-outreach-actions"><div class="co-outreach-actions-left"><button class="co-button alt" data-action="generate"><span class="material-symbols-outlined" aria-hidden="true">auto_awesome</span>${isFollowUp?'Generate Follow-Up':'Generate Draft'}</button><button class="co-button alt" data-action="copy"><span class="material-symbols-outlined" aria-hidden="true">content_copy</span>Copy Email</button></div><button class="co-button" data-action="record-sent">Record Sent<span class="material-symbols-outlined" aria-hidden="true">send</span></button></div>
- </div>${reuseGuideCard(chosen)}</div>`;
+ </div><div id="reuse-guide-container">${ui.guideVisible?reuseGuideCard(chosen):''}</div></div>`;
 }
 function draftCandidates(search=''){
  const q=search.toLowerCase().trim();
@@ -300,9 +296,8 @@ function closeDraftOptions(reset=true){
 }
 async function chooseDraftPartner(id){
  if(!data.partners.some(p=>p.id===id&&p.status!=='closed'))return;
- ui.selectedId=id;ui.draft=null;ui.draftOptionIndex=0;ui.guideEditing=false;
+ ui.selectedId=id;ui.draft=null;ui.draftOptionIndex=0;ui.guideEditing=false;ui.guideVisible=false;ui.generatingDraft=false;ui.generatedDraftBody=null;
  history.replaceState(null,'','/outreach?partner='+encodeURIComponent(id)+(qs.get('mode')==='followup'?'&mode=followup':''));
- try{await loadReuseGuide(id);}catch{notice('Could not prepare the reuse guide.','error');}
  render();
 }
 const manageStages=[
@@ -931,7 +926,46 @@ async function handleAction(el){const action=el.dataset.action;
    catch{notice('Clipboard unavailable; select and copy manually.','error');}
    return;
   }
-  if(action==='generate'){el.disabled=true;el.textContent='Preparing draft…';try{ui.draft=await request(qs.get('mode')==='followup'?'/api/draft/follow-up':'/api/draft',{method:'POST',body:JSON.stringify({partnerId:ui.selectedId})});render();notice('Draft prepared.');}catch(err){notice(err.message,'error');el.disabled=false;el.textContent='Generate draft';}return;}
+  if(action==='generate'){
+  if(ui.generatingDraft)return;
+  const id=ui.selectedId,bodyField=$('#draft-body'),initialBody=bodyField?.value||'';
+  if(initialBody.trim()&&initialBody!==ui.generatedDraftBody&&!confirm('Replace your edited email with a new draft?'))return;
+  ui.generatingDraft=true;
+  el.disabled=true;
+  const originalLabel=el.innerHTML;
+  el.textContent='Preparing Draftâ€¦';
+  // Start the deterministic guide and AI email independently. The guide can appear
+  // immediately even if the model is slow or the email request fails.
+  const guidePromise=loadReuseGuide(id).then(()=>{
+   if(ui.selectedId!==id)return;
+   ui.guideVisible=true;
+   const slot=$('#reuse-guide-container');
+   if(slot&&!slot.querySelector('.co-reuse-guide'))slot.innerHTML=reuseGuideCard(partner(id));
+  }).catch(err=>{
+   if(ui.selectedId===id)notice('Reuse Guide unavailable: '+err.message,'error');
+  });
+  try{
+   const draft=await request(qs.get('mode')==='followup'?'/api/draft/follow-up':'/api/draft',{method:'POST',body:JSON.stringify({partnerId:id})});
+   if(ui.selectedId===id){
+    const field=$('#draft-body'),currentBody=field?.value??'';
+    const untouched=currentBody===initialBody;
+    if(untouched&&field)field.value=draft.body;
+    ui.generatedDraftBody=draft.body;
+    ui.draft={...draft,body:untouched?draft.body:currentBody};
+    notice(untouched?'Draft prepared.':'Draft prepared; your email edits were preserved.');
+   }
+  }catch(err){
+   if(ui.selectedId===id)notice(err.message,'error');
+  }finally{
+   await guidePromise;
+   if(ui.selectedId===id){
+    ui.generatingDraft=false;
+    el.disabled=false;
+    el.innerHTML=originalLabel;
+   }
+  }
+  return;
+ }
  if(action==='record-sent'){
    const body=$('#draft-body')?.value?.trim()||'';
    if(!body){notice('Generate or enter the email body first.','error');return;}
