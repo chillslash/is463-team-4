@@ -12,6 +12,9 @@ test('A1 email selects one succinct bespoke reuse paragraph, not full annex',()=
  assert.match(idea,/farms and community gardens/);
  assert.equal((body.match(/Nanyang Polytechnic/g)||[]).length,1);
  assert.ok(emailWordCount(body)<=125);
+ assert.match(body,/operate coffee machines in Singapore/);
+ assert.match(body,/efforts to reduce waste/);
+ assert.doesNotMatch(body,/moisture|haven't measured|not measured/i);
  assert.ok(isConciseFirstEmail(body,idea));
  assert.doesNotMatch(body,/Potential Reuse Pathway|What CoffeeBot Can Provide|Before Starting a Trial|Annex|Appendix|https?:\/\//i);
 });
@@ -36,4 +39,11 @@ test('first-contact validation rejects long or generic AI output',()=>{
  const p=sample('A1 Environment Pte Ltd'),idea=outreachReuseIdea(p);
  assert.equal(isConciseFirstEmail('Hello\\n\\nGeneric reply',idea),false);
  assert.equal(isConciseFirstEmail(outreachEmailBody(p,'Dear Team,')+' '+('extra '.repeat(190)),idea),false);
+});
+
+test('rejects AI drafts that volunteer irrelevant moisture-measurement disclosures',()=>{
+ const p=sample('A1 Environment Pte Ltd'),idea=outreachReuseIdea(p);
+ const clean=outreachEmailBody(p,'Dear Team,');
+ assert.equal(isConciseFirstEmail(clean,idea),true);
+ assert.equal(isConciseFirstEmail(clean.replace('If this could be relevant', 'Our moisture content has not been measured. If this could be relevant'),idea),false);
 });
