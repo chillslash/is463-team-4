@@ -19,6 +19,8 @@ The VPS starts with a fresh state: no imported partners, assessments, handovers 
 
 Run tests from the Git checkout with Node.js 24 on the PATH: `npm ci` then `npm test`. Copy verified source files into the staging app without overwriting ignored `data/`, `node_modules/` or the private configuration. Restart only the CoffeeBot user service, verify `GET /api/health`, then check HTTPS and a complete staff workflow. Verify persistence across application restarts and restore from a parsed JSON backup.
 
+Cloudflare Quick Tunnel can provide a temporary HTTPS preview using the user service `coffeebot-quick-tunnel.service`. Its public address changes on restart and has no uptime guarantee. It is *not* stable production hosting. The service only connects outward and leaves the SSH relay untouched.
+
 Caddy requires `cap_net_bind_service=ep` for ports 80 and 443, and inbound firewall permission. Do not modify existing SSH or laptop-relay services and ports.
 
 ## Security and operational caveats
