@@ -1,6 +1,6 @@
 import {researchOrganisationEvidence} from './src/evidence-research.js';
 import {outreachReuseIdea,cleanOutreachText,isConciseFirstEmail} from './src/outreach-email.js';
-import {activeEvidenceReview,hasCurrentSpecificEvidence,hasRecentEvidenceFailure,evidenceFingerprint,evidencePrompt,validateEvidenceAssessments} from './src/evidence-review.js';
+import {activeEvidenceReview,hasCurrentSpecificEvidence,hasRecentEvidenceFailure,evidenceFingerprint,evidencePrompt,validateEvidenceAssessments,diagnoseEvidenceAssessments,evidenceAssessmentSchema} from './src/evidence-review.js';
 import {selectSourceBalanced} from './src/assessment-selection.js';
 import {createServer} from 'node:http';
 import {readFile, writeFile, rename, mkdir, stat} from 'node:fs/promises';
@@ -26,6 +26,25 @@ const FOLLOWUP_SUBJECT='CoffeeBot | Spent Coffee Grounds Reuse Follow-Up';
 const AI_PROVIDER=process.env.AI_PROVIDER==='template'?'template':(process.env.ANTHROPIC_API_KEY||process.env.CLAUDE_API_KEY)?'claude':'template';
 const AUTO_AI_REVIEW=process.env.AUTO_AI_REVIEW===undefined?AI_PROVIDER!=='template':/^(1|true)$/i.test(process.env.AUTO_AI_REVIEW);
 const SFA_LOCATION_ENRICHMENT_LIMIT=12;
+const PRODUCTION=process.env.NODE_ENV==='production';
+const PROD_DISCOVERY_LIMIT=Math.max(0,Math.min(20,Number(process.env.MAX_DISCOVERIES_PER_DAY||2)));
+const PROD_AI_ACTION_LIMIT=Math.max(0,Math.min(200,Number(process.env.MAX_AI_ACTIONS_PER_DAY||25)));
+const costlyCounter={day:'',discoveries:0,aiActions:0};
+function enforcePublicAIBudget(path,method){
+ if(!PRODUCTION||method!=='POST')return;
+ const discovery=path==='/api/discover';
+ const ai=path==='/api/draft'||path==='/api/draft/follow-up'||
+  /^\/api\/partners\/[a-zA-Z0-9_-]+\/activity\/analyse$/.test(path);
+ if(!discovery&&!ai)return;
+ const day=new Date().toISOString().slice(0,10);
+ if(day!==costlyCounter.day){costlyCounter.day=day;costlyCounter.discoveries=0;costlyCounter.aiActions=0;}
+ if(discovery&&costlyCounter.discoveries>=PROD_DISCOVERY_LIMIT)
+  throw Object.assign(new Error('Daily discovery limit reached; try again tomorrow'),{status:429});
+ if(ai&&costlyCounter.aiActions>=PROD_AI_ACTION_LIMIT)
+  throw Object.assign(new Error('Daily AI drafting/analysis limit reached; try again tomorrow'),{status:429});
+ if(discovery)costlyCounter.discoveries++;else costlyCounter.aiActions++;
+}
+
 let discoveryStatus={active:false,phase:'Idle',completed:0,total:4};
 let discoveryController=null;
 const stoppedError=()=>Object.assign(new Error('Discovery stopped; changes discarded'),{status:409,code:'DISCOVERY_STOPPED'});
@@ -69,7 +88,11 @@ export function cleanSeededPartnerNotes(partners){
  }
  return stats;
 }
-async function readState(){if(!existsSync(DB_PATH)){const seed=initialState();await store(seed);return seed;}const s=JSON.parse(await readFile(DB_PATH,'utf8'));const defaults=initialState().settings;migrateSponsorAssumptions(s);if(!Number.isInteger(s.settings.automaticAIAssessments)||s.settings.automaticAIAssessments<0||s.settings.automaticAIAssessments>24)s.settings.automaticAIAssessments=defaults.automaticAIAssessments;if(!validRatingWeights(s.settings.ratingWeights))s.settings.ratingWeights={...defaults.ratingWeights};delete s.settings.reportingCollectedKg;delete s.settings.reportingDiscardedKg;for(const field of ['referenceLat','referenceLon','referenceLabel'])s.settings[field]=defaults[field];delete s.settings.aiProvider;s.discoveryRuns??=[];s.aiActivity??=[];s.partnerActivity??=[];
+async function readState(){if(!existsSync(DB_PATH)){
+ const seed=initialState();
+ if(PRODUCTION){seed.demo=false;seed.partners=[];seed.partnerActivity=[];}
+ await store(seed);return seed;
+}const s=JSON.parse(await readFile(DB_PATH,'utf8'));const defaults=initialState().settings;migrateSponsorAssumptions(s);if(!Number.isInteger(s.settings.automaticAIAssessments)||s.settings.automaticAIAssessments<0||s.settings.automaticAIAssessments>24)s.settings.automaticAIAssessments=defaults.automaticAIAssessments;if(!validRatingWeights(s.settings.ratingWeights))s.settings.ratingWeights={...defaults.ratingWeights};delete s.settings.reportingCollectedKg;delete s.settings.reportingDiscardedKg;for(const field of ['referenceLat','referenceLon','referenceLabel'])s.settings[field]=defaults[field];delete s.settings.aiProvider;s.discoveryRuns??=[];s.aiActivity??=[];s.partnerActivity??=[];
  if(s.demoProfilesVersion!==2){
   enrichDemoProfiles(s.partners);
   const previouslyActive=new Set(s.partnerActivity.map(x=>x.partnerId));
@@ -385,16 +408,23 @@ async function discover(s,{provider=AI_PROVIDER,assessmentGenerator=generateJSON
     let usage=null,success=false,error=null;
     try{
      run.aiCalls++;
-     const generated=await assessmentGenerator(provider,prompt,{withUsage:true,signal});
+     const generated=await assessmentGenerator(provider,prompt,{withUsage:true,signal,jsonSchema:evidenceAssessmentSchema(batch)});
      check();usage=generated.usage;
-     const assessed=validateEvidenceAssessments(generated.result,batch);
+     const {accepted:assessed,rejected,normalised}=diagnoseEvidenceAssessments(generated.result,batch);
      const saved=saveEvidenceResults(s.partners,assessed,{provider,runId});
      run.reviewed+=saved;
+     if(normalised.length){
+      run.assessmentDiagnostics??=[];
+      run.assessmentDiagnostics.push(...normalised.map(({id,field,reason})=>({batch:i+1,partnerId:id,field,reason})));
+     }
      const invalid=batch.length-saved;
      if(invalid){
       const accepted=new Set(assessed.map(x=>x.id));
       for(const candidate of batch){if(accepted.has(candidate.id))continue;const target=s.partners.find(x=>x.id===candidate.id);if(target){target.aiEvidenceFailureAt=new Date().toISOString();target.aiEvidenceFailureHash=evidenceFingerprint(target);}}
-      run.assessmentFailed+=invalid;error=invalid+' assessment(s) returned no evidence-valid result';run.warnings.push('AI batch '+(i+1)+': '+error);
+      run.assessmentFailed+=invalid;error=invalid+' assessment(s) returned no evidence-valid result';
+      run.warnings.push('AI batch '+(i+1)+': '+error);
+      run.assessmentDiagnostics??=[];
+      run.assessmentDiagnostics.push(...rejected.map(({id,reason})=>({batch:i+1,partnerId:id,reason})));
      }
      success=invalid===0;
     }catch(err){
@@ -479,6 +509,9 @@ async function aiFollowUpDraft(p,state,provider,generator=generateJSON){
 export function createApp({aiProvider=AI_PROVIDER,assessmentGenerator=generateJSON,draftGenerator=generateJSON,websiteResearchGenerator=null,contactResearcher=researchPublicContact,discoveryProvider=discoverAll}={}){const activityAnalysisRuns=new Map();return createServer(async(req,res)=>{
  try{
   const url=new URL(req.url,'http://localhost');const path=url.pathname;
+  if(PRODUCTION&&['/api/reset-demo','/api/reset-suggestions'].includes(path)&&req.method==='POST')
+   return response(res,403,{error:'Reset operations are disabled on the deployed application'});
+  enforcePublicAIBudget(path,req.method);
   if(path==='/api/health')return response(res,200,{ok:true,service:'CoffeeBot Circularity Copilot'});
   if(path==='/api/state'&&req.method==='GET'){const s=await readState();return response(res,200,{...s,metrics:numbers(s.settings,s.partners,s.handovers),sponsorReference:{estimated:true,locations:COFFEEBOT_MONTHLY_CUP_VOLUMES,monthlyTotalCups:SPONSOR_MONTHLY_CUPS,coffeeSharePercent:60,gramsPerCoffee:15},ranked:rankPartners(s.partners,numbers(s.settings,s.partners,s.handovers).gapKg,s.settings.ratingWeights)});}
   if(path==='/api/settings'&&req.method==='PATCH'){

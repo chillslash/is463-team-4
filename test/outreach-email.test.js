@@ -1,8 +1,31 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
 import {outreachEmailBody,outreachReuseIdea,emailWordCount,cleanOutreachText,isConciseFirstEmail} from '../src/outreach-email.js';
-const partners=JSON.parse(readFileSync('data/state.json','utf8')).partners;
+// Standalone fixtures: these tests must run on a freshly cloned deployment,
+// without depending on live prospects or staff data in ignored data/state.json.
+const checkedAt=new Date().toISOString();
+const a1={id:'a1',name:'A1 Environment Pte Ltd',category:'organic waste recycler',
+ source:'NEA Food Waste Recycling Facilities',websiteUrl:'https://www.a1environment.com.sg/',
+ evidenceEntries:[{source:'NEA Food Waste Recycling Facilities',url:'https://www.nea.gov.sg/example',
+  claim:'Accepted materials: Used coffee grounds',checkedAt}]};
+const arista={id:'arista',name:'Arista Farming Pte Ltd',category:'crop farm',
+ websiteUrl:'https://arista-example.sg/',evidenceEntries:[{
+  url:'https://arista-example.sg/process',source:'Organisation website excerpt (unverified)',
+  claim:'After harvest, cocopeat is reused with organic compost as a growing medium for cultivation.',
+  checkedAt}]};
+const green={id:'green',name:'GreenSpade Pte Ltd',category:'landscaping business',
+ websiteUrl:'https://greenspade-example.sg/',evidenceEntries:[{
+  url:'https://greenspade-example.sg/soil',source:'Organisation website excerpt (unverified)',
+  claim:'Our product catalogue lists potting mixes, organic compost and plant growing media.',
+  checkedAt}]};
+import {evidenceFingerprint,EVIDENCE_RUBRIC_VERSION} from '../src/evidence-review.js';
+for(const p of [arista,green]){
+ p.aiEvidenceReview={rubricVersion:EVIDENCE_RUBRIC_VERSION,factsHash:evidenceFingerprint(p),
+  reuseSuitability:20,sourceEvidence:12,potentialIntake:8,evidenceIds:[0],
+  intakeEvidenceIds:[0],assessedAt:checkedAt,reason:'Published use of organic materials',
+  intakeReason:'Potential small-scale operations',check:'Does this use fit coffee grounds?'};
+}
+const partners=[a1,arista,green];
 const sample=name=>partners.find(p=>p.name===name);
 test('A1 email selects one succinct bespoke reuse paragraph, not full annex',()=>{
  const p=sample('A1 Environment Pte Ltd');assert.ok(p);

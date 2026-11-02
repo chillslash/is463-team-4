@@ -30,11 +30,12 @@ export function parseAIOutput(message){
 // No CLI, local model, paid second-pass fallback or API key in error messages.
 export async function generateJSON(provider,prompt,{fetchImpl=globalThis.fetch,apiKey=process.env.ANTHROPIC_API_KEY||process.env.CLAUDE_API_KEY,
  model=process.env.CLAUDE_MODEL||DEFAULT_CLAUDE_MODEL,timeoutMs=90000,
- withUsage=false,signal,webSearch=false}={}){
+ withUsage=false,signal,webSearch=false,jsonSchema=null}={}){
  signal?.throwIfAborted();
  if(provider!=='claude')throw new Error('Only Claude is supported for AI generation');
  if(!apiKey?.trim())throw new Error('Set ANTHROPIC_API_KEY (or CLAUDE_API_KEY) in your local environment');
  if(typeof fetchImpl!=='function')throw new Error('HTTP client unavailable');
+ if(jsonSchema&&webSearch)throw new Error('Cannot combine strict JSON assessment with web search');
  const controller=new AbortController();
  const abort=()=>controller.abort(signal?.reason||new Error('AI request cancelled'));
  signal?.addEventListener('abort',abort,{once:true});
@@ -42,6 +43,8 @@ export async function generateJSON(provider,prompt,{fetchImpl=globalThis.fetch,a
  const messages=[{role:'user',content:'Return only a valid JSON object. No Markdown fences or commentary.\n\n'+prompt}];
  const base={model,max_tokens:8192,messages};
  if(webSearch)base.tools=[{type:'web_search_20250305',name:'web_search',max_uses:2}];
+ if(jsonSchema){
+  base.output_config={format:{type:'json_schema',schema:jsonSchema}};}
  try{
   for(let turn=0;turn<3;turn++){
    let res;

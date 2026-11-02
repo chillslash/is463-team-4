@@ -61,27 +61,64 @@ export function activeEvidenceReview(p){
     !validCitations(p,r.intakeEvidenceIds,r.potentialIntake))return null;
  return r;
 }
-export function validateEvidenceAssessments(payload,partners){
+// Schema-constrained Claude responses prevent missing/incorrectly typed fields.
+// Scores and source-index citations are still independently checked on our side.
+export function evidenceAssessmentSchema(partners){
+ const properties={
+  id:{type:'string',enum:partners.map(p=>p.id)},
+  reuseSuitability:{type:'integer'},sourceEvidence:{type:'integer'},
+  potentialIntake:{type:'integer'},evidenceIds:{type:'array',items:{type:'integer'}},
+  intakeEvidenceIds:{type:'array',items:{type:'integer'}},
+  pathway:{type:'string'},reason:{type:'string'},intakeReason:{type:'string'},check:{type:'string'}
+ };
+ return {type:'object',properties:{assessments:{type:'array',items:{
+  type:'object',properties,required:Object.keys(properties),additionalProperties:false
+ }}},required:['assessments'],additionalProperties:false};
+}
+export function diagnoseEvidenceAssessments(payload,partners){
  if(!Array.isArray(payload?.assessments))throw new Error('AI assessment response is missing assessments');
- const index=new Map(partners.map(p=>[p.id,p])),saved=new Map();
+ const index=new Map(partners.map(p=>[p.id,p])),saved=new Map(),failures=new Map(),normalised=[];
+ const bad=(id,reason)=>{if(!failures.has(id))failures.set(id,reason);};
  for(const x of payload.assessments){
   const p=index.get(x?.id);
-  if(!p||saved.has(x.id))continue;
-  if(!Number.isInteger(x.reuseSuitability)||x.reuseSuitability<0||x.reuseSuitability>40||
-     !Number.isInteger(x.sourceEvidence)||x.sourceEvidence<0||x.sourceEvidence>35||
-     !Number.isInteger(x.potentialIntake)||x.potentialIntake<0||x.potentialIntake>20||
-     !validCitations(p,x.evidenceIds,x.sourceEvidence)||
-     !validCitations(p,x.intakeEvidenceIds,x.potentialIntake)||
-     typeof x.reason!=='string'||!x.reason.trim()||
-     typeof x.intakeReason!=='string'||!x.intakeReason.trim()||
-     typeof x.check!=='string'||!x.check.trim())continue;
+  if(!p)continue;
+  if(saved.has(x.id)){bad(x.id,'Duplicate assessment ID');continue;}
+  if(![['reuseSuitability',40],['sourceEvidence',35],['potentialIntake',20]]
+    .every(([key,max])=>Number.isInteger(x[key])&&x[key]>=0&&x[key]<=max)){
+   bad(x.id,'Missing or out-of-range integer score');continue;
+  }
+  // The model can produce a plausible but uncited scale estimate. Never
+  // award evidence/intake points unless a supplied source index supports them.
+  if(!Array.isArray(x.evidenceIds)||!Array.isArray(x.intakeEvidenceIds)){
+   bad(x.id,'Citation indices must be arrays');continue;
+  }
+  if(x.evidenceIds.length&&!validCitations(p,x.evidenceIds,x.sourceEvidence)){
+   bad(x.id,'Invalid or fabricated source citation index');continue;
+  }
+  if(x.intakeEvidenceIds.length&&!validCitations(p,x.intakeEvidenceIds,x.potentialIntake)){
+   bad(x.id,'Invalid or fabricated intake citation index');continue;
+  }
+  const sourceEvidence=x.evidenceIds.length?x.sourceEvidence:0;
+  const potentialIntake=x.intakeEvidenceIds.length?x.potentialIntake:0;
+  if(sourceEvidence!==x.sourceEvidence)normalised.push({id:x.id,field:'sourceEvidence',reason:'Uncited evidence points reduced to zero'});
+  if(potentialIntake!==x.potentialIntake)normalised.push({id:x.id,field:'potentialIntake',reason:'Uncited intake points reduced to zero'});
+  if(!['reason','intakeReason','check'].every(k=>typeof x[k]==='string'&&x[k].trim())){
+   bad(x.id,'Missing explanation or follow-up question');continue;
+  }
   saved.set(x.id,{rubricVersion:EVIDENCE_RUBRIC_VERSION,factsHash:evidenceFingerprint(p),
-   reuseSuitability:x.reuseSuitability,sourceEvidence:x.sourceEvidence,potentialIntake:x.potentialIntake,
+   reuseSuitability:x.reuseSuitability,sourceEvidence,potentialIntake,
    evidenceIds:[...new Set(x.evidenceIds)],intakeEvidenceIds:[...new Set(x.intakeEvidenceIds)],
-   reason:x.reason.trim().slice(0,450),intakeReason:x.intakeReason.trim().slice(0,300),
+   reason:(sourceEvidence===0&&x.sourceEvidence>0?'No independently cited reuse evidence; suitability is a hypothesis only.':x.reason.trim()).slice(0,450),
+   intakeReason:(potentialIntake===0&&x.potentialIntake>0?'No cited material-consuming scale; potential intake remains unknown.':x.intakeReason.trim()).slice(0,300),
    check:x.check.trim().slice(0,250),pathway:typeof x.pathway==='string'?x.pathway.slice(0,180):''});
+  failures.delete(x.id);
  }
- return [...saved.entries()].map(([id,data])=>({id,...data}));
+ const rejected=partners.filter(p=>!saved.has(p.id))
+  .map(p=>({id:p.id,reason:failures.get(p.id)||'Missing assessment for candidate'}));
+ return {accepted:[...saved.entries()].map(([id,data])=>({id,...data})),rejected,normalised};
+}
+export function validateEvidenceAssessments(payload,partners){
+ return diagnoseEvidenceAssessments(payload,partners).accepted;
 }
 // Single evidence-only AI evaluation prompt used by Claude.
 export function evidencePrompt(partners){
