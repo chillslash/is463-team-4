@@ -27,13 +27,14 @@ test.after(async()=>{await rm(temp,{recursive:true,force:true});});
 test('Codex email body without subject is valid when system owns subject',async()=>{
  const {status,result,log}=await run(async(_provider,prompt)=>{
   const facts=JSON.parse(prompt.split('Facts: ').at(-1));
-  const body=facts.salutation+'\n\nI am reaching out from CoffeeBot about spent coffee grounds.\n\n'+facts.reuseParagraph+'\n\nWe collect and sun-dry the grounds at HQ, although moisture content is unmeasured. Would you be open to a short discussion about a trial and any material requirements?\n\nBest regards,\nCoffeeBot Partnerships';
+  const body=facts.salutation+'\n\nI am reaching out from CoffeeBot about spent coffee grounds.\n\n'+facts.reuseParagraph+'\n\nCoffeeBot operates coffee machines in Singapore and collects the spent grounds to reduce waste. Would you be open to a short discussion about a trial and any collection requirements?\n\nBest regards,\nCoffeeBot Partnerships';
   return {result:{body},usage:{inputTokens:80,outputTokens:90,cachedInputTokens:0}};
  });
  assert.equal(status,200);
  assert.equal(result.subject,'CoffeeBot | Spent Coffee Grounds Reuse Partnership');
  assert.match(result.body,/compost|growing.media/i);
  assert.notEqual(result.aiFailed,true);
+ assert.doesNotMatch(result.body,/moisture|not measured/i);
  assert.equal(log.success,true);
 });
 test('malformed or empty Codex body produces labelled template, no HTTP 500',async()=>{
@@ -74,5 +75,18 @@ test('AI email lacking specific partner reuse connection falls back rather than 
  assert.equal(result.aiFailed,true);
  assert.match(result.mode,/Template fallback/);
  assert.match(result.body,/compost|growing.media/i);
+ assert.equal(log.success,false);
+});
+
+test('AI body that volunteers moisture information falls back to suitable email',async()=>{
+ const {status,result,log}=await run(async(_provider,prompt)=>{
+  const facts=JSON.parse(prompt.split('Facts: ').at(-1));
+  const body=facts.salutation+'\n\nCoffeeBot operates coffee machines in Singapore and collects spent grounds to reduce waste.\n\n'+facts.reuseParagraph+'\n\nOur moisture content has not been measured. Would you be open to a brief trial conversation?\n\nBest regards,\nCoffeeBot Partnerships';
+  return {result:{body}};
+ });
+ assert.equal(status,200);
+ assert.equal(result.aiFailed,true);
+ assert.match(result.mode,/Template fallback/);
+ assert.doesNotMatch(result.body,/moisture|not measured/i);
  assert.equal(log.success,false);
 });
