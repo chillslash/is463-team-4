@@ -47,7 +47,9 @@ test('legacy advisory AI does not alter the evidence-grounded outreach priority'
 });
 test('initial email gives a concise reuse opportunity without claiming acceptance',()=>{
  const draft=draftTemplate(initialState().partners[3]);
- assert.match(draft.body,/moisture content has not been measured/);
+ assert.match(draft.body,/operate coffee machines in Singapore/);
+ assert.match(draft.body,/efforts to reduce waste/);
+ assert.doesNotMatch(draft.body,/moisture|not measured/i);
  assert.match(draft.body,/small trial/);
  assert.match(draft.body,/reuse|compost/i);
  assert.doesNotMatch(draft.body,/10 kg|Potential Reuse Pathway|What We'd Like to Learn/i);
