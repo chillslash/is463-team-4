@@ -12,6 +12,7 @@ export const CURATED_REUSE_CASES=[
    {url:'https://www.a1environment.com.sg/',label:'A1 Environment - Technology and Community',checked:'2026-11-01'},
    {url:'https://www.nea.gov.sg/media/news/news/index/closing-the-food-resource-loop-and-driving-sustainability-at-the-inaugural-food-resource-valorisation-awards',label:'NEA - Food Resource Valorisation Awards (2021)',checked:'2026-11-01'}
   ],
+  emailIdea:"I noticed A1's work with Nanyang Polytechnic on coffee-ground bio-composite panels, alongside its recovery routes for farms and community gardens. Could grounds from CoffeeBot be useful for one of these initiatives?",
   opportunities:[
    {
     title:'Coffee-ground bio-composite panels',
@@ -21,7 +22,7 @@ export const CURATED_REUSE_CASES=[
    {
     title:'Compost for local farms',
     description:'NEA has documented A1 sending recovered coffee grounds to local organic farms to make compost.',
-    collaboration:'CoffeeBot could explore contributing suitable grounds to A1â€™s farm-compost distribution route if those arrangements are still operating. This would make use of an existing recovery pathway rather than asking A1 to design a new one.'
+    collaboration:'CoffeeBot could explore contributing suitable grounds to the A1 farm-compost distribution route if those arrangements are still operating. This would make use of an existing recovery pathway rather than asking A1 to design a new one.'
    },
    {
     title:'Community-garden composting',
@@ -29,7 +30,7 @@ export const CURATED_REUSE_CASES=[
     collaboration:'CoffeeBot could ask whether A1 has current community-garden partners able to make use of additional grounds. Site permissions, preparation and collection arrangements would remain to be agreed.'
    }
   ],
-  firstTrialQuestion:'Which of your existing coffee-ground recovery routesâ€”bio-composite material, farm composting or community-garden useâ€”would currently suit a small batch of CoffeeBot grounds?'
+  firstTrialQuestion:'Which of your existing coffee-ground recovery routes - bio-composite material, farm composting or community-garden use - would currently suit a small batch of CoffeeBot grounds?'
  }
 ];
 const hostname=u=>{try{return new URL(u).hostname.toLowerCase().replace(/^www\./,'');}catch{return '';}};

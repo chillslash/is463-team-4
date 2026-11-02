@@ -96,7 +96,7 @@ test('manual outreach and lifecycle keep durable activity records',async()=>{
  let draft=await call('/api/draft','POST',{partnerId:id});
  assert.equal(draft.status,200);
  assert.equal(draft.data.subject,'CoffeeBot | Spent Coffee Grounds Reuse Partnership');
- assert.match(draft.data.body,/growing substrate/);
+ assert.match(draft.data.body,/compost|growing.media/i);
  const saved=await call('/api/outreach','POST',{partnerId:id,subject:'Custom',body:draft.data.body});
  assert.equal(saved.status,201);
  assert.equal(saved.data.subject,draft.data.subject);

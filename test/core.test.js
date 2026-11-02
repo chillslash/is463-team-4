@@ -45,15 +45,14 @@ test('legacy advisory AI does not alter the evidence-grounded outreach priority'
  assert.equal(scorePartner({...p,verified:true,confirmed:true,capacityKg:25},42).score,28);
  assert.equal(scorePartner({...p,aiAssessment:{priority:'high'}},42).provisional,true);
 });
-test('draft has relevant caveats and does not promise acceptance',()=>{
- const draft=draftTemplate(initialState().partners[3],42);
- assert.match(draft.body,/haven't measured their moisture content/);
- assert.match(draft.body,/collection arrangements/);
- assert.match(draft.body,/small initial collection/);
- assert.doesNotMatch(draft.body,/\btrial\b|\b10 kg\b/i);
+test('initial email gives a concise reuse opportunity without claiming acceptance',()=>{
+ const draft=draftTemplate(initialState().partners[3]);
+ assert.match(draft.body,/moisture content has not been measured/);
+ assert.match(draft.body,/small trial/);
+ assert.match(draft.body,/reuse|compost/i);
+ assert.doesNotMatch(draft.body,/10 kg|Potential Reuse Pathway|What We'd Like to Learn/i);
  assert.match(draft.mode,/Template fallback/);
 });
-
 test('NParks places remain only potential sites with no acceptance assumed',()=>{
  const features={features:[{geometry:{type:'Point',coordinates:[103.84,1.31]},properties:{NAME:'Example Park',OBJECTID:1200}}]};
  const c=nparksCandidates(features,initialState().settings);

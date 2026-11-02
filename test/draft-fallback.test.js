@@ -25,10 +25,14 @@ const run=async(draftGenerator,route='/api/draft')=>{
 };
 test.after(async()=>{await rm(temp,{recursive:true,force:true});});
 test('Codex email body without subject is valid when system owns subject',async()=>{
- const {status,result,log}=await run(async()=>({result:{body:'Hello, a specific enquiry regarding spent grounds.'},usage:{inputTokens:80,outputTokens:15,cachedInputTokens:0}}));
+ const {status,result,log}=await run(async(_provider,prompt)=>{
+  const facts=JSON.parse(prompt.split('Facts: ').at(-1));
+  const body=facts.salutation+'\n\nI am reaching out from CoffeeBot about spent coffee grounds.\n\n'+facts.reuseParagraph+'\n\nWe collect and sun-dry the grounds at HQ, although moisture content is unmeasured. Would you be open to a short discussion about a trial and any material requirements?\n\nBest regards,\nCoffeeBot Partnerships';
+  return {result:{body},usage:{inputTokens:80,outputTokens:90,cachedInputTokens:0}};
+ });
  assert.equal(status,200);
  assert.equal(result.subject,'CoffeeBot | Spent Coffee Grounds Reuse Partnership');
- assert.match(result.body,/specific enquiry/);
+ assert.match(result.body,/compost|growing.media/i);
  assert.notEqual(result.aiFailed,true);
  assert.equal(log.success,true);
 });
@@ -62,5 +66,13 @@ test('follow-up AI failure falls back to reviewed template',async()=>{
  assert.equal(result.aiFailed,true);
  assert.match(result.mode,/Template follow-up/i);
  assert.match(result.body,/CoffeeBot/);
+ assert.equal(log.success,false);
+});
+test('AI email lacking specific partner reuse connection falls back rather than sending generic text',async()=>{
+ const {status,result,log}=await run(async()=>({result:{body:'Dear Team,\\n\\nWe are CoffeeBot. We would love to collaborate on coffee grounds. Please contact us about this opportunity.\\n\\nBest regards,\\nCoffeeBot'}}));
+ assert.equal(status,200);
+ assert.equal(result.aiFailed,true);
+ assert.match(result.mode,/Template fallback/);
+ assert.match(result.body,/compost|growing.media/i);
  assert.equal(log.success,false);
 });

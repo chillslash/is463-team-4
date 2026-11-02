@@ -1,4 +1,5 @@
 import {activeEvidenceReview} from './evidence-review.js';
+import {outreachEmailBody} from './outreach-email.js';
 export const STATUSES = ['suggested', 'contacted', 'interested', 'trial', 'regular', 'closed'];
 export const OUTREACH_SUBJECT = 'CoffeeBot | Spent Coffee Grounds Reuse Partnership';
 export const RESPONSE_STATUSES = ['none', 'awaiting-reply', 'positive', 'declined', 'no-response', 'other'];
@@ -238,17 +239,8 @@ export function proposedReuseContext(p){
  return 'We would love to hear whether there is a suitable reuse process your team already follows where a small initial collection could make sense.';
 }
 export function draftTemplate(p) {
-
- const hello=outreachSalutation(p);
- const idea=suggestedReuse(p);
- const context=/school/i.test(p.category||'')?'school gardening activities':
-   /park|garden|nursery|farm|horticultur/i.test(p.category||'')?'gardening and growing activities':
-   /compost|organic waste/i.test(p.category||'')?'organic materials and composting':
-   /business|material|recycl/i.test(p.category||'')?'materials and reuse':
-   'your organisation\'s activities';
- return {subject:OUTREACH_SUBJECT,
- body:`${hello}\n\nI'm reaching out from CoffeeBot. We're looking for local partners who might be interested in finding a useful second life for spent coffee grounds from our coffee machines.\n\nI came across ${p.name} while looking into ${context}. ${proposedReuseContext(p)}\n\nFor context, we currently collect and sun-dry the grounds at our headquarters, though we haven't measured their moisture content. If the material sounds relevant to your work, perhaps we could discuss a small initial collection and work out suitable collection arrangements and approvals together.\n\nWould you be open to a brief conversation?\n\nThanks for your time, and I look forward to hearing from you.\n\nBest regards,\nCoffeeBot Partnerships`,
- suggestedUse:idea,guide:'Verify material suitability, contact and collection arrangements.',mode:'Template fallback (no AI selected)'};
+ return {subject:OUTREACH_SUBJECT,body:outreachEmailBody(p,outreachSalutation(p)),
+ suggestedUse:suggestedReuse(p),mode:'Template fallback (no AI selected)'};
 }
 
 /** Public NParks parks dataset. A physical site is NOT an accepting partner. */

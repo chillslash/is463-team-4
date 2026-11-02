@@ -87,24 +87,14 @@ test('draft guidance is ghost text with recipient and subject copy controls',asy
  assert.ok(!root.innerHTML.includes('□'));
 });
 
-test('outreach hides reuse guide until shared draft generation is requested',async()=>{
- const {root,context}=await boot('/outreach','?partner=p0');
- assert.ok(root.innerHTML.includes('id="reuse-guide-container"'));
- assert.ok(!root.innerHTML.includes('co-guide-section'));
- assert.ok(!root.innerHTML.includes('data-action="guide-copy"'));
- assert.ok(root.innerHTML.includes('data-action="generate"'));
- runInNewContext("ui.reuseGuides.p0={partnerName:'Sample Partner 0',sections:{pathway:'Possible managed composting',supply:'Sun-dried at HQ',before:'Confirm quantities',learn:'Confirm actual use'}};ui.guideVisible=true;render()",context);
- assert.ok(root.innerHTML.includes('co-guide-section'));
- assert.ok(root.innerHTML.includes('data-action="guide-copy"'));
- assert.ok(root.innerHTML.includes('Possible managed composting'));
- assert.ok(!root.innerHTML.includes('Check published source'));
- assert.ok(script.includes('const guidePromise=loadReuseGuide(id).then('));
- assert.ok(script.includes('const draft=await request('));
- assert.ok(script.includes("if(initialBody.trim()&&initialBody!==ui.generatedDraftBody&&!confirm("));
- assert.ok(script.includes('ui.generatedDraftBody=draft.body;'));
- assert.ok(!script.includes('if(chosen)try{await loadReuseGuide(chosen.id)'));
+test('outreach is a single email with no guide annex',async()=>{
+ const {root}=await boot('/outreach','?partner=p0');
+ for(const required of ['id="draft-body"','data-action="generate"','data-action="copy"'])
+  assert.ok(root.innerHTML.includes(required),required);
+ for(const removed of ['reuse-guide-container','co-guide-section','data-action="guide-copy"'])
+  assert.ok(!root.innerHTML.includes(removed),removed);
+ assert.ok(!script.includes('loadReuseGuide'));
 });
-
 test('copy controls copy the entered content without requiring AI generation',async()=>{
  const {listeners,copied}=await boot('/outreach');
  const act=async action=>listeners.click({

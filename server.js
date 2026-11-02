@@ -1,5 +1,5 @@
 import {researchOrganisationEvidence} from './src/evidence-research.js';
-import {generateReuseGuide} from './src/reuse-guide.js';
+import {outreachReuseIdea,cleanOutreachText,isConciseFirstEmail} from './src/outreach-email.js';
 import {activeEvidenceReview,hasCurrentSpecificEvidence,hasRecentEvidenceFailure,evidenceFingerprint,evidencePrompt,validateEvidenceAssessments} from './src/evidence-review.js';
 import {selectSourceBalanced} from './src/assessment-selection.js';
 import {createServer} from 'node:http';
@@ -427,9 +427,10 @@ async function discover(s,{provider=AI_PROVIDER,assessmentGenerator=generateJSON
 async function aiDraft(p,provider,generator=generateJSON){
  const base=draftTemplate(p);
  if(provider==='template')return base;
- const facts={organisation:p.name,category:p.category,salutation:outreachSalutation(p),reuseContext:proposedReuseContext(p),suggestedUse:suggestedReuse(p),possibleUse:p.use,source:p.source,sourceUrl:p.sourceUrl,sourceEvidence:p.evidenceEntries,location:p.location,verified:p.verified,weeklyCapacityKg:p.capacityKg,contact:p.contactName,notes:p.notes,
-   grounds:'CoffeeBot grounds are collected and sun-dried at HQ. Moisture content is not measured.'};
- const prompt='Write a warm, natural first-contact email from CoffeeBot to this organisation. Return strictly JSON with a non-empty body string. The subject is handled by CoffeeBot; do not waste tokens on it. Sound like a real person: start with the exact salutation supplied in the facts, then use short connected conversational paragraphs, a genuine specific reason for contacting the organisation, one practical but tentative reuse idea with source-backed context and preparation/handling questions in reuseContext, and a low-pressure invitation to discuss a small initial collection if appropriate. Do not use any section headings or labels such as Introduction:, Partner Fit:, Proposed Reuse:, Call to Action:, Conclusion: or Closing:. No bullet points, markdown, generic marketing filler, or script-like scaffolding. Avoid repetitive possible/potential/exploring wording. Ground every claim in the facts; never assert suitability, acceptance, performance, safe use, capacity, approval or a named person not provided. Mention grounds are collected and sun-dried, with unmeasured moisture, and ask naturally about suitability, collection arrangements and who can approve an initial collection. Do not use tools or browse. Staff review before sending and the app overrides the subject. Facts: '+JSON.stringify(facts);
+ const idea=outreachReuseIdea(p);
+ const facts={organisation:p.name,category:p.category,salutation:outreachSalutation(p),
+ reuseParagraph:idea,grounds:'CoffeeBot sun-dries collected grounds at HQ; moisture content has not been measured.'};
+ const prompt='Write a warm, concise initial email from CoffeeBot. JSON object with body string only; subject is fixed. Include the following reuse paragraph EXACTLY, as one standalone paragraph: '+JSON.stringify(idea)+'. Keep 85-165 words (hard maximum 185). No bullets, headings, markdown, annex or appendix. Use the exact greeting from facts, one brief intro, the supplied reuse paragraph, one short paragraph explaining sun-dried grounds and asking about a possible trial, and a brief signoff. Do not repeat reuse ideas or invent facts. Do not browse or call tools. Facts: '+JSON.stringify(facts);
  let output,draft;
  try{
   output=await generator(provider,prompt,{withUsage:true});
@@ -437,10 +438,13 @@ async function aiDraft(p,provider,generator=generateJSON){
  }catch(err){
   return {...base,mode:'Template fallback (AI unavailable)',aiFailed:true,fallbackReason:err.message};
  }
+  if(!isConciseFirstEmail(draft.body,idea))return {...base,mode:'Template fallback (AI email too long or insufficiently tailored)',aiFailed:true,fallbackReason:'AI email omitted the approved reuse paragraph or exceeded the first-contact length limit'};
+  draft.body=cleanOutreachText(draft.body);
   draft.body=draft.body.replace(/(^|\n)\s*(?:\*\*)?(?:introduction|greeting|partner fit|why this partner|proposed reuse|reuse idea|next steps|call to action|conclusion|closing|sign[- ]?off)(?:\*\*)?:\s*/gi,'$1').replace(/\n{3,}/g,'\n\n').trim();
   const greeting=outreachSalutation(p);
    if(/^\s*(?:Dear[^\n,]+|Hello|Hi)[,!]/i.test(draft.body))draft.body=draft.body.replace(/^\s*(?:Dear[^\n,]+|Hello|Hi)[,!]/i,greeting);
    else draft.body=greeting+'\n\n'+draft.body;
+   draft.body=cleanOutreachText(draft.body);
    draft.subject=OUTREACH_SUBJECT;
    draft.suggestedUse=suggestedReuse(p);
  return {...draft,usage:output.usage, mode:provider+' CLI-assisted draft — review before use',audit:{provider,generatedAt:new Date().toISOString(),factsHash:digest(facts),sourceEvidence:p.evidenceEntries||[]}};
@@ -476,11 +480,6 @@ export function createApp({aiProvider=AI_PROVIDER,assessmentGenerator=generateJS
  try{
   const url=new URL(req.url,'http://localhost');const path=url.pathname;
   if(path==='/api/health')return response(res,200,{ok:true,service:'CoffeeBot Circularity Copilot'});
-  if(path==='/api/reuse-guide'&&req.method==='GET'){
-   const s=await readState(),p=s.partners.find(x=>x.id===url.searchParams.get('partnerId'));
-   if(!p)return response(res,404,{error:'Partner not found'});
-   return response(res,200,generateReuseGuide(p));
-  }
   if(path==='/api/state'&&req.method==='GET'){const s=await readState();return response(res,200,{...s,metrics:numbers(s.settings,s.partners,s.handovers),sponsorReference:{estimated:true,locations:COFFEEBOT_MONTHLY_CUP_VOLUMES,monthlyTotalCups:SPONSOR_MONTHLY_CUPS,coffeeSharePercent:60,gramsPerCoffee:15},ranked:rankPartners(s.partners,numbers(s.settings,s.partners,s.handovers).gapKg,s.settings.ratingWeights)});}
   if(path==='/api/settings'&&req.method==='PATCH'){
    const v=await input(req);if(Object.hasOwn(v,'aiProvider'))fail('AI provider must be configured in the local repository environment');const changed=await mutation(s=>{for(const [key,min,max] of [['cupsPerWeek',0,10000000],['coffeeSharePercent',0,100],['gramsPerCup',1,1000],['referenceLat',1.1,1.55],['referenceLon',103.5,104.1]])if(Object.hasOwn(v,key))s.settings[key]=validNumber(v[key],key,min,max);
