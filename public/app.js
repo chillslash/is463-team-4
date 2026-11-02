@@ -4,6 +4,7 @@ const esc = v => String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','
 const m = v => new Intl.NumberFormat('en-SG',{maximumFractionDigits:1}).format(Number(v)||0);
 const qs = new URLSearchParams(location.search);
 let data=null;
+let discoveryObserver=null;
 let journalSuggestion=null;
 let journalAnalysisRun=null;
 let ui={category:'all',sort:'fit',aiAssessedOnly:false,contactableFirst:false,search:'',page:1,discoveryRunning:false,discoveryStopping:false,discoveryStatus:null,reviewingId:null,draft:null,selectedId:qs.get('partner')||null,manageSearch:'',manageCategory:'all',manageStage:'active',manageSort:'name',managePage:1,partnerTab:'relationship',generatingDraft:false,generatedDraftBody:null};
@@ -21,6 +22,40 @@ async function refresh(){
   ui.discoveryStatus=status.active?status:null;
  }
  render();
+ if(current==='find_partners'&&status.active&&!ui.discoveryOwned)observeServerDiscovery();
+}
+function observeServerDiscovery(){
+ if(current!=='find_partners'||discoveryObserver)return;
+ discoveryObserver=setInterval(async()=>{
+  try{
+   const status=await request('/api/discovery-status');
+   if(status.active){
+    if(!ui.discoveryRunning||ui.discoveryStopping!==!!status.stopping){
+     ui.discoveryRunning=true;ui.discoveryStopping=!!status.stopping;render();
+    }
+    ui.discoveryStatus=status;
+    const progress=discoveryViewProgress(status);
+    const phase=$('#discovery-phase'),bar=$('#discovery-bar'),
+      count=$('#discovery-count'),detail=$('#discovery-detail');
+    if(phase)phase.textContent=progress.phase;
+    if(bar)bar.style.width=progress.percentage+'%';
+    if(count)count.textContent=progress.label;
+    if(detail)detail.textContent=progress.detail;
+    return;
+   }
+   clearInterval(discoveryObserver);discoveryObserver=null;
+   ui.discoveryRunning=false;ui.discoveryStopping=false;ui.discoveryStatus=null;
+   await refresh();
+   if(status.phase?.startsWith('Completed')){
+    const last=data?.discoveryRuns?.[0];
+    notice(last?'Discovery completed: '+last.newLeads+' new · '+last.reviewed+' AI assessed · '+(last.assessmentFailed||0)+' failed.':'Discovery completed. Results saved.');
+   }else if(status.stopped)notice('Discovery stopped. No partner changes were saved.');
+   else if(status.phase?.startsWith('Failed'))notice(status.phase,'error');
+  }catch{
+   // A lost tunnel request must not be mistaken for a cancelled server run.
+   // Keep checking while this page remains open.
+  }
+ },1250);
 }
 function dateLabel(v){if(!v)return 'Not Recorded';const raw=String(v);const d=new Date(/^\d{4}-\d{2}-\d{2}$/.test(raw)?raw+'T12:00:00+08:00':raw);return isNaN(d)?'Not Recorded':d.toLocaleDateString('en-SG',{day:'numeric',month:'long',year:'numeric',timeZone:'Asia/Singapore'});}
 function timeLabel(v){if(!v)return 'Never';const d=new Date(v);return isNaN(d)?'Unknown':new Intl.DateTimeFormat('en-SG',{day:'numeric',month:'long',year:'numeric',hour:'numeric',minute:'2-digit',hour12:true,timeZone:'Asia/Singapore'}).format(d).replace(' at ', ', ').replace(/\b(am|pm)\b/gi,(_match,period)=>period.toLowerCase()==='am'?'a.m.':'p.m.');}
@@ -880,8 +915,21 @@ async function handleAction(el){const action=el.dataset.action;
    updateProgress({phase:'Completed',completed:4,total:4,detail:''});
    await refresh();
    notice(result.added+' new · '+(result.existingRefreshed||0)+' existing refreshed · '+result.assessed+' AI assessed · '+(result.assessmentFailed||0)+' failed · '+(result.assessmentSkipped||0)+' skipped'+(result.sourceFreshness==='cached'?' · cached sources':''));
-  }catch(err){notice(ui.discoveryStopping||/Discovery stopped/i.test(err.message)?'Discovery stopped. No partner changes were saved.':err.message,ui.discoveryStopping||/Discovery stopped/i.test(err.message)?'ok':'error');}
-  finally{clearInterval(poller);ui.discoveryOwned=false;ui.discoveryRunning=false;ui.discoveryStopping=false;ui.discoveryStatus=null;await refresh();}
+  }catch(err){
+   let status=null;
+   try{status=await request('/api/discovery-status');}catch{}
+   if(status?.active)notice('Connection interrupted; discovery continues on the server. Progress will keep updating.');
+   else if(status?.phase?.startsWith('Completed'))notice('Discovery completed. Results have been saved.');
+   else if(ui.discoveryStopping||status?.stopped||/Discovery stopped/i.test(err.message))
+    notice('Discovery stopped. No partner changes were saved.');
+   else if(status?.phase?.startsWith('Failed'))notice(status.phase,'error');
+   else if(!status)notice('Connection interrupted. Reload the page to check discovery progress.','error');
+   else notice(err.message,'error');
+  }
+  finally{
+   clearInterval(poller);ui.discoveryOwned=false;ui.discoveryRunning=false;ui.discoveryStopping=false;ui.discoveryStatus=null;
+   try{await refresh();}catch{observeServerDiscovery();}
+  }
   return;
  }
  if(action==='draft-toggle'){
