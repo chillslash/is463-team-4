@@ -19,7 +19,7 @@ export function outreachReuseIdea(p) {
 }
 export function outreachEmailBody(p,salutation) {
  return cleanOutreachText(salutation+'\n\n'+
-  "I'm reaching out from CoffeeBot. We operate coffee machines in Singapore and actively collect the spent grounds as part of our efforts to reduce waste and find practical reuse partners.\n\n"+
+  "I'm reaching out from CoffeeBot. We operate coffee machines in Singapore and actively collect the spent coffee grounds as part of our efforts to reduce waste and find practical reuse partners.\n\n"+
   outreachReuseIdea(p)+'\n\n'+
   "If this could be relevant to your work, we'd be happy to discuss a small trial and any collection or material requirements. Would your team be open to a brief conversation?\n\n"+
   'Best regards,\nCoffeeBot Partnerships');
