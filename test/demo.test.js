@@ -30,7 +30,8 @@ test('draft fallback sounds like connected email paragraphs, not a labelled outl
  const body=draftTemplate(p,12).body;
  assert.match(body,/Dear CitySoil Community Composting Team/);
  assert.match(body,/CoffeeBot/);
- assert.match(body,/moisture content has not been measured/);
+ assert.match(body,/collect the spent grounds|efforts to reduce waste/i);
+ assert.doesNotMatch(body,/moisture|not measured/i);
  assert.doesNotMatch(body,/^(?:Introduction|Why This Partner|Proposed Reuse|Call To Action|Closing):/mi);
  assert.ok(body.includes('\n\n'));
 });
@@ -43,7 +44,7 @@ test('A1-style direct coffee evidence becomes specific and tentative email guida
  assert.match(draft.body,/^Dear A1 Environment Pte Ltd Team,/);
  assert.match(draft.body,/recycling|organic-waste/i);
  assert.match(draft.body,/material requirements/);
- assert.match(draft.body,/sun-dry/);
+ assert.match(draft.body,/operate coffee machines|collect the spent grounds/i);
  assert.match(proposedReuseContext(p),/intake process/);
  assert.doesNotMatch(draft.body,/^(?:Introduction|Proposed Reuse|Guidance):/m);
 });
