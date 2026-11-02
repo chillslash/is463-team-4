@@ -8,7 +8,7 @@ import {initialState} from '../src/core.js';
 
 const folder=await mkdtemp(join(tmpdir(),'coffee-evidence-failures-'));
 process.env.DATA_FILE=join(folder,'state.json');process.env.SOURCE_CACHE_DIR=join(folder,'source-cache');
-process.env.AI_PROVIDER='codex';process.env.AUTO_AI_REVIEW='true';
+process.env.AI_PROVIDER='claude';process.env.AUTO_AI_REVIEW='true';
 const state=initialState(),checkedAt=new Date().toISOString();
 for(let i=0;i<31;i++)state.partners.push({id:'eligible-'+i,name:'Eligible Farm '+i,status:'suggested',
  source:'SFA source '+i,category:'crop farm',capacityKg:null,verified:false,sourcedAt:checkedAt,
@@ -18,7 +18,7 @@ await writeFile(process.env.DATA_FILE,JSON.stringify(state));
 const {createApp}=await import('../server.js');
 let calls=0;
 const assessmentGenerator=async(_provider,prompt)=>{
- calls++;if(calls===1)throw new Error('Simulated Codex rate limit');
+ calls++;if(calls===1)throw new Error('Simulated Claude rate limit');
  const input=JSON.parse(prompt.slice(prompt.lastIndexOf('\n')+1));
  return {result:{assessments:input.map(p=>({id:p.id,reuseSuitability:32,sourceEvidence:28,potentialIntake:10,evidenceIds:[0],intakeEvidenceIds:[0],
   reason:'The cited organisation documents mushroom cultivation with agricultural by-products; spent grounds acceptance remains unverified.',
@@ -26,7 +26,7 @@ const assessmentGenerator=async(_provider,prompt)=>{
   check:'Can prepared coffee grounds be used in this documented process?',pathway:'Potential mushroom substrate component'}))}};
 };
 const discoveryProvider=async()=>({candidates:[],sources:[{name:'Cached source fixture',found:0,cached:true}],warnings:[]});
-const server=createApp({aiProvider:'codex',assessmentGenerator,discoveryProvider});server.listen(0,'127.0.0.1');await once(server,'listening');
+const server=createApp({aiProvider:'claude',assessmentGenerator,discoveryProvider});server.listen(0,'127.0.0.1');await once(server,'listening');
 test.after(async()=>{server.close();await once(server,'close');await rm(folder,{recursive:true,force:true});});
 test('a failed assessment batch is counted and later eligible partners continue',async()=>{
  const response=await fetch('http://127.0.0.1:'+server.address().port+'/api/discover',{method:'POST'});

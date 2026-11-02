@@ -9,7 +9,7 @@ import {initialState} from '../src/core.js';
 const folder=await mkdtemp(join(tmpdir(),'coffee-evidence-discovery-'));
 process.env.DATA_FILE=join(folder,'state.json');
 process.env.SOURCE_CACHE_DIR=join(folder,'source-cache');
-process.env.AI_PROVIDER='codex';process.env.AUTO_AI_REVIEW='true';
+process.env.AI_PROVIDER='claude';process.env.AUTO_AI_REVIEW='true';
 const state=initialState();
 const current=new Date().toISOString();
 state.partners.push({id:'existing-evidence-farm',name:'Existing Fungal Farm',status:'suggested',
@@ -30,7 +30,7 @@ const assessmentGenerator=async(_provider,prompt)=>{
 };
 let refreshedCandidates=[];
 const discoveryProvider=async()=>({candidates:refreshedCandidates,sources:[{name:'Cached fixture source',found:refreshedCandidates.length,cached:true}],warnings:[]});
-const server=createApp({aiProvider:'codex',assessmentGenerator,discoveryProvider});
+const server=createApp({aiProvider:'claude',assessmentGenerator,discoveryProvider});
 server.listen(0,'127.0.0.1');await once(server,'listening');
 const api=async(path,method='GET')=>{const r=await fetch('http://127.0.0.1:'+server.address().port+path,{method});return {status:r.status,body:await r.json()};};
 test.after(async()=>{server.close();await once(server,'close');await rm(folder,{recursive:true,force:true});});
@@ -41,7 +41,7 @@ test('discovery assesses an existing eligible partner with zero newly discovered
  assert.equal(calls,1);
  const after=(await api('/api/state')).body;
  const partner=after.ranked.find(p=>p.id==='existing-evidence-farm');
- assert.equal(partner.match.method,'AI-assisted');assert.equal(partner.aiEvidenceReview.provider,'codex');
+ assert.equal(partner.match.method,'AI-assisted');assert.equal(partner.aiEvidenceReview.provider,'claude');
  assert.equal('operations' in partner.match.parts,false);
  assert.equal(after.discoveryRuns[0].newLeads,0);assert.equal(after.discoveryRuns[0].reviewed,1);
 });

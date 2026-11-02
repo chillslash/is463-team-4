@@ -83,7 +83,7 @@ export function validateEvidenceAssessments(payload,partners){
  }
  return [...saved.entries()].map(([id,data])=>({id,...data}));
 }
-// Single evidence-only AI evaluation prompt used by Codex.
+// Single evidence-only AI evaluation prompt used by Claude.
 export function evidencePrompt(partners){
  const input=partners.map(p=>({
   id:p.id,name:p.name,category:p.category,source:p.source,sourceUrl:p.sourceUrl||null,

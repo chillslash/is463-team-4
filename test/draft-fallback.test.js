@@ -10,7 +10,7 @@ process.env.DATA_FILE=join(temp,'state.json');
 process.env.AI_PROVIDER='template';
 const {createApp}=await import('../server.js');
 const run=async(draftGenerator,route='/api/draft')=>{
- const app=createApp({aiProvider:'codex',draftGenerator});
+ const app=createApp({aiProvider:'claude',draftGenerator});
  app.listen(0,'127.0.0.1');await once(app,'listening');
  try{
   const origin='http://127.0.0.1:'+app.address().port;
@@ -24,7 +24,7 @@ const run=async(draftGenerator,route='/api/draft')=>{
  }finally{app.close();await once(app,'close');}
 };
 test.after(async()=>{await rm(temp,{recursive:true,force:true});});
-test('Codex email body without subject is valid when system owns subject',async()=>{
+test('Claude email body without subject is valid when system owns subject',async()=>{
  const {status,result,log}=await run(async(_provider,prompt)=>{
   const facts=JSON.parse(prompt.split('Facts: ').at(-1));
   const body=facts.salutation+'\n\nI am reaching out from CoffeeBot about spent coffee grounds.\n\n'+facts.reuseParagraph+'\n\nCoffeeBot operates coffee machines in Singapore and collects the spent grounds to reduce waste. Would you be open to a short discussion about a trial and any collection requirements?\n\nBest regards,\nCoffeeBot Partnerships';
@@ -37,7 +37,7 @@ test('Codex email body without subject is valid when system owns subject',async(
  assert.doesNotMatch(result.body,/moisture|not measured/i);
  assert.equal(log.success,true);
 });
-test('malformed or empty Codex body produces labelled template, no HTTP 500',async()=>{
+test('malformed or empty Claude body produces labelled template, no HTTP 500',async()=>{
  const {status,result,log}=await run(async()=>({result:{subject:'Ignored',body:''}}));
  assert.equal(status,200);
  assert.equal(result.aiFailed,true);
@@ -46,7 +46,7 @@ test('malformed or empty Codex body produces labelled template, no HTTP 500',asy
  assert.equal(log.success,false);
  assert.match(log.error,/body was missing/i);
 });
-test('Codex exception produces usable template and failure audit',async()=>{
+test('Claude exception produces usable template and failure audit',async()=>{
  const {status,result,log}=await run(async()=>{throw new Error('Artificial provider timeout')});
  assert.equal(status,200);
  assert.equal(result.aiFailed,true);

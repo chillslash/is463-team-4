@@ -7,7 +7,7 @@ import {once} from 'node:events';
 const dir=await mkdtemp(join(tmpdir(),'is463-stop-ai-'));
 process.env.DATA_FILE=join(dir,'state.json');
 process.env.SOURCE_CACHE_DIR=join(dir,'sources');
-process.env.AI_PROVIDER='codex';
+process.env.AI_PROVIDER='claude';
 process.env.AUTO_AI_REVIEW='true';
 const {createApp}=await import('../server.js');
 let attempted=0;
@@ -15,7 +15,7 @@ const assessmentGenerator=async()=>{
  attempted++;
  throw new Error('Simulated provider outage after valid selection of directory candidates');
 };
-const srv=createApp({aiProvider:'codex',assessmentGenerator});srv.listen(0,'127.0.0.1');await once(srv,'listening');
+const srv=createApp({aiProvider:'claude',assessmentGenerator});srv.listen(0,'127.0.0.1');await once(srv,'listening');
 const base='http://127.0.0.1:'+srv.address().port,native=globalThis.fetch;
 const cib='d_f91a8b057cfb2bebf2e531ad8061e1c1',parks='d_0542d48f0991541706b58059381a6eca';
 globalThis.fetch=async(url,opts)=>{

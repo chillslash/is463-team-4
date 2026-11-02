@@ -35,7 +35,7 @@ const {createApp}=await import('../server.js');
 let invalid=false,providerFailure=false,calls=0;
 const assessmentGenerator=async(_provider,prompt)=>{
  calls++;
- if(providerFailure)throw new Error('Codex provider unavailable');
+ if(providerFailure)throw new Error('Claude provider unavailable');
  const [input]=JSON.parse(prompt.split('\n').at(-1));
  const generic=input.id==='generic-farm';
  return {result:{assessments:[{id:input.id,reuseSuitability:invalid?40:generic?12:36,
@@ -46,7 +46,7 @@ const assessmentGenerator=async(_provider,prompt)=>{
   check:'Can prepared coffee grounds be used in a documented process?',
   pathway:generic?'Unknown; verify organisation-specific use':'Fungal cultivation trial'}]},usage:{inputTokens:250,outputTokens:70}};
 };
-const srv=createApp({aiProvider:'codex',assessmentGenerator});
+const srv=createApp({aiProvider:'claude',assessmentGenerator});
 srv.listen(0,'127.0.0.1');await once(srv,'listening');
 const base='http://127.0.0.1:'+srv.address().port;
 const call=async(path,method='GET')=>{
@@ -67,7 +67,7 @@ test('AI evidence review increases relative suitability and has an auditable exp
  assert.ok(p.match.score>initial.score);
  assert.equal('operations' in p.match.parts,false);
  assert.equal(p.capacityKg,null);
- assert.equal(p.aiEvidenceReview.provider,'codex');
+ assert.equal(p.aiEvidenceReview.provider,'claude');
  assert.ok(after.aiActivity.some(x=>x.kind==='manual-evidence-review'&&x.success));
 });
 test('generic directory partner is assessed with low confidence instead of being blocked',async()=>{
@@ -101,5 +101,5 @@ test('failed live provider calls leave deterministic scores and record the failu
  assert.equal(after.ranked.find(p=>p.id==='second-material-farm').match.method,'Rule-ranked');
  const log=after.aiActivity.find(x=>x.kind==='manual-evidence-review'&&x.partnerId==='second-material-farm');
  assert.equal(log.success,false);
- assert.match(log.error,/Codex provider unavailable/);
+ assert.match(log.error,/Claude provider unavailable/);
 });

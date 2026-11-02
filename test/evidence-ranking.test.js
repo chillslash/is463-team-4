@@ -23,7 +23,7 @@ test('v2 AI can distinguish differently evidenced partners from the same categor
  const outputA=validateEvidenceAssessments(answer(a,37,31,12),[a]);
  const outputB=validateEvidenceAssessments(answer(b,3,5,2),[b]);
  assert.equal(outputA.length,1);assert.equal(outputB.length,1);
- assert.equal(saveEvidenceResults([a,b],[...outputA,...outputB],{provider:'codex',runId:'test'}),2);
+ assert.equal(saveEvidenceResults([a,b],[...outputA,...outputB],{provider:'claude',runId:'test'}),2);
  const afterA=scorePartner(a,0),afterB=scorePartner(b,0);
  assert.equal(afterA.method,'AI-assisted');assert.equal(afterB.method,'AI-assisted');
  assert.ok(afterA.score>afterB.score+15,'Specific evidence creates meaningful relative ordering');

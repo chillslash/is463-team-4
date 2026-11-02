@@ -9,7 +9,7 @@ import {initialState} from '../src/core.js';
 const folder=await mkdtemp(join(tmpdir(),'coffee-website-pipeline-'));
 process.env.DATA_FILE=join(folder,'state.json');
 process.env.SOURCE_CACHE_DIR=join(folder,'source-cache');
-process.env.AI_PROVIDER='codex';
+process.env.AI_PROVIDER='claude';
 process.env.AUTO_AI_REVIEW='true';
 
 const state=initialState();
@@ -37,14 +37,14 @@ const {createApp}=await import('../server.js');
 let websiteCalls=0,assessmentCalls=0;
 const websiteResearchGenerator=async(provider,prompt,options)=>{
  websiteCalls++;
- assert.equal(provider,'codex');
+ assert.equal(provider,'claude');
  assert.equal(options.webSearch,true);
  assert.match(prompt,/Ento Industries Pte Ltd/);
  return {result:{organisations:[{id:'ento-test',websiteUrl:'https://ento.example/',reason:'Official Ento Industries website'}]},
   usage:{inputTokens:80,outputTokens:30,cachedInputTokens:0}};
 };
 const assessmentGenerator=async(provider,prompt)=>{
- assessmentCalls++;assert.equal(provider,'codex');
+ assessmentCalls++;assert.equal(provider,'claude');
  const input=JSON.parse(prompt.split('\n').at(-1));
  const candidate=input.find(x=>x.id==='ento-test');
  assert.ok(candidate,'Selected candidate must reach AI evaluation');
@@ -58,7 +58,7 @@ const assessmentGenerator=async(provider,prompt)=>{
   usage:{inputTokens:100,outputTokens:40,cachedInputTokens:0}};
 };
 const discoveryProvider=async()=>({candidates:[],sources:[{name:'Fixture source',found:0,cached:true}],warnings:[]});
-const server=createApp({aiProvider:'codex',assessmentGenerator,websiteResearchGenerator,discoveryProvider});
+const server=createApp({aiProvider:'claude',assessmentGenerator,websiteResearchGenerator,discoveryProvider});
 server.listen(0,'127.0.0.1');await once(server,'listening');
 const base='http://127.0.0.1:'+server.address().port;
 const api=async(path,method='GET')=>{const r=await originalFetch(base+path,{method});return {status:r.status,body:await r.json()};};
@@ -77,9 +77,9 @@ test('discovery resolves and verifies an official site before evidence-only AI e
  const after=(await api('/api/state')).body;
  const p=after.partners.find(x=>x.id==='ento-test');
  assert.equal(p.websiteUrl,'https://ento.example/');
- assert.equal(p.websiteOrigin,'codex-web-search');
+ assert.equal(p.websiteOrigin,'claude-web-search');
  assert.equal(p.websiteResolution.result,'verified');
  assert.ok(p.evidenceEntries.some(e=>/black soldier fly/i.test(e.claim)));
- assert.equal(p.aiEvidenceReview.provider,'codex');
+ assert.equal(p.aiEvidenceReview.provider,'claude');
  assert.equal(after.ranked.find(x=>x.id==='ento-test').match.method,'AI-assisted');
 });

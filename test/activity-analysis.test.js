@@ -34,7 +34,7 @@ test('AI analyses only pasted email/text and does not update partners or activit
   runs++;prompts.push({provider,prompt,opts});
   return {result:{outcome:'requested-information',stage:'interested',nextAction:'Send collection specifications',followUpDate:null,contactPerson:null,rationale:'Open to discussing a trial'},usage:{inputTokens:180,outputTokens:50,cachedInputTokens:0}};
  };
- const srv=createApp({aiProvider:'codex',assessmentGenerator});
+ const srv=createApp({aiProvider:'claude',assessmentGenerator});
  srv.listen(0,'127.0.0.1');await once(srv,'listening');
  const url='http://127.0.0.1:'+srv.address().port;
  const call=async(path,method='GET',body)=>{
@@ -59,7 +59,7 @@ test('AI analyses only pasted email/text and does not update partners or activit
    assert.equal(analysed.data.followUpDate,null);
   }
   assert.equal(runs,2);
-  assert.ok(prompts.every(x=>x.provider==='codex'&&x.opts.withUsage===true));
+  assert.ok(prompts.every(x=>x.provider==='claude'&&x.opts.withUsage===true));
   assert.ok(prompts.every(x=>x.prompt.includes('UNTRUSTED QUOTED CONTENT')));
   const after=(await call('/api/state')).data;
   assert.deepEqual(after.partners,before.partners);
@@ -86,7 +86,7 @@ test('configured-template mode refuses to pretend deterministic rules are AI',as
   const data=await (await fetch(base+'/api/state')).json();
   const r=await fetch(base+'/api/partners/'+data.partners[0].id+'/activity/analyse',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'email',text:'Thanks for your note'})});
   assert.equal(r.status,503);
-  assert.match((await r.json()).error,/Codex/);
+  assert.match((await r.json()).error,/Claude/);
  }finally{
   srv.close();await once(srv,'close');
   if(originalDataFile===undefined)delete process.env.DATA_FILE;else process.env.DATA_FILE=originalDataFile;
@@ -106,7 +106,7 @@ test('Cancel Analysis stops an active provider run and discards its results',asy
   signal.addEventListener('abort',()=>reject(signal.reason||new Error('Stopped')),{once:true});
   started();
  });
- const srv=createApp({aiProvider:'codex',assessmentGenerator});
+ const srv=createApp({aiProvider:'claude',assessmentGenerator});
  srv.listen(0,'127.0.0.1');await once(srv,'listening');
  const base='http://127.0.0.1:'+srv.address().port;
  const call=async(path,method='GET',body)=>{
