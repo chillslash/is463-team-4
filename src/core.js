@@ -25,6 +25,14 @@ export const LEGACY_SEEDED_PARTNER_NOTES=Object.freeze([
 ]);
 // Sponsor priority: meaningful intake quantity, then dependable logistics and reuse.
 export const DEFAULT_RATING_WEIGHTS = Object.freeze({suitability:40,evidence:25,intake:20,proximity:15});
+export const DEFAULT_REUSE_GUIDES = Object.freeze([
+ {id:'schools-educational-institutions',name:'Schools & Educational Institutions',mappedCategories:['school garden','school programme','school','education','university','polytechnic'],asset:{type:'bundled',file:'schools-educational-institutions.jpg',mimeType:'image/jpeg',name:'schools-educational-institutions.jpg'}},
+ {id:'community-gardens',name:'Community Gardens',mappedCategories:['community garden','garden'],asset:{type:'bundled',file:'community-gardens.jpg',mimeType:'image/jpeg',name:'community-gardens.jpg'}},
+ {id:'farms-growers',name:'Farms & Growers',mappedCategories:['urban farm','crop farm','mixed crop/aquaculture farm','farm','grower'],asset:{type:'bundled',file:'farms-growers.jpg',mimeType:'image/jpeg',name:'farms-growers.jpg'}},
+ {id:'landscaping-horticulture',name:'Landscaping & Horticulture Organisations',mappedCategories:['nursery','horticultural business','landscaping business'],asset:{type:'bundled',file:'landscaping-horticulture.jpg',mimeType:'image/jpeg',name:'landscaping-horticulture.jpg'}},
+ {id:'food-waste-material-recovery',name:'Food Waste & Material Recovery Organisations',mappedCategories:['organic waste recycler','composting','food waste recycler','material recovery'],asset:{type:'bundled',file:'food-waste-material-recovery.jpg',mimeType:'image/jpeg',name:'food-waste-material-recovery.jpg'}}
+]);
+export const defaultReuseGuides=()=>DEFAULT_REUSE_GUIDES.map(g=>({...g,mappedCategories:[...g.mappedCategories],asset:{...g.asset}}));
 export const LEGACY_THREE_FACTOR_RATING_WEIGHTS = Object.freeze({suitability:55,evidence:30,proximity:15});
 export const LEGACY_RATING_WEIGHTS = Object.freeze({suitability:30,evidence:30,proximity:5,operations:35});
 export const OLDER_RATING_WEIGHTS = Object.freeze({suitability:40,evidence:35,proximity:10,operations:15});
@@ -43,7 +51,7 @@ export const SPONSOR_MONTHLY_CUPS = Object.freeze({
 // 52 weeks / 12 months; use the range midpoint as the editable initial forecast.
 const SPONSOR_WEEKLY_CUPS = Math.round((SPONSOR_MONTHLY_CUPS.min+SPONSOR_MONTHLY_CUPS.max)/2*12/52);
 export function validRatingWeights(weights){return !!weights && typeof weights==='object' && Object.keys(DEFAULT_RATING_WEIGHTS).every(k=>Number.isInteger(weights[k])&&weights[k]>=0&&weights[k]<=100) && Object.keys(weights).length===4 && Object.values(weights).reduce((sum,v)=>sum+v,0)===100;}
-export const DEFAULT_SETTINGS = { ratingWeights: {...DEFAULT_RATING_WEIGHTS}, sponsorAssumptionsVersion: 1, cupsPerWeek: SPONSOR_WEEKLY_CUPS, coffeeSharePercent: 60, gramsPerCup: 15, referenceLat: 1.3275, referenceLon: 103.8723, referenceLabel: 'CoffeeBot HQ, 8 Lor Bakar Batu, #05-01, Singapore 348743 (approximate coordinates)', automaticAIAssessments: 24, aiProvider: 'template' };
+export const DEFAULT_SETTINGS = { ratingWeights: {...DEFAULT_RATING_WEIGHTS}, reuseGuides: defaultReuseGuides(), sponsorAssumptionsVersion: 1, cupsPerWeek: SPONSOR_WEEKLY_CUPS, coffeeSharePercent: 60, gramsPerCup: 15, referenceLat: 1.3275, referenceLon: 103.8723, referenceLabel: 'CoffeeBot HQ, 8 Lor Bakar Batu, #05-01, Singapore 348743 (approximate coordinates)', automaticAIAssessments: 24, aiProvider: 'template' };
 // Upgrade only untouched historical demo assumptions. Staff-edited forecasts and
 // real partner records must never be silently replaced by sponsor sample data.
 export function migrateSponsorAssumptions(state){
@@ -106,7 +114,7 @@ export function enrichDemoProfiles(partners){
  return partners;
 }
 export const initialState = () => ({
-  schemaVersion: 1, demo: true, demoProfilesVersion: 2, settings: { ...DEFAULT_SETTINGS, ratingWeights:{...DEFAULT_RATING_WEIGHTS} },
+  schemaVersion: 1, demo: true, demoProfilesVersion: 2, settings: { ...DEFAULT_SETTINGS, ratingWeights:{...DEFAULT_RATING_WEIGHTS}, reuseGuides:defaultReuseGuides() },
   partners: [
     demo('p1','EcoGrow Urban Farm','urban farm','regular',3,{ use: 'Composting (demo)', frequency: 'Wednesdays (demo)' }),
     demo('p2','GreenCycle Organics','composting','regular',2,{ use: 'Composting (demo)', frequency: 'Thursdays (demo)' }),

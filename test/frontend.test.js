@@ -13,7 +13,7 @@ function sample(){
   match:{score:90-i,aiLed:i===0,parts:{suitability:30,evidence:30,proximity:8,operations:7},checks:['Confirm interest and authorised contact']},
   aiAssessment:i===0?{reason:'Evidence supports a plausible reuse trial.'}:null
  }));
- return {ranked,partners:ranked,discoveryRuns:[],aiActivity:[],metrics:{},settings:{},handovers:[],outreach:[]};
+ return {ranked,partners:ranked,discoveryRuns:[],aiActivity:[],metrics:{},settings:{automaticAIAssessments:24,reuseGuides:[{id:'community-gardens',name:'Community Gardens',mappedCategories:['garden','community garden'],asset:{type:'bundled',file:'community-gardens.jpg',mimeType:'image/jpeg',name:'community-gardens.jpg'}}]},handovers:[],outreach:[]};
 }
 
 async function boot(pathname,search=''){
@@ -89,7 +89,7 @@ test('draft guidance is ghost text with recipient and subject copy controls',asy
 
 test('outreach remains one email while exposing the matching static category guide',async()=>{
  const {root}=await boot('/outreach','?partner=p0');
- for(const required of ['id="draft-body"','data-action="generate"','data-action="copy"','View Guide','Download Guide','/guides/community-gardens.jpg'])
+ for(const required of ['id="draft-body"','data-action="generate"','data-action="copy"','View Guide','Download Guide','/guides/community-gardens'])
   assert.ok(root.innerHTML.includes(required),required);
  for(const removed of ['reuse-guide-container','co-guide-section','data-action="guide-copy"'])
   assert.ok(!root.innerHTML.includes(removed),removed);
@@ -919,19 +919,28 @@ test('Best Fit tie order stays independent of AI review status',async()=>{
  assert.deepEqual(ids.slice(0,3),['p0','p1','p10']);
 });
 
-test('Assessment Settings keeps the AI budget separate from reset controls',()=>{
+test('Settings combines assessment and reuse guide management in one modal',()=>{
  const js=readFileSync(new URL('../public/app.js',import.meta.url),'utf8');
  const css=readFileSync(new URL('../public/app.css',import.meta.url),'utf8');
+ assert.match(js,/data-action="app-settings"/);
+ assert.match(js,/dialog\('Settings'/);
+ assert.match(js,/data-settings-tab="assessment"/);
+ assert.match(js,/data-settings-tab="guides"/);
+ assert.match(js,/id="reuse-guide-list"/);
+ assert.match(js,/Add Guide/);
+ assert.match(js,/JPEG, PNG or PDF/);
  assert.match(js,/class="co-assessment-controls"/);
  assert.match(js,/class="co-field co-assessment-budget"><label for="assessment-budget"/);
  assert.match(js,/class="co-assessment-budget-control"/);
  assert.match(js,/Potential Intake Scale/);
  assert.match(js,/weightIntake/);
  assert.match(js,/weightSuitability:40,weightEvidence:25,weightIntake:20,weightProximity:15/);
- assert.match(js,/classList\.add\('co-dialog-assessment'\)/);
+ assert.match(js,/classList\.add\('co-dialog-settings'\)/);
  assert.match(js,/name==='automaticAIAssessments'\?\$\('#assessment-budget'\):\$\('#f-'\+name\)/);
  assert.match(css,/\.co-assessment-controls\{display:flex;/);
- assert.match(css,/\.co-dialog-assessment #reset-assessment-settings/);
+ assert.match(css,/\.co-dialog-settings #reset-assessment-settings/);
+ assert.match(css,/\.co-settings-tabs\{display:flex/);
  assert.match(css,/@media\(max-width:580px\)/);
+ assert.doesNotMatch(js,/data-action="assessment-settings"/);
  assert.doesNotMatch(js,/class="co-assessment-reset"/);
 });

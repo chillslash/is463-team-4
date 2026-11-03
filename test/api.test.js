@@ -31,6 +31,37 @@ test('static category reuse guide is served as JPEG',async()=>{
  assert.match(r.headers.get('content-type')||'',/^image\/jpeg/);
  assert.ok((await r.arrayBuffer()).byteLength>10000);
 });
+test('reuse guide settings support category CRUD, uploads and dynamic serving',async()=>{
+ let state=(await call('/api/state')).data;
+ assert.equal(state.settings.reuseGuides.length,5);
+ assert.equal(state.settings.reuseGuides.find(g=>g.id==='community-gardens').name,'Community Gardens');
+ let created=await call('/api/reuse-guides','POST',{name:'Hotels & Hospitality',mappedCategories:['hotel','resort']});
+ assert.equal(created.status,201);
+ const id=created.data.id;
+ assert.deepEqual(created.data.mappedCategories,['hotel','resort']);
+ const conflict=await call('/api/reuse-guides','POST',{name:'Duplicate Garden Guide',mappedCategories:['community garden']});
+ assert.equal(conflict.status,400);
+ let patched=await call('/api/reuse-guides/'+id,'PATCH',{name:'Hospitality',mappedCategories:['hotel']});
+ assert.equal(patched.status,200);
+ assert.equal(patched.data.name,'Hospitality');
+ const payload=Buffer.from('%PDF-1.4\nCoffeeBot reuse guide\n');
+ let r=await fetch(base+'/api/reuse-guides/'+id+'/file',{method:'POST',headers:{'Content-Type':'application/pdf','X-File-Name':encodeURIComponent('hospitality-guide.pdf')},body:payload});
+ assert.equal(r.status,200);
+ const uploaded=await r.json();
+ assert.equal(uploaded.asset.mimeType,'application/pdf');
+ assert.equal(uploaded.asset.name,'hospitality-guide.pdf');
+ r=await fetch(base+'/guides/'+id);
+ assert.equal(r.status,200);
+ assert.match(r.headers.get('content-type')||'',/^application\/pdf/);
+ assert.equal(Buffer.from(await r.arrayBuffer()).toString(),payload.toString());
+ r=await fetch(base+'/guides/'+id+'?download=1');
+ assert.equal(r.status,200);
+ assert.match(r.headers.get('content-disposition')||'',/^attachment/);
+ r=await fetch(base+'/api/reuse-guides/'+id+'/file',{method:'POST',headers:{'Content-Type':'text/plain','X-File-Name':'bad.txt'},body:'bad'});
+ assert.equal(r.status,400);
+ assert.equal((await call('/api/reuse-guides/'+id,'DELETE')).status,200);
+ assert.equal((await fetch(base+'/guides/'+id)).status,404);
+});
 test('forecast settings, partner arrangements and handovers persist without certification',async()=>{
  let state=(await call('/api/state')).data;assert.equal(state.metrics.gapKg,1.6);assert.equal(state.settings.coffeeSharePercent,60);assert.deepEqual(state.sponsorReference.monthlyTotalCups,{min:3600,max:4200});assert.equal(state.sponsorReference.locations.length,5);
  assert.equal((await call('/api/settings','PATCH',{coffeeSharePercent:101})).status,400);

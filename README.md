@@ -58,7 +58,7 @@ The current editable forecast uses CoffeeBot’s five reported machine locations
 
 These calculations use the shared backend `numbers()` implementation. Future sponsor-confirmed requirements may change the data model; they are not assumed now.
 
-**Email-generation fallback:** The outbound email subject is fixed. A valid body without a subject is accepted. If Claude returns an incomplete body or fails, staff receive a clearly labelled, editable deterministic template and the failure is recorded in the AI activity log. The first-contact email still incorporates one concise reuse paragraph. Static category reuse guides are optional supporting assets and require no additional AI call. Carefully sourced organisation-specific reuse examples are maintained in `src/reuse-opportunities.js` with strict identity checks, not extrapolated to other organisations.
+**Email-generation fallback:** The outbound email subject is fixed. A valid body without a subject is accepted. If Claude returns an incomplete body or fails, staff receive a clearly labelled, editable deterministic template and the failure is recorded in the AI activity log. The first-contact email still incorporates one concise reuse paragraph. Static category reuse guides are optional supporting assets and require no additional AI call. Staff can manage guide categories, organisation-type mappings and JPEG/PNG/PDF files from **Settings → Reuse Guides**; this configuration is separate from the discovery taxonomy. Carefully sourced organisation-specific reuse examples are maintained in `src/reuse-opportunities.js` with strict identity checks, not extrapolated to other organisations.
 
 ## Discovery sources and assessment
 

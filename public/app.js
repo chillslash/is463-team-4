@@ -67,27 +67,14 @@ const ACTIVITY_OUTCOME_LABELS={
 const activityOutcomeLabel=outcome=>ACTIVITY_OUTCOME_LABELS[outcome]||titleCase(String(outcome||'').replaceAll('-',' '));
 const titleCase=s=>String(s||'').replace(/\b[a-z][a-z']*/gi,w=>({hq:'HQ',ai:'AI',id:'ID',kg:'kg',api:'API'}[w.toLowerCase()]||w[0].toUpperCase()+w.slice(1)));
 const stageLabel=s=>String(s||'').toLowerCase()==='trial'?'Pilot':titleCase(s);
-const REUSE_GUIDES=[
- {key:'education',label:'Schools & Educational Institutions',file:'schools-educational-institutions.jpg'},
- {key:'community',label:'Community Gardens',file:'community-gardens.jpg'},
- {key:'farm',label:'Farms & Growers',file:'farms-growers.jpg'},
- {key:'horticulture',label:'Landscaping & Horticulture Organisations',file:'landscaping-horticulture.jpg'},
- {key:'recovery',label:'Food Waste & Material Recovery Organisations',file:'food-waste-material-recovery.jpg'}
-];
 function reuseGuideFor(p){
- const c=String(p?.category||'').toLowerCase(),n=String(p?.name||'').toLowerCase(),text=c+' '+n;
- if(/(?:^|\s)(?:park|public park|zoo)(?:\s|$)/.test(c))return null;
- const key=/school|education|polytechnic|university|college|institute of technical education/.test(text)?'education':
-  /organic waste recycler|food waste|material recovery|recycl|compost/.test(c)?'recovery':
-  /farm|grower|aquaculture/.test(c)?'farm':
-  /nursery|horticultur|landscap/.test(c)?'horticulture':
-  /community garden|garden/.test(c)?'community':null;
- return key?REUSE_GUIDES.find(g=>g.key===key)||null:null;
+ const category=String(p?.category||'').trim().toLowerCase().replace(/\s+/g,' ');
+ return (data?.settings?.reuseGuides||[]).find(g=>g?.asset&&(g.mappedCategories||[]).some(x=>String(x).trim().toLowerCase().replace(/\s+/g,' ')===category))||null;
 }
 function reuseGuidePanel(p){
  const guide=reuseGuideFor(p);if(!guide)return '';
- const href='/guides/'+guide.file;
- return '<section class="co-outreach-guide" aria-label="Reuse guide"><div class="co-outreach-guide-copy"><span class="material-symbols-outlined" aria-hidden="true">menu_book</span><div><strong>Reuse Guide</strong><span>'+esc(guide.label)+'</span></div></div><div class="co-outreach-guide-actions"><a class="co-button alt small" href="'+href+'" target="_blank" rel="noopener"><span class="material-symbols-outlined" aria-hidden="true">visibility</span>View Guide</a><a class="co-button alt small" href="'+href+'" download="'+guide.file+'"><span class="material-symbols-outlined" aria-hidden="true">download</span>Download Guide</a></div></section>';
+ const href='/guides/'+encodeURIComponent(guide.id);
+ return '<section class="co-outreach-guide" aria-label="Reuse guide"><div class="co-outreach-guide-copy"><span class="material-symbols-outlined" aria-hidden="true">menu_book</span><div><strong>Reuse Guide</strong><span>'+esc(guide.name)+'</span></div></div><div class="co-outreach-guide-actions"><a class="co-button alt small" href="'+href+'" target="_blank" rel="noopener"><span class="material-symbols-outlined" aria-hidden="true">visibility</span>View Guide</a><a class="co-button alt small" href="'+href+'?download=1"><span class="material-symbols-outlined" aria-hidden="true">download</span>Download Guide</a></div></section>';
 }
 // Render legacy and current automatic stage changes consistently, without rewriting stored history.
 function activityDisplayText(text,type){
@@ -269,7 +256,7 @@ function findView(){
     <p class="co-source-caption">Sources: Community in Bloom · NParks · MOE · NEA · LIAS · SFA</p>
    </div>
   </aside>`;
-   return base('Discover Partners','',`${ui.discoveryRunning?`<button class="co-button alt co-stop-discovery" data-action="stop-discovery" ${ui.discoveryStopping?'disabled':''}><span class="material-symbols-outlined" aria-hidden="true">stop_circle</span>${ui.discoveryStopping?'Stopping...':'Stop Discovery'}</button>`:`<button class="co-button" data-action="discover">Discover Partners</button>`}<button class="co-button alt" data-action="assessment-settings" ${ui.discoveryRunning?'disabled':''}>Assessment Settings</button>`)+
+   return base('Discover Partners','',`${ui.discoveryRunning?`<button class="co-button alt co-stop-discovery" data-action="stop-discovery" ${ui.discoveryStopping?'disabled':''}><span class="material-symbols-outlined" aria-hidden="true">stop_circle</span>${ui.discoveryStopping?'Stopping...':'Stop Discovery'}</button>`:`<button class="co-button" data-action="discover">Discover Partners</button>`}<button class="co-button alt" data-action="app-settings" ${ui.discoveryRunning?'disabled':''}>Settings</button>`)+
   `<div class="co-page co-discovery-page" style="padding-top:0">
    <div class="co-discovery-layout">\n     ${filters}
     <div class="co-discovery-main">
@@ -814,6 +801,107 @@ function toggleListingDetails(card){
  details.open=!details.open;
  card.setAttribute('aria-expanded',String(details.open));
 }
+function settingsAssessmentHtml(){
+ const w=data.settings.ratingWeights||{suitability:40,evidence:25,intake:20,proximity:15};
+ const weightRows=[
+  ['Reuse Suitability','weightSuitability',w.suitability],
+  ['Organisation-Specific Evidence','weightEvidence',w.evidence],
+  ['Potential Intake Scale','weightIntake',w.intake],
+  ['HQ Proximity','weightProximity',w.proximity]
+ ];
+ const rows=weightRows.map(([label,key,value])=>`<div class="co-assessment-weight-row"><label for="f-${key}">${label}</label><div class="co-assessment-weight-input"><input id="f-${key}" name="${key}" type="number" min="0" max="100" step="1" value="${esc(value)}" aria-describedby="assessment-weight-total"><span>%</span></div></div>`).join('');
+ return `<div class="co-assessment-weight-list">${rows}<div class="co-assessment-total"><strong>Total</strong><output id="assessment-weight-total" aria-live="polite">100/100%</output></div></div>`+
+  '<div class="co-assessment-controls"><div class="co-field co-assessment-budget"><label for="assessment-budget">AI Assessments per Discovery Run</label><div class="co-assessment-budget-control"><input id="assessment-budget" name="automaticAIAssessments" type="number" min="0" max="24" step="1" value="'+esc(data.settings.automaticAIAssessments??24)+'"><span class="co-assessment-budget-note">0–24 Partners</span></div></div><button type="button" class="co-button alt small" id="reset-assessment-settings">Reset to Default Settings</button></div>';
+}
+function guideCategoryText(g){return (g.mappedCategories||[]).map(titleCase).join(' · ');}
+function openSettingsDialog(initialTab='assessment'){
+ const body='<div class="co-settings-tabs" role="tablist" aria-label="Settings sections"><button type="button" class="co-settings-tab" data-settings-tab="assessment" role="tab">Assessment</button><button type="button" class="co-settings-tab" data-settings-tab="guides" role="tab">Reuse Guides</button></div>'+
+  '<section class="co-settings-panel" data-settings-panel="assessment">'+settingsAssessmentHtml()+'</section>'+
+  '<section class="co-settings-panel" data-settings-panel="guides"><div class="co-guide-manager-head"><div><h3>Reuse Guides</h3><p>Manage reusable partner-facing guides without changing discovery categories.</p></div><button type="button" class="co-button small" id="add-reuse-guide">Add Guide</button></div><div id="reuse-guide-list"></div></section>';
+ dialog('Settings',body,async f=>{
+  const weights={suitability:Number(f.weightSuitability),evidence:Number(f.weightEvidence),intake:Number(f.weightIntake),proximity:Number(f.weightProximity)};
+  if(Object.values(weights).some(v=>!Number.isInteger(v)||v<0||v>100)||Object.values(weights).reduce((a,b)=>a+b,0)!==100)
+   throw Error('Rating weights must be whole percentages adding up to 100.');
+  const automaticAIAssessments=Number(f.automaticAIAssessments);
+  if(!Number.isInteger(automaticAIAssessments)||automaticAIAssessments<0||automaticAIAssessments>24)
+   throw Error('AI assessments per discovery run must be a whole number from 0 to 24.');
+  return request('/api/settings',{method:'PATCH',body:JSON.stringify({ratingWeights:weights,automaticAIAssessments})});
+ });
+ const modal=$('.co-dialog');modal?.classList.add('co-dialog-settings');
+ let guideEditId=null;
+ const list=$('#reuse-guide-list');
+ const footer=$('.co-dialog-footer',modal);
+ const switchTab=tab=>{
+  const next=tab==='guides'?'guides':'assessment';
+  modal?.querySelectorAll?.('[data-settings-tab]')?.forEach?.(button=>{const active=button.dataset.settingsTab===next;button.classList.toggle('active',active);button.setAttribute('aria-selected',String(active));});
+  modal?.querySelectorAll?.('[data-settings-panel]')?.forEach?.(panel=>panel.hidden=panel.dataset.settingsPanel!==next);
+  if(footer)footer.hidden=next==='guides';
+ };
+ const parseMappings=value=>[...new Set(String(value||'').split(/[,\n]/).map(x=>x.trim().toLowerCase()).filter(Boolean))];
+ const replaceLocalGuide=guide=>{
+  const guides=data.settings.reuseGuides||[];const index=guides.findIndex(g=>g.id===guide.id);
+  if(index>=0)guides[index]=guide;else guides.push(guide);
+ };
+ const uploadGuideFile=async(id,file)=>{
+  if(!file)return;
+  if(!['image/jpeg','image/png','application/pdf'].includes(file.type))throw Error('Guide files must be JPEG, PNG or PDF.');
+  if(file.size>8*1024*1024)throw Error('Guide file must be 8 MB or smaller.');
+  const guide=await request('/api/reuse-guides/'+encodeURIComponent(id)+'/file',{method:'POST',headers:{'Content-Type':file.type,'X-File-Name':encodeURIComponent(file.name)},body:file});
+  replaceLocalGuide(guide);
+ };
+ const renderGuides=()=>{
+  if(!list)return;
+  const guides=data.settings.reuseGuides||[];
+  const editor=(g,isNew=false)=>`<div class="co-guide-editor" data-guide-editor="${esc(isNew?'new':g.id)}"><div class="co-field"><label>Guide Category Name</label><input data-guide-name value="${esc(g.name||'')}" maxlength="100"></div><div class="co-field"><label>Mapped Organisation Types</label><textarea data-guide-mappings rows="2" placeholder="community garden, garden">${esc((g.mappedCategories||[]).join(', '))}</textarea><span class="co-field-help">Comma-separated partner types. These mappings do not alter Discovery.</span></div>${isNew?'<div class="co-field"><label>Guide File <span class="co-optional">(optional)</span></label><input data-guide-file type="file" accept="image/jpeg,image/png,application/pdf"><span class="co-field-help">JPEG, PNG or PDF · max 8 MB</span></div>':''}<div class="co-guide-editor-actions">${!isNew?'<button type="button" class="co-text-danger" data-guide-action="delete" data-id="'+esc(g.id)+'">Delete Guide</button>':'<span></span>'}<div><button type="button" class="co-button alt small" data-guide-action="cancel">Cancel</button><button type="button" class="co-button small" data-guide-action="save" data-id="${esc(isNew?'':g.id)}">${isNew?'Add Guide':'Save'}</button></div></div></div>`;
+  const add=guideEditId==='new'?editor({name:'',mappedCategories:[]},true):'';
+  const rows=guides.map(g=>guideEditId===g.id?editor(g):`<div class="co-guide-row"><div class="co-guide-row-main"><strong>${esc(g.name)}</strong><span>${esc(guideCategoryText(g)||'No organisation types mapped')}</span><small>${g.asset?esc(g.asset.name||'Guide file'):'No guide file uploaded'}</small></div><div class="co-guide-row-actions">${g.asset?`<a class="co-button alt small" href="/guides/${encodeURIComponent(g.id)}" target="_blank" rel="noopener">View</a>`:''}<button type="button" class="co-button alt small" data-guide-action="replace" data-id="${esc(g.id)}">${g.asset?'Replace':'Upload'}</button><button type="button" class="co-button alt small" data-guide-action="edit" data-id="${esc(g.id)}">Edit</button></div></div>`).join('');
+  list.innerHTML=add+(rows||'<p class="co-empty">No reuse guides configured.</p>');
+ };
+ const updateWeightTotal=()=>{
+  const total=['Suitability','Evidence','Intake','Proximity'].reduce((sum,key)=>sum+Number($('#f-weight'+key)?.value||0),0);
+  const output=$('#assessment-weight-total');if(output){output.value=total+'/100%';output.textContent=total+'/100%';output.classList.toggle('co-invalid',total!==100);}
+ };
+ modal?.querySelectorAll?.('[data-settings-tab]')?.forEach?.(button=>button.addEventListener('click',()=>switchTab(button.dataset.settingsTab)));
+ for(const key of ['Suitability','Evidence','Intake','Proximity'])$('#f-weight'+key)?.addEventListener('input',updateWeightTotal);
+ updateWeightTotal();
+ $('#reset-assessment-settings')?.addEventListener('click',()=>{
+  const defaults={weightSuitability:40,weightEvidence:25,weightIntake:20,weightProximity:15,automaticAIAssessments:24};
+  for(const [name,value] of Object.entries(defaults)){const input=name==='automaticAIAssessments'?$('#assessment-budget'):$('#f-'+name);if(input)input.value=value;}
+  updateWeightTotal();
+ });
+ $('#add-reuse-guide')?.addEventListener('click',()=>{guideEditId='new';renderGuides();list?.querySelector?.('[data-guide-name]')?.focus?.();});
+ list?.addEventListener('click',async e=>{
+  const button=e.target.closest?.('[data-guide-action]');if(!button)return;
+  const action=button.dataset.guideAction,id=button.dataset.id;
+  if(action==='cancel'){guideEditId=null;renderGuides();return;}
+  if(action==='edit'){guideEditId=id;renderGuides();return;}
+  if(action==='replace'){
+   const input=document.createElement('input');input.type='file';input.accept='image/jpeg,image/png,application/pdf';
+   input.addEventListener('change',async()=>{try{await uploadGuideFile(id,input.files?.[0]);renderGuides();notice('Reuse guide updated.');}catch(err){notice(err.message,'error');}});
+   input.click();return;
+  }
+  if(action==='delete'){
+   const guide=(data.settings.reuseGuides||[]).find(g=>g.id===id);if(!guide||!confirm('Delete "'+guide.name+'"? Partners mapped to it will no longer show a guide.'))return;
+   try{await request('/api/reuse-guides/'+encodeURIComponent(id),{method:'DELETE'});data.settings.reuseGuides=(data.settings.reuseGuides||[]).filter(g=>g.id!==id);guideEditId=null;renderGuides();render();notice('Reuse guide deleted.');}catch(err){notice(err.message,'error');}
+   return;
+  }
+  if(action==='save'){
+   const editorNode=button.closest?.('.co-guide-editor');const name=editorNode?.querySelector?.('[data-guide-name]')?.value?.trim()||'',mappings=parseMappings(editorNode?.querySelector?.('[data-guide-mappings]')?.value);
+   if(!name){notice('Guide category name is required.','error');return;}
+   button.disabled=true;
+   try{
+    if(guideEditId==='new'){
+     const guide=await request('/api/reuse-guides',{method:'POST',body:JSON.stringify({name,mappedCategories:mappings})});replaceLocalGuide(guide);
+     const file=editorNode?.querySelector?.('[data-guide-file]')?.files?.[0];if(file)await uploadGuideFile(guide.id,file);
+    }else{
+     const guide=await request('/api/reuse-guides/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({name,mappedCategories:mappings})});replaceLocalGuide(guide);
+    }
+    guideEditId=null;renderGuides();render();notice('Reuse guide settings saved.');
+   }catch(err){notice(err.message,'error');button.disabled=false;}
+  }
+ });
+ renderGuides();switchTab(initialTab);
+}
 async function handleAction(el){const action=el.dataset.action;
  if(action==='close-dialog'){closeDialog();return;}
  if(action==='handover-select'){openHandoverPicker();return;}
@@ -838,43 +926,8 @@ async function handleAction(el){const action=el.dataset.action;
  if(action==='edit'){editPartner(partner(el.dataset.id));return;}
  if(action==='settings'){const settings=data.settings;const ref=data.sponsorReference;const refHtml=ref?'<details class="co-source-evidence"><summary>CoffeeBot Reference Volumes</summary><p>Estimated total beverages per month:</p><p>'+ref.locations.map(x=>esc(x.location)+': '+m(x.minCups)+(x.maxCups!==x.minCups?'–'+m(x.maxCups):'')).join(' · ')+'</p></details>':'';const html=`<div class="co-field-row">${formField('Total Beverages per Week','cupsPerWeek',settings.cupsPerWeek,'number')}${formField('Coffee-Based Beverages (%)','coffeeSharePercent',settings.coffeeSharePercent??60,'number')}</div>${formField('Grounds per Coffee (g)','gramsPerCup',settings.gramsPerCup,'number')}${refHtml}`;dialog('Edit Forecast',html,async f=>request('/api/settings',{method:'PATCH',body:JSON.stringify(f)}));return;}
 
- if(action==='assessment-settings'){
-  const w=data.settings.ratingWeights||{suitability:40,evidence:25,intake:20,proximity:15};
-  const weightRows=[
-   ['Reuse Suitability','weightSuitability',w.suitability],
-   ['Organisation-Specific Evidence','weightEvidence',w.evidence],
-   ['Potential Intake Scale','weightIntake',w.intake],
-   ['HQ Proximity','weightProximity',w.proximity]
-  ];
-  const rows=weightRows.map(([label,key,value])=>`<div class="co-assessment-weight-row"><label for="f-${key}">${label}</label><div class="co-assessment-weight-input"><input id="f-${key}" name="${key}" type="number" min="0" max="100" step="1" value="${esc(value)}" aria-describedby="assessment-weight-total"><span>%</span></div></div>`).join('');
-  const html=`<div class="co-assessment-weight-list">${rows}<div class="co-assessment-total"><strong>Total</strong><output id="assessment-weight-total" aria-live="polite">100/100%</output></div></div>`+
-    '<div class="co-assessment-controls"><div class="co-field co-assessment-budget"><label for="assessment-budget">AI Assessments per Discovery Run</label><div class="co-assessment-budget-control"><input id="assessment-budget" name="automaticAIAssessments" type="number" min="0" max="24" step="1" value="'+esc(data.settings.automaticAIAssessments??24)+'"><span class="co-assessment-budget-note">0–24 Partners</span></div></div><button type="button" class="co-button alt small" id="reset-assessment-settings">Reset to Default Settings</button></div>';
-  dialog('Assessment Settings',html,async f=>{
-   const weights={suitability:Number(f.weightSuitability),evidence:Number(f.weightEvidence),intake:Number(f.weightIntake),proximity:Number(f.weightProximity)};
-   if(Object.values(weights).some(v=>!Number.isInteger(v)||v<0||v>100)||Object.values(weights).reduce((a,b)=>a+b,0)!==100)
-    throw Error('Rating weights must be whole percentages adding up to 100.');
-   const automaticAIAssessments=Number(f.automaticAIAssessments);
-   if(!Number.isInteger(automaticAIAssessments)||automaticAIAssessments<0||automaticAIAssessments>24)
-    throw Error('AI assessments per discovery run must be a whole number from 0 to 24.');
-   return request('/api/settings',{method:'PATCH',body:JSON.stringify({ratingWeights:weights,automaticAIAssessments})});
-  });
-  $('.co-dialog')?.classList.add('co-dialog-assessment');
-  const updateWeightTotal=()=>{
-   const total=['Suitability','Evidence','Intake','Proximity'].reduce((sum,key)=>sum+Number($('#f-weight'+key)?.value||0),0);
-   const output=$('#assessment-weight-total');if(output){output.value=total+'/100%';output.textContent=total+'/100%';output.classList.toggle('co-invalid',total!==100);}
-  };
-  for(const key of ['Suitability','Evidence','Intake','Proximity'])$('#f-weight'+key)?.addEventListener('input',updateWeightTotal);
-  updateWeightTotal();
-  $('#reset-assessment-settings')?.addEventListener('click',()=>{
-   const defaults={weightSuitability:40,weightEvidence:25,weightIntake:20,weightProximity:15,automaticAIAssessments:24};
-   for(const [name,value] of Object.entries(defaults)){
-    const input=name==='automaticAIAssessments'?$('#assessment-budget'):$('#f-'+name);
-    if(input)input.value=value;
-   }
-   updateWeightTotal();
-  });
-  return;
- }   if(action==='research-contact'){
+ if(action==='app-settings'){openSettingsDialog('assessment');return;}
+   if(action==='research-contact'){
    const p=partner(el.dataset.id);if(!p)return;
    const webSearch='https://www.google.com/search?q='+encodeURIComponent(p.name+' official contact Singapore');
    const html='<div class="co-field"><label for="contact-website">Organisation Website <span class="co-required" aria-label="required">*</span></label><input id="contact-website" name="websiteUrl" type="url" placeholder="https://example.org" value="'+esc(p.websiteUrl||'')+'" required autocomplete="off"></div><p class="co-note">Only published contact details are saved; contact does not imply acceptance.</p><a href="'+esc(webSearch)+'" target="_blank" rel="noopener noreferrer">Search for the organisation’s website ↗</a>';

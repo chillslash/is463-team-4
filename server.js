@@ -3,12 +3,12 @@ import {outreachReuseIdea,cleanOutreachText,isConciseFirstEmail} from './src/out
 import {activeEvidenceReview,hasCurrentSpecificEvidence,hasRecentEvidenceFailure,evidenceFingerprint,evidencePrompt,validateEvidenceAssessments,diagnoseEvidenceAssessments,evidenceAssessmentSchema} from './src/evidence-review.js';
 import {selectSourceBalanced} from './src/assessment-selection.js';
 import {createServer} from 'node:http';
-import {readFile, writeFile, rename, mkdir, stat} from 'node:fs/promises';
+import {readFile, writeFile, rename, mkdir, stat, unlink} from 'node:fs/promises';
 import {existsSync} from 'node:fs';
 import {loadEnvFile} from 'node:process';
 import {join, resolve, extname} from 'node:path';
 import {randomUUID,createHash} from 'node:crypto';
-import {initialState, numbers, rankPartners, distanceKm, draftTemplate, OUTREACH_SUBJECT, suggestedReuse, outreachSalutation, proposedReuseContext, RESPONSE_STATUSES, ACTIVITY_OUTCOMES, LEGACY_ACTIVITY_OUTCOMES, STATUSES, AI_RUBRIC_VERSION, hasAIFit, validRatingWeights, migrateSponsorAssumptions, COFFEEBOT_MONTHLY_CUP_VOLUMES, SPONSOR_MONTHLY_CUPS, enrichDemoProfiles, DEMO_ACTIVITY, LEGACY_DEMO_NOTES, LEGACY_SEEDED_PARTNER_NOTES} from './src/core.js';
+import {initialState, numbers, rankPartners, distanceKm, draftTemplate, OUTREACH_SUBJECT, suggestedReuse, outreachSalutation, proposedReuseContext, RESPONSE_STATUSES, ACTIVITY_OUTCOMES, LEGACY_ACTIVITY_OUTCOMES, STATUSES, AI_RUBRIC_VERSION, hasAIFit, validRatingWeights, migrateSponsorAssumptions, COFFEEBOT_MONTHLY_CUP_VOLUMES, SPONSOR_MONTHLY_CUPS, enrichDemoProfiles, DEMO_ACTIVITY, LEGACY_DEMO_NOTES, LEGACY_SEEDED_PARTNER_NOTES, defaultReuseGuides} from './src/core.js';
 import {generateJSON,validateDraft,validateActivitySuggestion,ensureCoffeeBotSubject} from './src/ai.js';
 import {discoverAll} from './src/discovery.js';
 import {resolveLocations,postalCoordinates} from './src/geocode.js';
@@ -21,6 +21,7 @@ const ROOT=process.cwd();
 const localConfig=join(ROOT,'.env');
 if(existsSync(localConfig))loadEnvFile(localConfig);
 const DB_PATH=process.env.DATA_FILE || join(ROOT,'data','state.json');
+const GUIDE_UPLOAD_DIR=process.env.REUSE_GUIDE_DIR || join(resolve(DB_PATH,'..'),'reuse-guides');
 const PORT=Number(process.env.PORT || 4173);
 const FOLLOWUP_SUBJECT='CoffeeBot | Spent Coffee Grounds Reuse Follow-Up';
 const AI_PROVIDER=process.env.AI_PROVIDER==='template'?'template':(process.env.ANTHROPIC_API_KEY||process.env.CLAUDE_API_KEY)?'claude':'template';
@@ -50,7 +51,13 @@ let discoveryController=null;
 const stoppedError=()=>Object.assign(new Error('Discovery stopped; changes discarded'),{status:409,code:'DISCOVERY_STOPPED'});
 const digest=v=>createHash('sha256').update(JSON.stringify(v)).digest('hex');
 const ROUTES={'/':'this_week','/dashboard':'this_week','/this-week':'this_week','/find-partners':'find_partners','/outreach':'outreach_draft','/pipeline':'manage_partners','/manage-partners':'manage_partners','/partner':'partner'};
-const FILE_TYPES={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8','.md':'text/markdown; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg'};
+const FILE_TYPES={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8','.md':'text/markdown; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.pdf':'application/pdf'};
+const GUIDE_MIME_EXT={'image/jpeg':'.jpg','image/png':'.png','application/pdf':'.pdf'};
+const GUIDE_ID=/^[a-z0-9][a-z0-9-]{0,79}$/;
+const normaliseCategory=v=>String(v||'').trim().toLowerCase().replace(/\s+/g,' ');
+const mappedCategories=v=>{if(!Array.isArray(v))fail('Mapped organisation types must be a list');const values=[...new Set(v.map(normaliseCategory).filter(Boolean))];if(values.length>30||values.some(x=>x.length>80))fail('Mapped organisation types are invalid');return values;};
+const ensureGuideMappingsAvailable=(guides,id,categories)=>{for(const category of categories){const conflict=(guides||[]).find(g=>g.id!==id&&(g.mappedCategories||[]).includes(category));if(conflict)fail('Organisation type "'+category+'" is already mapped to '+conflict.name);}};
+const normaliseGuideList=v=>Array.isArray(v)?v.filter(g=>g&&GUIDE_ID.test(String(g.id||''))&&String(g.name||'').trim()).map(g=>({id:String(g.id),name:String(g.name).trim().slice(0,100),mappedCategories:[...new Set((Array.isArray(g.mappedCategories)?g.mappedCategories:[]).map(normaliseCategory).filter(Boolean))].slice(0,30),asset:g.asset&&['bundled','uploaded'].includes(g.asset.type)&&typeof g.asset.file==='string'&&/^[a-zA-Z0-9._-]+$/.test(g.asset.file)&&GUIDE_MIME_EXT[g.asset.mimeType]?{type:g.asset.type,file:g.asset.file,mimeType:g.asset.mimeType,name:String(g.asset.name||g.asset.file).slice(0,180)}:null})):defaultReuseGuides();
 let serial=Promise.resolve();
 function appendAILog(state,log){state.aiActivity??=[];state.aiActivity.unshift(log);state.aiActivity=state.aiActivity.slice(0,200);}
 export function cleanGeneratedReuseClaims(partners){
@@ -92,7 +99,7 @@ async function readState(){if(!existsSync(DB_PATH)){
  const seed=initialState();
  if(PRODUCTION){seed.demo=false;seed.partners=[];seed.partnerActivity=[];}
  await store(seed);return seed;
-}const s=JSON.parse(await readFile(DB_PATH,'utf8'));const defaults=initialState().settings;migrateSponsorAssumptions(s);if(!Number.isInteger(s.settings.automaticAIAssessments)||s.settings.automaticAIAssessments<0||s.settings.automaticAIAssessments>24)s.settings.automaticAIAssessments=defaults.automaticAIAssessments;if(!validRatingWeights(s.settings.ratingWeights))s.settings.ratingWeights={...defaults.ratingWeights};delete s.settings.reportingCollectedKg;delete s.settings.reportingDiscardedKg;for(const field of ['referenceLat','referenceLon','referenceLabel'])s.settings[field]=defaults[field];delete s.settings.aiProvider;s.discoveryRuns??=[];s.aiActivity??=[];s.partnerActivity??=[];
+}const s=JSON.parse(await readFile(DB_PATH,'utf8'));const defaults=initialState().settings;migrateSponsorAssumptions(s);s.settings??={...defaults};s.settings.reuseGuides=Object.hasOwn(s.settings,'reuseGuides')?normaliseGuideList(s.settings.reuseGuides):defaultReuseGuides();if(!Number.isInteger(s.settings.automaticAIAssessments)||s.settings.automaticAIAssessments<0||s.settings.automaticAIAssessments>24)s.settings.automaticAIAssessments=defaults.automaticAIAssessments;if(!validRatingWeights(s.settings.ratingWeights))s.settings.ratingWeights={...defaults.ratingWeights};delete s.settings.reportingCollectedKg;delete s.settings.reportingDiscardedKg;for(const field of ['referenceLat','referenceLon','referenceLabel'])s.settings[field]=defaults[field];delete s.settings.aiProvider;s.discoveryRuns??=[];s.aiActivity??=[];s.partnerActivity??=[];
  if(s.demoProfilesVersion!==2){
   enrichDemoProfiles(s.partners);
   const previouslyActive=new Set(s.partnerActivity.map(x=>x.partnerId));
@@ -122,6 +129,7 @@ async function store(v){await mkdir(resolve(DB_PATH,'..'),{recursive:true});cons
 function mutation(fn,{signal,guard}={}){const next=serial.catch(()=>{}).then(async()=>{signal?.throwIfAborted();let s=await readState();signal?.throwIfAborted();const value=await fn(s);signal?.throwIfAborted();if(guard)guard.committing=true;await store(s);return value;});serial=next;return next;}
 function response(res,status,value){const body=JSON.stringify(value);res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Content-Length':Buffer.byteLength(body),'Cache-Control':'no-store'});res.end(body);}
 async function input(req){let txt='';for await (const chunk of req){txt+=chunk;if(txt.length>150000)throw Object.assign(new Error('Request too large'),{status:413});}try{return txt?JSON.parse(txt):{};}catch{throw Object.assign(new Error('Invalid JSON'),{status:400});}}
+async function binaryInput(req,max=8*1024*1024){let size=0;const chunks=[];for await(const chunk of req){size+=chunk.length;if(size>max)throw Object.assign(new Error('Guide file must be 8 MB or smaller'),{status:413});chunks.push(chunk);}if(!size)fail('Choose a guide file to upload');return Buffer.concat(chunks);}
 function fail(msg){throw Object.assign(new Error(msg),{status:400});}
 const cleanString=(v,n=300)=>String(v ?? '').trim().slice(0,n);
 const contactSearchOutcome=r=>r.email?'email-found':r.contactPageUrl?'contact-page':r.pagesRead===0&&r.tried>0?'unavailable':'not-found';
@@ -522,6 +530,33 @@ export function createApp({aiProvider=AI_PROVIDER,assessmentGenerator=generateJS
     if(Object.hasOwn(v,'automaticAIAssessments')){if(!Number.isInteger(v.automaticAIAssessments)||v.automaticAIAssessments<0||v.automaticAIAssessments>24)fail('AI assessment limit must be a whole number from 0 to 24');s.settings.automaticAIAssessments=v.automaticAIAssessments;}
     return s.settings;});return response(res,200,changed);
   }
+  if(path==='/api/reuse-guides'&&req.method==='POST'){
+   const v=await input(req),name=cleanString(v.name,100);if(!name)fail('Guide category name is required');const categories=mappedCategories(v.mappedCategories||[]);
+   const id='guide-'+randomUUID().replace(/-/g,'').slice(0,12);
+   const guide=await mutation(s=>{s.settings.reuseGuides??=[];ensureGuideMappingsAvailable(s.settings.reuseGuides,id,categories);const item={id,name,mappedCategories:categories,asset:null};s.settings.reuseGuides.push(item);return item;});
+   return response(res,201,guide);
+  }
+  const guideApi=path.match(/^\/api\/reuse-guides\/([a-z0-9][a-z0-9-]{0,79})$/);
+  if(guideApi&&req.method==='PATCH'){
+   const v=await input(req),guide=await mutation(s=>{const item=(s.settings.reuseGuides||[]).find(g=>g.id===guideApi[1]);if(!item)throw Object.assign(new Error('Reuse guide not found'),{status:404});if(Object.hasOwn(v,'name')){const name=cleanString(v.name,100);if(!name)fail('Guide category name is required');item.name=name;}if(Object.hasOwn(v,'mappedCategories')){const categories=mappedCategories(v.mappedCategories);ensureGuideMappingsAvailable(s.settings.reuseGuides,item.id,categories);item.mappedCategories=categories;}return item;});
+   return response(res,200,guide);
+  }
+  if(guideApi&&req.method==='DELETE'){
+   let oldAsset=null;const result=await mutation(s=>{const guides=s.settings.reuseGuides||[],index=guides.findIndex(g=>g.id===guideApi[1]);if(index<0)throw Object.assign(new Error('Reuse guide not found'),{status:404});oldAsset=guides[index].asset;guides.splice(index,1);return {deleted:true,id:guideApi[1]};});
+   if(oldAsset?.type==='uploaded')await unlink(join(GUIDE_UPLOAD_DIR,oldAsset.file)).catch(()=>{});
+   return response(res,200,result);
+  }
+  const guideUpload=path.match(/^\/api\/reuse-guides\/([a-z0-9][a-z0-9-]{0,79})\/file$/);
+  if(guideUpload&&req.method==='POST'){
+   const mime=String(req.headers['content-type']||'').split(';')[0].trim().toLowerCase(),ext=GUIDE_MIME_EXT[mime];if(!ext)fail('Guide files must be JPEG, PNG or PDF');
+   const bytes=await binaryInput(req),rawName=String(req.headers['x-file-name']||'');let displayName='reuse-guide'+ext;try{displayName=decodeURIComponent(rawName)||displayName;}catch{}displayName=displayName.replace(/[\r\n]/g,'').slice(0,180);
+   const stored=guideUpload[1]+'-'+randomUUID()+ext;await mkdir(GUIDE_UPLOAD_DIR,{recursive:true});await writeFile(join(GUIDE_UPLOAD_DIR,stored),bytes);
+   let oldAsset=null,guide;
+   try{guide=await mutation(s=>{const item=(s.settings.reuseGuides||[]).find(g=>g.id===guideUpload[1]);if(!item)throw Object.assign(new Error('Reuse guide not found'),{status:404});oldAsset=item.asset;item.asset={type:'uploaded',file:stored,mimeType:mime,name:displayName};return item;});}
+   catch(err){await unlink(join(GUIDE_UPLOAD_DIR,stored)).catch(()=>{});throw err;}
+   if(oldAsset?.type==='uploaded')await unlink(join(GUIDE_UPLOAD_DIR,oldAsset.file)).catch(()=>{});
+   return response(res,200,guide);
+  }
   if(path==='/api/discovery-status'&&req.method==='GET')return response(res,200,discoveryStatus);
   if(path==='/api/discovery/stop'&&req.method==='POST'){
    if(!discoveryController||!discoveryStatus.active)return response(res,409,{error:'No discovery is running'});
@@ -885,12 +920,19 @@ export function createApp({aiProvider=AI_PROVIDER,assessmentGenerator=generateJS
    res.writeHead(302,{Location:id?'/partner?partner='+encodeURIComponent(id):'/manage-partners','Cache-Control':'no-store'});res.end();return;
   }
 
-  let file;
-  if(Object.hasOwn(ROUTES,path))file=join(ROOT,'public',ROUTES[path]+'.html');
+  let file,contentType,downloadName;
+  const guideView=path.match(/^\/guides\/([a-z0-9][a-z0-9-]{0,79})$/);
+  if(guideView){
+   const state=await readState(),guide=(state.settings.reuseGuides||[]).find(g=>g.id===guideView[1]);if(!guide?.asset)return response(res,404,{error:'Reuse guide not found'});
+   file=guide.asset.type==='bundled'?join(ROOT,'public','guides',guide.asset.file):join(GUIDE_UPLOAD_DIR,guide.asset.file);
+   contentType=guide.asset.mimeType;downloadName=guide.asset.name||('reuse-guide'+GUIDE_MIME_EXT[contentType]);
+  }else if(Object.hasOwn(ROUTES,path))file=join(ROOT,'public',ROUTES[path]+'.html');
   else if(/^\/(app\.js|app\.css)$/.test(path))file=join(ROOT,'public',path.slice(1));
   else if(/^\/guides\/(?:schools-educational-institutions|community-gardens|farms-growers|landscaping-horticulture|food-waste-material-recovery)\.jpg$/.test(path))file=join(ROOT,'public',path.slice(1));
   else return response(res,404,{error:'Not found'});
-  const blob=await readFile(file);res.writeHead(200,{'Content-Type':FILE_TYPES[extname(file)]||'application/octet-stream','Cache-Control':'no-cache','X-Content-Type-Options':'nosniff'});res.end(blob);
+  const blob=await readFile(file),headers={'Content-Type':contentType||FILE_TYPES[extname(file)]||'application/octet-stream','Cache-Control':'no-cache','X-Content-Type-Options':'nosniff'};
+  if(guideView&&url.searchParams.get('download')==='1')headers['Content-Disposition']="attachment; filename*=UTF-8''"+encodeURIComponent(downloadName);
+  res.writeHead(200,headers);res.end(blob);
  }catch(err){response(res,err.status||500,{error:err.message||'Server error'});}
  });}
 if(process.argv[1] && resolve(process.argv[1])===resolve(new URL(import.meta.url).pathname.replace(/^\/(\w:)\//,'$1/'))){createApp({websiteResearchGenerator:generateJSON}).listen(PORT,()=>console.log(`Circularity Copilot http://localhost:${PORT}`));}
