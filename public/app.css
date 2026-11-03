@@ -322,6 +322,16 @@ body>aside nav a[aria-current="page"]{font-size:14px!important;line-height:1.35!
 .co-outreach-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:20px;flex-wrap:wrap}
 .co-outreach-actions-left{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .co-outreach-actions .co-button{min-width:133px}
+.co-outreach-guide{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:16px 0 2px;padding:14px 16px;border:1px solid #d8e6db;border-radius:9px;background:#f8fbf8}
+.co-outreach-guide-copy{display:flex;align-items:center;gap:11px;min-width:0}
+.co-outreach-guide-copy>.material-symbols-outlined{font-size:21px;color:#4f7b5a}
+.co-outreach-guide-copy>div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.co-outreach-guide-copy strong{font-size:13px;color:var(--forest)}
+.co-outreach-guide-copy span{font-size:12px;color:var(--sub);line-height:1.4}
+.co-outreach-guide-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.co-outreach-guide-actions .co-button{min-width:auto;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.co-outreach-guide-actions .material-symbols-outlined{font-size:17px}
+@media(max-width:680px){.co-outreach-guide{align-items:flex-start;flex-direction:column}.co-outreach-guide-actions{width:100%}.co-outreach-guide-actions .co-button{flex:1;justify-content:center}}
 .co-partner-combobox{position:relative}
 .co-combobox-control{position:relative}
 .co-combobox-control input{padding-right:50px!important}

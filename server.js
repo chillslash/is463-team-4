@@ -50,7 +50,7 @@ let discoveryController=null;
 const stoppedError=()=>Object.assign(new Error('Discovery stopped; changes discarded'),{status:409,code:'DISCOVERY_STOPPED'});
 const digest=v=>createHash('sha256').update(JSON.stringify(v)).digest('hex');
 const ROUTES={'/':'this_week','/dashboard':'this_week','/this-week':'this_week','/find-partners':'find_partners','/outreach':'outreach_draft','/pipeline':'manage_partners','/manage-partners':'manage_partners','/partner':'partner'};
-const FILE_TYPES={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8','.md':'text/markdown; charset=utf-8','.png':'image/png'};
+const FILE_TYPES={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8','.md':'text/markdown; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg'};
 let serial=Promise.resolve();
 function appendAILog(state,log){state.aiActivity??=[];state.aiActivity.unshift(log);state.aiActivity=state.aiActivity.slice(0,200);}
 export function cleanGeneratedReuseClaims(partners){
@@ -888,6 +888,7 @@ export function createApp({aiProvider=AI_PROVIDER,assessmentGenerator=generateJS
   let file;
   if(Object.hasOwn(ROUTES,path))file=join(ROOT,'public',ROUTES[path]+'.html');
   else if(/^\/(app\.js|app\.css)$/.test(path))file=join(ROOT,'public',path.slice(1));
+  else if(/^\/guides\/(?:schools-educational-institutions|community-gardens|farms-growers|landscaping-horticulture|food-waste-material-recovery)\.jpg$/.test(path))file=join(ROOT,'public',path.slice(1));
   else return response(res,404,{error:'Not found'});
   const blob=await readFile(file);res.writeHead(200,{'Content-Type':FILE_TYPES[extname(file)]||'application/octet-stream','Cache-Control':'no-cache','X-Content-Type-Options':'nosniff'});res.end(blob);
  }catch(err){response(res,err.status||500,{error:err.message||'Server error'});}

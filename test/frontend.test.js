@@ -87,9 +87,9 @@ test('draft guidance is ghost text with recipient and subject copy controls',asy
  assert.ok(!root.innerHTML.includes('□'));
 });
 
-test('outreach is a single email with no guide annex',async()=>{
+test('outreach remains one email while exposing the matching static category guide',async()=>{
  const {root}=await boot('/outreach','?partner=p0');
- for(const required of ['id="draft-body"','data-action="generate"','data-action="copy"'])
+ for(const required of ['id="draft-body"','data-action="generate"','data-action="copy"','View Guide','Download Guide','/guides/community-gardens.jpg'])
   assert.ok(root.innerHTML.includes(required),required);
  for(const removed of ['reuse-guide-container','co-guide-section','data-action="guide-copy"'])
   assert.ok(!root.innerHTML.includes(removed),removed);

@@ -67,6 +67,28 @@ const ACTIVITY_OUTCOME_LABELS={
 const activityOutcomeLabel=outcome=>ACTIVITY_OUTCOME_LABELS[outcome]||titleCase(String(outcome||'').replaceAll('-',' '));
 const titleCase=s=>String(s||'').replace(/\b[a-z][a-z']*/gi,w=>({hq:'HQ',ai:'AI',id:'ID',kg:'kg',api:'API'}[w.toLowerCase()]||w[0].toUpperCase()+w.slice(1)));
 const stageLabel=s=>String(s||'').toLowerCase()==='trial'?'Pilot':titleCase(s);
+const REUSE_GUIDES=[
+ {key:'education',label:'Schools & Educational Institutions',file:'schools-educational-institutions.jpg'},
+ {key:'community',label:'Community Gardens',file:'community-gardens.jpg'},
+ {key:'farm',label:'Farms & Growers',file:'farms-growers.jpg'},
+ {key:'horticulture',label:'Landscaping & Horticulture Organisations',file:'landscaping-horticulture.jpg'},
+ {key:'recovery',label:'Food Waste & Material Recovery Organisations',file:'food-waste-material-recovery.jpg'}
+];
+function reuseGuideFor(p){
+ const c=String(p?.category||'').toLowerCase(),n=String(p?.name||'').toLowerCase(),text=c+' '+n;
+ if(/(?:^|\s)(?:park|public park|zoo)(?:\s|$)/.test(c))return null;
+ const key=/school|education|polytechnic|university|college|institute of technical education/.test(text)?'education':
+  /organic waste recycler|food waste|material recovery|recycl|compost/.test(c)?'recovery':
+  /farm|grower|aquaculture/.test(c)?'farm':
+  /nursery|horticultur|landscap/.test(c)?'horticulture':
+  /community garden|garden/.test(c)?'community':null;
+ return key?REUSE_GUIDES.find(g=>g.key===key)||null:null;
+}
+function reuseGuidePanel(p){
+ const guide=reuseGuideFor(p);if(!guide)return '';
+ const href='/guides/'+guide.file;
+ return '<section class="co-outreach-guide" aria-label="Reuse guide"><div class="co-outreach-guide-copy"><span class="material-symbols-outlined" aria-hidden="true">menu_book</span><div><strong>Reuse Guide</strong><span>'+esc(guide.label)+'</span></div></div><div class="co-outreach-guide-actions"><a class="co-button alt small" href="'+href+'" target="_blank" rel="noopener"><span class="material-symbols-outlined" aria-hidden="true">visibility</span>View Guide</a><a class="co-button alt small" href="'+href+'" download="'+guide.file+'"><span class="material-symbols-outlined" aria-hidden="true">download</span>Download Guide</a></div></section>';
+}
 // Render legacy and current automatic stage changes consistently, without rewriting stored history.
 function activityDisplayText(text,type){
  const value=String(text||'');
@@ -278,6 +300,7 @@ function outreachView(){
   <div class="co-field"><div class="co-field-heading"><label for="draft-partner-search">Selected Partner</label><button type="button" class="co-button alt co-outreach-edit" data-action="edit" data-id="${esc(chosen.id)}"><span class="material-symbols-outlined" aria-hidden="true">edit</span>Edit Partner</button></div>
    <div class="co-partner-combobox"><div class="co-combobox-control"><input id="draft-partner-search" role="combobox" aria-autocomplete="list" aria-haspopup="listbox" aria-expanded="false" aria-controls="draft-partner-options" autocomplete="off" value="${esc(chosen.name)}" placeholder="Search Partners" ${isFollowUp?'readonly':''}><button type="button" class="co-combobox-toggle" data-action="draft-toggle" aria-label="Show partners" ${isFollowUp?'hidden':''} aria-controls="draft-partner-options"><span class="material-symbols-outlined" aria-hidden="true">expand_more</span></button></div><div class="co-partner-options" id="draft-partner-options" role="listbox" hidden></div></div>
   </div>
+  ${reuseGuidePanel(chosen)}
   ${contextPanel}<div class="co-outreach-fields">
   ${copyField('draft-recipient','Recipient',chosen.contactEmail||'','copy-recipient',false,true)}
   ${copyField('draft-subject','Subject',isFollowUp?'CoffeeBot | Spent Coffee Grounds Reuse Follow-Up':'CoffeeBot | Spent Coffee Grounds Reuse Partnership','copy-subject')}

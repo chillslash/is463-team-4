@@ -16,6 +16,21 @@ test('health and each HTML page loads',async()=>{
  const {data}=await call('/api/health');assert.equal(data.ok,true);
  for(const p of ['/dashboard','/this-week','/find-partners','/outreach','/pipeline','/manage-partners','/log-handover']){const r=await fetch(base+p);assert.equal(r.status,200);assert.match(await r.text(),/\/app.js/);}
 });
+test('static reuse guides are served as JPEGs',async()=>{
+ for(const file of ['schools-educational-institutions.jpg','community-gardens.jpg','farms-growers.jpg','landscaping-horticulture.jpg','food-waste-material-recovery.jpg']){
+  const r=await fetch(base+'/guides/'+file);
+  assert.equal(r.status,200,file);
+  assert.match(r.headers.get('content-type')||'',/^image\/jpeg/,file);
+  assert.ok((await r.arrayBuffer()).byteLength>1000,file);
+ }
+ assert.equal((await fetch(base+'/guides/not-a-guide.jpg')).status,404);
+});
+test('static category reuse guide is served as JPEG',async()=>{
+ const r=await fetch(base+'/guides/community-gardens.jpg');
+ assert.equal(r.status,200);
+ assert.match(r.headers.get('content-type')||'',/^image\/jpeg/);
+ assert.ok((await r.arrayBuffer()).byteLength>10000);
+});
 test('forecast settings, partner arrangements and handovers persist without certification',async()=>{
  let state=(await call('/api/state')).data;assert.equal(state.metrics.gapKg,1.6);assert.equal(state.settings.coffeeSharePercent,60);assert.deepEqual(state.sponsorReference.monthlyTotalCups,{min:3600,max:4200});assert.equal(state.sponsorReference.locations.length,5);
  assert.equal((await call('/api/settings','PATCH',{coffeeSharePercent:101})).status,400);
